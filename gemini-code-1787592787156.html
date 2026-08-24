@@ -1,0 +1,1384 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Nómina y RRHH</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        @media print {
+            body * { visibility: hidden !important; }
+            #area-impresion, #area-impresion *,
+            #area-impresion-recibos, #area-impresion-recibos * { visibility: visible !important; }
+            #area-impresion, #area-impresion-recibos {
+                position: absolute !important;
+                left: 0 !important;
+                top: 0 !important;
+                width: 100% !important;
+                color: #000 !important;
+                background: #fff !important;
+            }
+            #area-impresion table { color: #000 !important; border-collapse: collapse !important; width: 100% !important; }
+            #area-impresion th, #area-impresion td { border: 1px solid #ccc !important; padding: 6px !important; color: #000 !important; }
+            #area-impresion th { background-color: #f1f5f9 !important; }
+            .page-break { page-break-after: always; break-after: page; }
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans antialiased min-h-screen flex flex-col md:flex-row">
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-5 right-5 z-50 hidden px-4 py-3 rounded-lg text-xs font-semibold shadow-xl transition-all border"></div>
+
+    <!-- SIDEBAR -->
+    <aside class="w-full md:w-64 bg-slate-900 border-r border-slate-800 p-4 flex flex-col justify-between">
+        <div>
+            <div class="flex items-center space-x-3 px-2 py-3 border-b border-slate-800 mb-6">
+                <div class="bg-emerald-500/20 text-emerald-400 p-2 rounded-lg">
+                    <i class="fa-solid fa-file-invoice-dollar text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-sm tracking-wide text-white">NóminaApp</h1>
+                    <p class="text-xs text-slate-400">Control de Pagos & RRHH</p>
+                </div>
+            </div>
+
+            <!-- MENÚ ORDENADO -->
+            <nav class="space-y-1">
+                <button id="nav-dashboard" onclick="switchTab('dashboard')" class="tab-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-xs font-semibold bg-slate-800 text-sky-400 border border-slate-700">
+                    <i class="fa-solid fa-chart-pie w-5 text-center"></i>
+                    <span>Dashboard</span>
+                </button>
+                <button id="nav-departamentos" onclick="switchTab('departamentos')" class="tab-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition">
+                    <i class="fa-solid fa-building w-5 text-center"></i>
+                    <span>Departamentos</span>
+                </button>
+                <button id="nav-cargos" onclick="switchTab('cargos')" class="tab-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition">
+                    <i class="fa-solid fa-briefcase w-5 text-center"></i>
+                    <span>Cargos</span>
+                </button>
+                <button id="nav-empleados" onclick="switchTab('empleados')" class="tab-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition">
+                    <i class="fa-solid fa-users w-5 text-center"></i>
+                    <span>Empleados</span>
+                </button>
+                <button id="nav-nomina" onclick="switchTab('nomina')" class="tab-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition">
+                    <i class="fa-solid fa-calculator w-5 text-center"></i>
+                    <span>Procesar Nómina</span>
+                </button>
+                <button id="nav-historico" onclick="switchTab('historico')" class="tab-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition">
+                    <i class="fa-solid fa-clock-rotate-left w-5 text-center"></i>
+                    <span>Nóminas Procesadas</span>
+                </button>
+            </nav>
+        </div>
+
+        <div class="pt-4 border-t border-slate-800 text-xs text-slate-500 flex justify-between items-center">
+            <span>Supabase Database</span>
+            <span class="inline-flex items-center text-emerald-400 text-[10px] font-semibold">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 mr-1.5 animate-pulse"></span> Online
+            </span>
+        </div>
+    </aside>
+
+    <!-- CONTENIDO PRINCIPAL -->
+    <main class="flex-1 p-6 space-y-6 overflow-y-auto">
+
+        <!-- HEADER SUPERIOR -->
+        <header class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-800 pb-4">
+            <div>
+                <h2 id="view-title" class="text-xl font-bold text-white">Panel de Control</h2>
+                <p id="view-desc" class="text-xs text-slate-400">Resumen general de sueldos, deducciones y personal activo</p>
+            </div>
+        </header>
+
+        <!-- DASHBOARD -->
+        <div id="tab-dashboard-content" class="tab-content space-y-6">
+            <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl">
+                    <div class="flex justify-between items-center text-slate-400 mb-2">
+                        <span class="text-xs font-medium">Nómina Total Mensual</span>
+                        <i class="fa-solid fa-dollar-sign text-emerald-400"></i>
+                    </div>
+                    <div class="text-2xl font-bold text-white" id="kpi-total-nomina">$0.00</div>
+                    <span class="text-[10px] text-emerald-400 mt-1 inline-block"><i class="fa-solid fa-calculator"></i> Personal activo</span>
+                </div>
+
+                <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl">
+                    <div class="flex justify-between items-center text-slate-400 mb-2">
+                        <span class="text-xs font-medium">Empleados Activos</span>
+                        <i class="fa-solid fa-user-group text-sky-400"></i>
+                    </div>
+                    <div class="text-2xl font-bold text-white" id="kpi-total-empleados">0</div>
+                    <span class="text-[10px] text-slate-400 mt-1 inline-block">Personal activo registrado</span>
+                </div>
+
+                <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl">
+                    <div class="flex justify-between items-center text-slate-400 mb-2">
+                        <span class="text-xs font-medium">Departamentos</span>
+                        <i class="fa-solid fa-building text-amber-400"></i>
+                    </div>
+                    <div class="text-2xl font-bold text-white" id="kpi-total-deptos">0</div>
+                    <span class="text-[10px] text-amber-400 mt-1 inline-block">Áreas configuradas</span>
+                </div>
+
+                <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl">
+                    <div class="flex justify-between items-center text-slate-400 mb-2">
+                        <span class="text-xs font-medium">Cargos Definidos</span>
+                        <i class="fa-solid fa-briefcase text-purple-400"></i>
+                    </div>
+                    <div class="text-2xl font-bold text-white" id="kpi-total-cargos">0</div>
+                    <span class="text-[10px] text-purple-400 mt-1 inline-block">Puestos de trabajo</span>
+                </div>
+            </section>
+        </div>
+
+        <!-- DEPARTAMENTOS -->
+        <div id="tab-departamentos-content" class="tab-content hidden space-y-6">
+            <section class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
+                <div class="p-4 border-b border-slate-800 flex justify-between items-center">
+                    <h3 class="font-bold text-sm text-white flex items-center">
+                        <i class="fa-solid fa-building text-amber-400 mr-2"></i> Gestión de Departamentos
+                    </h3>
+                    <button onclick="abrirCrearDepartamento()" class="bg-amber-600 hover:bg-amber-500 text-white text-xs px-3 py-1.5 rounded-lg font-semibold flex items-center space-x-1">
+                        <i class="fa-solid fa-plus"></i>
+                        <span>Nuevo Departamento</span>
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-slate-950 text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-800">
+                            <tr>
+                                <th class="p-3.5">ID</th>
+                                <th class="p-3.5">Nombre del Departamento</th>
+                                <th class="p-3.5 text-right">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-deptos-body" class="divide-y divide-slate-800/50"></tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+
+        <!-- CARGOS -->
+        <div id="tab-cargos-content" class="tab-content hidden space-y-6">
+            <section class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
+                <div class="p-4 border-b border-slate-800 flex justify-between items-center">
+                    <h3 class="font-bold text-sm text-white flex items-center">
+                        <i class="fa-solid fa-briefcase text-purple-400 mr-2"></i> Gestión de Cargos
+                    </h3>
+                    <button onclick="abrirCrearCargo()" class="bg-purple-600 hover:bg-purple-500 text-white text-xs px-3 py-1.5 rounded-lg font-semibold flex items-center space-x-1">
+                        <i class="fa-solid fa-plus"></i>
+                        <span>Nuevo Cargo</span>
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-slate-950 text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-800">
+                            <tr>
+                                <th class="p-3.5">ID</th>
+                                <th class="p-3.5">Nombre del Cargo</th>
+                                <th class="p-3.5 text-right">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-cargos-body" class="divide-y divide-slate-800/50"></tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+
+        <!-- EMPLEADOS -->
+        <div id="tab-empleados-content" class="tab-content hidden space-y-6">
+            <section class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
+                <div class="p-4 border-b border-slate-800 flex justify-between items-center">
+                    <h3 class="font-bold text-sm text-white flex items-center">
+                        <i class="fa-solid fa-users text-sky-400 mr-2"></i> Directorio de Personal
+                    </h3>
+                    <button onclick="abrirCrearEmpleado()" class="bg-sky-600 hover:bg-sky-500 text-white text-xs px-3.5 py-2 rounded-lg font-semibold flex items-center space-x-2 transition shadow-lg shadow-sky-600/20">
+                        <i class="fa-solid fa-user-plus"></i>
+                        <span>Nuevo Empleado</span>
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-slate-950 text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-800">
+                            <tr>
+                                <th class="p-3.5 text-center">Activo</th>
+                                <th class="p-3.5">F. Ingreso</th>
+                                <th class="p-3.5">Cédula</th>
+                                <th class="p-3.5">Nombre</th>
+                                <th class="p-3.5">Teléfono</th>
+                                <th class="p-3.5">Departamento</th>
+                                <th class="p-3.5">Cargo</th>
+                                <th class="p-3.5">Sueldo Base</th>
+                                <th class="p-3.5">Bono Alim.</th>
+                                <th class="p-3.5">Otros Ing.</th>
+                                <th class="p-3.5 text-right">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-empleados-body" class="divide-y divide-slate-800/50"></tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+
+        <!-- PROCESAR NÓMINA -->
+        <div id="tab-nomina-content" class="tab-content hidden space-y-6">
+            <section class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-xl space-y-4">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-950 p-4 rounded-lg border border-slate-800">
+                    <div class="flex flex-wrap items-center gap-4 w-full md:w-auto">
+                        <div>
+                            <label class="text-[11px] font-semibold text-slate-400 block mb-1">Salario Mínimo (Bs)</label>
+                            <input type="number" step="0.01" id="nom-salario-minimo" value="130.00" oninput="recalcularTodaLaNomina()" class="w-28 bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-emerald-500">
+                        </div>
+                        <div>
+                            <label class="text-[11px] font-semibold text-slate-400 block mb-1">Fecha de Pago Nómina</label>
+                            <input type="date" id="nom-fecha-proceso" class="bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-emerald-500">
+                        </div>
+                        <div>
+                            <label class="text-[11px] font-semibold text-slate-400 block mb-1">Tasa BCV (Bs/$)</label>
+                            <input type="number" step="0.01" id="nom-tasa-bcv" value="36.50" oninput="recalcularTodaLaNomina()" class="w-28 bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-emerald-500">
+                        </div>
+                    </div>
+                    <button onclick="procesarNominaGlobal()" class="w-full md:w-auto bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-5 py-2.5 rounded-lg font-bold flex items-center justify-center space-x-2 transition shadow-lg shadow-emerald-600/20">
+                        <i class="fa-solid fa-file-invoice-dollar"></i>
+                        <span>Procesar y Guardar Nómina</span>
+                    </button>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs whitespace-nowrap">
+                        <thead class="bg-slate-950 text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-800">
+                            <tr>
+                                <th class="p-3">Empleado</th>
+                                <th class="p-3">S. Integral ($)</th>
+                                <th class="p-3 text-center">Días Falt.</th>
+                                <th class="p-3">Otras Asig. ($)</th>
+                                <th class="p-3 text-center">Hrs. Desc.</th>
+                                <th class="p-3">Otros Desc. ($)</th>
+                                <th class="p-3">Adelantos ($)</th>
+                                <th class="p-3">Préstamos ($)</th>
+                                <th class="p-3">Desc. Ley ($)</th>
+                                <th class="p-3">Neto ($)</th>
+                                <th class="p-3">Neto (Bs)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-nomina-editable-body" class="divide-y divide-slate-800/50"></tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+
+        <!-- NÓMINAS PROCESADAS -->
+        <div id="tab-historico-content" class="tab-content hidden space-y-6">
+            <section class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
+                <div class="p-4 border-b border-slate-800 flex justify-between items-center">
+                    <h3 class="font-bold text-sm text-white flex items-center">
+                        <i class="fa-solid fa-clock-rotate-left text-sky-400 mr-2"></i> Histórico de Nóminas Procesadas
+                    </h3>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-slate-950 text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-800">
+                            <tr>
+                                <th class="p-3.5">Fecha de Pago</th>
+                                <th class="p-3.5 text-center">Empleados</th>
+                                <th class="p-3.5">Tasa BCV</th>
+                                <th class="p-3.5">Salario Mín. (Bs)</th>
+                                <th class="p-3.5">Total ($)</th>
+                                <th class="p-3.5">Total (Bs)</th>
+                                <th class="p-3.5 text-right">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-historico-body" class="divide-y divide-slate-800/50"></tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+
+    </main>
+
+    <!-- MODAL DESGLOSE -->
+    <div id="modal-detalle-nomina" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+        <div class="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-5xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+            <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-950">
+                <div>
+                    <h3 class="font-bold text-sm text-white flex items-center">
+                        <i class="fa-solid fa-receipt text-emerald-400 mr-2"></i> Desglose de Nómina - <span id="detalle-fecha-pago" class="ml-1 text-sky-400"></span>
+                    </h3>
+                    <p class="text-[11px] text-slate-400">Detalle empleado por empleado de asignaciones, deducciones y netos a pagar</p>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <button onclick="imprimirDesglose()" class="bg-sky-600 hover:bg-sky-500 text-white text-xs px-3 py-1.5 rounded-lg font-semibold flex items-center space-x-1 transition">
+                        <i class="fa-solid fa-print"></i>
+                        <span>Imprimir</span>
+                    </button>
+                    <button onclick="closeModal('modal-detalle-nomina')" class="text-slate-400 hover:text-white p-1">
+                        <i class="fa-solid fa-xmark text-base"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div id="area-impresion" class="p-4 overflow-y-auto space-y-4 text-slate-100">
+                <div class="hidden print:block mb-4 border-b pb-2">
+                    <h2 class="text-lg font-bold">Reporte General de Nómina</h2>
+                    <p class="text-xs">Fecha de Pago: <span id="print-fecha-pago"></span></p>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs whitespace-nowrap">
+                        <thead class="bg-slate-950 text-slate-400 uppercase text-[9px] tracking-wider border-b border-slate-800">
+                            <tr>
+                                <th class="p-2.5">Empleado</th>
+                                <th class="p-2.5">Cargo</th>
+                                <th class="p-2.5">S. Base ($)</th>
+                                <th class="p-2.5">Asignac. ($)</th>
+                                <th class="p-2.5">IVSS 4% ($)</th>
+                                <th class="p-2.5">RPE 0.5% ($)</th>
+                                <th class="p-2.5">FAOV 1% ($)</th>
+                                <th class="p-2.5">Otr. Desc ($)</th>
+                                <th class="p-2.5">Neto ($)</th>
+                                <th class="p-2.5">Neto (Bs)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-detalle-body" class="divide-y divide-slate-800/50"></tbody>
+                        <tfoot id="tabla-detalle-foot" class="bg-slate-950 font-bold border-t border-slate-700"></tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL RECIBOS DE PAGO FORMATO OFICIAL -->
+    <div id="modal-recibos-nomina" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+        <div class="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-4xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+            <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-950">
+                <div>
+                    <h3 class="font-bold text-sm text-white flex items-center">
+                        <i class="fa-solid fa-receipt text-emerald-400 mr-2"></i> Recibos de Pago - <span id="recibos-fecha-pago" class="ml-1 text-emerald-400"></span>
+                    </h3>
+                    <p class="text-[11px] text-slate-400">Formato oficial de recibo de pago listo para impresión</p>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <button onclick="imprimirRecibos()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3 py-1.5 rounded-lg font-semibold flex items-center space-x-1 transition">
+                        <i class="fa-solid fa-print"></i>
+                        <span>Imprimir Recibos</span>
+                    </button>
+                    <button onclick="closeModal('modal-recibos-nomina')" class="text-slate-400 hover:text-white p-1">
+                        <i class="fa-solid fa-xmark text-base"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div id="area-impresion-recibos" class="p-6 overflow-y-auto space-y-8 bg-slate-950 text-slate-900">
+                <!-- Se cargan dinámicamente -->
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL EMPLEADO -->
+    <div id="modal-empleado" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+        <div class="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-lg overflow-hidden shadow-2xl">
+            <div class="p-4 border-b border-slate-800 flex justify-between items-center">
+                <h3 id="modal-emp-titulo" class="font-bold text-sm text-white"><i class="fa-solid fa-user-plus text-sky-400 mr-2"></i> Registrar Empleado</h3>
+                <button onclick="closeModal('modal-empleado')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="p-4 space-y-3">
+                <input type="hidden" id="emp-id">
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-[11px] font-semibold text-slate-400 block mb-1">Fecha de Ingreso</label>
+                        <input type="date" id="emp-fecha" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white outline-none focus:border-sky-500">
+                    </div>
+                    <div>
+                        <label class="text-[11px] font-semibold text-slate-400 block mb-1">Cédula / Documento</label>
+                        <input type="text" id="emp-cedula" placeholder="Ej: V-12345678" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white outline-none focus:border-sky-500">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-[11px] font-semibold text-slate-400 block mb-1">Nombre Completo</label>
+                        <input type="text" id="emp-nombre" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white outline-none focus:border-sky-500">
+                    </div>
+                    <div>
+                        <label class="text-[11px] font-semibold text-slate-400 block mb-1">Teléfono</label>
+                        <input type="text" id="emp-telefono" placeholder="Ej: +58 412-0000000" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white outline-none focus:border-sky-500">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-[11px] font-semibold text-slate-400 block mb-1">Departamento</label>
+                        <select id="emp-depto-select" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white outline-none focus:border-sky-500">
+                            <option value="">-- Seleccionar --</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-[11px] font-semibold text-slate-400 block mb-1">Cargo</label>
+                        <select id="emp-cargo-select" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white outline-none focus:border-sky-500">
+                            <option value="">-- Seleccionar --</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-3 gap-3 pt-2 border-t border-slate-800">
+                    <div>
+                        <label class="text-[11px] font-semibold text-slate-400 block mb-1">Salario Base ($)</label>
+                        <input type="number" step="0.01" id="emp-sueldo" value="0.00" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white outline-none focus:border-sky-500">
+                    </div>
+                    <div>
+                        <label class="text-[11px] font-semibold text-slate-400 block mb-1">Bono Alimentación ($)</label>
+                        <input type="number" step="0.01" id="emp-bono-alim" value="0.00" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white outline-none focus:border-sky-500">
+                    </div>
+                    <div>
+                        <label class="text-[11px] font-semibold text-slate-400 block mb-1">Otros Ingresos ($)</label>
+                        <input type="number" step="0.01" id="emp-otros-ing" value="0.00" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white outline-none focus:border-sky-500">
+                    </div>
+                </div>
+                <div class="flex items-center space-x-2 pt-2">
+                    <input type="checkbox" id="emp-activo" class="rounded bg-slate-950 border-slate-800 text-sky-500 focus:ring-sky-500 w-4 h-4 cursor-pointer" checked>
+                    <label for="emp-activo" class="text-xs text-slate-300 font-medium cursor-pointer">Empleado Activo</label>
+                </div>
+            </div>
+            <div class="p-4 border-t border-slate-800 bg-slate-950/50 flex justify-end space-x-2">
+                <button onclick="closeModal('modal-empleado')" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:bg-slate-800">Cancelar</button>
+                <button onclick="guardarEmpleado()" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-sky-600 hover:bg-sky-500 text-white">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DEPARTAMENTO -->
+    <div id="modal-departamento" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+        <div class="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-sm overflow-hidden shadow-2xl">
+            <div class="p-4 border-b border-slate-800 flex justify-between items-center">
+                <h3 id="modal-depto-titulo" class="font-bold text-sm text-white"><i class="fa-solid fa-building text-amber-400 mr-2"></i> Crear Departamento</h3>
+                <button onclick="closeModal('modal-departamento')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="p-4">
+                <input type="hidden" id="depto-id">
+                <label class="text-[11px] font-semibold text-slate-400 block mb-1">Nombre del Departamento</label>
+                <input type="text" id="depto-nombre" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white outline-none focus:border-amber-500">
+            </div>
+            <div class="p-4 border-t border-slate-800 bg-slate-950/50 flex justify-end space-x-2">
+                <button onclick="closeModal('modal-departamento')" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:bg-slate-800">Cancelar</button>
+                <button onclick="guardarDepartamento()" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-600 hover:bg-amber-500 text-white">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL CARGO -->
+    <div id="modal-cargo" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+        <div class="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-sm overflow-hidden shadow-2xl">
+            <div class="p-4 border-b border-slate-800 flex justify-between items-center">
+                <h3 id="modal-cargo-titulo" class="font-bold text-sm text-white"><i class="fa-solid fa-briefcase text-purple-400 mr-2"></i> Crear Cargo</h3>
+                <button onclick="closeModal('modal-cargo')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="p-4">
+                <input type="hidden" id="cargo-id">
+                <label class="text-[11px] font-semibold text-slate-400 block mb-1">Nombre del Cargo</label>
+                <input type="text" id="cargo-nombre" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white outline-none focus:border-purple-500">
+            </div>
+            <div class="p-4 border-t border-slate-800 bg-slate-950/50 flex justify-end space-x-2">
+                <button onclick="closeModal('modal-cargo')" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:bg-slate-800">Cancelar</button>
+                <button onclick="guardarCargo()" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-purple-600 hover:bg-purple-500 text-white">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JS -->
+    <script>
+        const SUPABASE_URL = 'https://nrfplwpmwplpbskidtqs.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yZnBsd3Btd3BscGJza2lkdHFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc1OTA4MjIsImV4cCI6MjEwMzE2NjgyMn0.PZXrE9KtAVF2e4RbyM3-m1ClS8R8QaTCctLzZKAAYdQ';
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        let appState = {
+            departamentos: [],
+            cargos: [],
+            empleados: [],
+            nominas: []
+        };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const fechaInput = document.getElementById('nom-fecha-proceso');
+            if (fechaInput) fechaInput.valueAsDate = new Date();
+            fetchAllData();
+        });
+
+        async function fetchAllData() {
+            try {
+                const { data: deptos } = await supabaseClient.from('departamentos').select('*').order('nombre');
+                const { data: cargos } = await supabaseClient.from('cargos').select('*').order('nombre');
+                const { data: emps } = await supabaseClient.from('empleados').select('*, departamentos(nombre), cargos(nombre)').order('id', { ascending: false });
+                const { data: nominas } = await supabaseClient.from('nominas').select('*').order('id', { ascending: false });
+
+                appState.departamentos = deptos || [];
+                appState.cargos = cargos || [];
+                appState.empleados = emps || [];
+                appState.nominas = nominas || [];
+
+                renderDashboard();
+                renderDepartamentos();
+                renderCargos();
+                renderEmpleados();
+                renderTablaNominaEditable();
+                renderHistoricoNominas();
+                populateSelects();
+            } catch (err) {
+                showToast('Error de conexión', 'error');
+                console.error(err);
+            }
+        }
+
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('bg-slate-800', 'text-sky-400', 'border', 'border-slate-700');
+                btn.classList.add('text-slate-400');
+            });
+
+            const activeBtn = document.getElementById(`nav-${tab}`);
+            if (activeBtn) {
+                activeBtn.classList.add('bg-slate-800', 'text-sky-400', 'border', 'border-slate-700');
+                activeBtn.classList.remove('text-slate-400');
+            }
+
+            const activeContent = document.getElementById(`tab-${tab}-content`);
+            if (activeContent) activeContent.classList.remove('hidden');
+
+            const titles = {
+                dashboard: ['Panel de Control', 'Resumen general de sueldos, deducciones y personal activo'],
+                departamentos: ['Gestión de Departamentos', 'Áreas y divisiones de la empresa'],
+                cargos: ['Gestión de Cargos', 'Puestos de trabajo disponibles'],
+                empleados: ['Gestión de Empleados', 'Directorio de trabajadores registrados'],
+                nomina: ['Procesamiento de Nómina', 'Cálculo interactivo y emisión de quincenas'],
+                historico: ['Nóminas Procesadas', 'Histórico de pagos guardados y recibos detallados']
+            };
+
+            document.getElementById('view-title').innerText = titles[tab][0];
+            document.getElementById('view-desc').innerText = titles[tab][1];
+
+            if (tab === 'nomina') renderTablaNominaEditable();
+            if (tab === 'historico') renderHistoricoNominas();
+        }
+
+        function renderDashboard() {
+            const empleadosActivos = appState.empleados.filter(e => Boolean(e.activo));
+            
+            const totalNominaMensual = empleadosActivos.reduce((acc, e) => {
+                const sBase = Number(e.sueldo) || 0;
+                const bAlim = Number(e.bono_alimentacion) || 0;
+                const oIng = Number(e.otros_ingresos) || 0;
+                return acc + sBase + bAlim + oIng;
+            }, 0);
+
+            document.getElementById('kpi-total-nomina').innerText = `$${totalNominaMensual.toFixed(2)}`;
+            document.getElementById('kpi-total-empleados').innerText = empleadosActivos.length;
+            document.getElementById('kpi-total-deptos').innerText = appState.departamentos.length;
+            document.getElementById('kpi-total-cargos').innerText = appState.cargos.length;
+        }
+
+        function renderDepartamentos() {
+            const tbody = document.getElementById('tabla-deptos-body');
+            tbody.innerHTML = appState.departamentos.map(d => `
+                <tr class="hover:bg-slate-900/50">
+                    <td class="p-3.5 font-mono text-slate-400 text-xs">#${d.id}</td>
+                    <td class="p-3.5 font-semibold text-white">${d.nombre}</td>
+                    <td class="p-3.5 text-right space-x-1">
+                        <button onclick="editarDepartamento(${d.id})" class="text-slate-400 hover:text-amber-400 p-1"><i class="fa-solid fa-pen-to-square"></i></button>
+                        <button onclick="eliminarDepartamento(${d.id})" class="text-slate-500 hover:text-red-400 p-1"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function renderCargos() {
+            const tbody = document.getElementById('tabla-cargos-body');
+            tbody.innerHTML = appState.cargos.map(c => `
+                <tr class="hover:bg-slate-900/50">
+                    <td class="p-3.5 font-mono text-slate-400 text-xs">#${c.id}</td>
+                    <td class="p-3.5 font-semibold text-white">${c.nombre}</td>
+                    <td class="p-3.5 text-right space-x-1">
+                        <button onclick="editarCargo(${c.id})" class="text-slate-400 hover:text-purple-400 p-1"><i class="fa-solid fa-pen-to-square"></i></button>
+                        <button onclick="eliminarCargo(${c.id})" class="text-slate-500 hover:text-red-400 p-1"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function renderEmpleados() {
+            const tbody = document.getElementById('tabla-empleados-body');
+            tbody.innerHTML = appState.empleados.map(e => `
+                <tr class="hover:bg-slate-900/50 ${!e.activo ? 'opacity-50' : ''}">
+                    <td class="p-3.5 text-center">
+                        <input type="checkbox" ${e.activo ? 'checked' : ''} onchange="toggleEstadoEmpleado(${e.id}, ${e.activo})" class="w-4 h-4 text-sky-500 rounded bg-slate-950 border-slate-800 cursor-pointer">
+                    </td>
+                    <td class="p-3.5 font-mono text-slate-400 text-[11px]">${e.fecha_ingreso || 'N/A'}</td>
+                    <td class="p-3.5 font-semibold text-slate-200">${e.cedula}</td>
+                    <td class="p-3.5 font-bold text-white">${e.nombre}</td>
+                    <td class="p-3.5 text-slate-400">${e.telefono || '-'}</td>
+                    <td class="p-3.5 text-amber-400">${e.departamentos ? e.departamentos.nombre : 'Sin asignación'}</td>
+                    <td class="p-3.5 text-purple-400">${e.cargos ? e.cargos.nombre : 'Sin asignación'}</td>
+                    <td class="p-3.5 text-slate-300 font-medium">$${Number(e.sueldo).toFixed(2)}</td>
+                    <td class="p-3.5 text-emerald-400">$${Number(e.bono_alimentacion).toFixed(2)}</td>
+                    <td class="p-3.5 text-sky-400">$${Number(e.otros_ingresos).toFixed(2)}</td>
+                    <td class="p-3.5 text-right space-x-1">
+                        <button onclick="editarEmpleado(${e.id})" class="text-slate-400 hover:text-sky-400 p-1"><i class="fa-solid fa-pen-to-square"></i></button>
+                        <button onclick="eliminarEmpleado(${e.id})" class="text-slate-500 hover:text-red-400 p-1"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function renderTablaNominaEditable() {
+            const tbody = document.getElementById('tabla-nomina-editable-body');
+            const empleadosActivos = appState.empleados.filter(e => Boolean(e.activo));
+
+            if (empleadosActivos.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="11" class="p-6 text-center text-slate-500">No hay empleados activos para procesar nómina.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = empleadosActivos.map(emp => {
+                const salarioBase = Number(emp.sueldo) || 0;
+                const bonoAlim = Number(emp.bono_alimentacion) || 0;
+                const otrosIng = Number(emp.otros_ingresos) || 0;
+                const salarioIntegral = salarioBase + bonoAlim + otrosIng;
+
+                return `
+                <tr id="fila-emp-${emp.id}" class="hover:bg-slate-900/50 transition">
+                    <td class="p-3">
+                        <div class="font-bold text-white">${emp.nombre}</div>
+                        <div class="text-[10px] text-slate-400">${emp.cedula}</div>
+                    </td>
+                    <td class="p-3 font-semibold text-sky-400">$${salarioIntegral.toFixed(2)}</td>
+                    <td class="p-3 text-center">
+                        <input type="number" id="df-${emp.id}" value="0" min="0" oninput="calcularNominaFila(${emp.id})" class="w-14 bg-slate-950 border border-slate-800 rounded text-center p-1 text-xs text-white outline-none focus:border-emerald-500">
+                    </td>
+                    <td class="p-3">
+                        <input type="number" step="0.01" id="oa-${emp.id}" value="0.00" oninput="calcularNominaFila(${emp.id})" class="w-20 bg-slate-950 border border-slate-800 rounded p-1 text-xs text-white outline-none focus:border-emerald-500">
+                    </td>
+                    <td class="p-3 text-center">
+                        <input type="number" id="hd-${emp.id}" value="0" min="0" oninput="calcularNominaFila(${emp.id})" class="w-14 bg-slate-950 border border-slate-800 rounded text-center p-1 text-xs text-white outline-none focus:border-emerald-500">
+                    </td>
+                    <td class="p-3">
+                        <input type="number" step="0.01" id="od-${emp.id}" value="0.00" oninput="calcularNominaFila(${emp.id})" class="w-20 bg-slate-950 border border-slate-800 rounded p-1 text-xs text-white outline-none focus:border-emerald-500">
+                    </td>
+                    <td class="p-3">
+                        <input type="number" step="0.01" id="ad-${emp.id}" value="0.00" oninput="calcularNominaFila(${emp.id})" class="w-20 bg-slate-950 border border-slate-800 rounded p-1 text-xs text-white outline-none focus:border-emerald-500">
+                    </td>
+                    <td class="p-3">
+                        <input type="number" step="0.01" id="pr-${emp.id}" value="0.00" oninput="calcularNominaFila(${emp.id})" class="w-20 bg-slate-950 border border-slate-800 rounded p-1 text-xs text-white outline-none focus:border-emerald-500">
+                    </td>
+                    <td class="p-3 text-amber-400 font-medium" id="ley-${emp.id}">$0.00</td>
+                    <td class="p-3 font-bold text-emerald-400" id="neto-usd-${emp.id}">$0.00</td>
+                    <td class="p-3 font-bold text-emerald-400" id="neto-bs-${emp.id}">Bs. 0.00</td>
+                </tr>
+                `;
+            }).join('');
+
+            recalcularTodaLaNomina();
+        }
+
+        function calcularNominaFila(empId) {
+            const emp = appState.empleados.find(e => e.id === empId && Boolean(e.activo));
+            if (!emp) return;
+
+            const tasaBCV = parseFloat(document.getElementById('nom-tasa-bcv').value) || 1;
+            const salarioMinimoBs = parseFloat(document.getElementById('nom-salario-minimo').value) || 130;
+            
+            const salarioBase = Number(emp.sueldo) || 0;
+            const bonoAlim = Number(emp.bono_alimentacion) || 0;
+            const otrosIng = Number(emp.otros_ingresos) || 0;
+            
+            const salarioIntegral = salarioBase + bonoAlim + otrosIng;
+            const diarioIntegral = salarioIntegral / 30;
+            const quincenaBase = diarioIntegral * 15;
+
+            const diasFaltantes = parseFloat(document.getElementById(`df-${empId}`).value) || 0;
+            const otrasAsig = parseFloat(document.getElementById(`oa-${empId}`).value) || 0;
+            const horasDesc = parseFloat(document.getElementById(`hd-${empId}`).value) || 0;
+            const otrosDesc = parseFloat(document.getElementById(`od-${empId}`).value) || 0;
+            const adelantos = parseFloat(document.getElementById(`ad-${empId}`).value) || 0;
+            const prestamos = parseFloat(document.getElementById(`pr-${empId}`).value) || 0;
+
+            const montoDiasFaltantes = diarioIntegral * diasFaltantes;
+            const montoHorasDesc = (diarioIntegral / 8) * horasDesc;
+
+            // Salario Base mensual en Bolívares
+            const salarioBaseBs = salarioBase * tasaBCV;
+
+            // 1. IVSS: 4% del Salario Base en Bs. Tope: 5 Salarios Mínimos. Quincenal: / 2
+            const topeIVSS = 5 * salarioMinimoBs;
+            const baseIVSS = Math.min(salarioBaseBs, topeIVSS);
+            const ivssBs = (baseIVSS * 0.04) / 2;
+            const ivssUSD = ivssBs / tasaBCV;
+
+            // 2. RPE (Paro Forzoso): 0.5% del Salario Base en Bs. Tope: 10 Salarios Mínimos. Quincenal: / 2
+            const topeRPE = 10 * salarioMinimoBs;
+            const baseRPE = Math.min(salarioBaseBs, topeRPE);
+            const rpeBs = (baseRPE * 0.005) / 2;
+            const rpeUSD = rpeBs / tasaBCV;
+
+            // 3. FAOV (LPH): 1% del Salario Base en Bs. Quincenal: / 2
+            const faovBs = (salarioBaseBs * 0.01) / 2;
+            const faovUSD = faovBs / tasaBCV;
+
+            const totalLeyUSD = ivssUSD + rpeUSD + faovUSD;
+
+            const netoUSD = quincenaBase - montoDiasFaltantes + otrasAsig - montoHorasDesc - otrosDesc - adelantos - prestamos - totalLeyUSD;
+            const netoBs = netoUSD * tasaBCV;
+
+            document.getElementById(`ley-${empId}`).innerText = `$${totalLeyUSD.toFixed(2)}`;
+            document.getElementById(`neto-usd-${empId}`).innerText = `$${netoUSD.toFixed(2)}`;
+            document.getElementById(`neto-bs-${empId}`).innerText = `Bs. ${netoBs.toFixed(2)}`;
+        }
+
+        function recalcularTodaLaNomina() {
+            const empleadosActivos = appState.empleados.filter(e => Boolean(e.activo));
+            empleadosActivos.forEach(emp => calcularNominaFila(emp.id));
+        }
+
+        async function procesarNominaGlobal() {
+            const fechaPago = document.getElementById('nom-fecha-proceso').value;
+            const tasaBCV = parseFloat(document.getElementById('nom-tasa-bcv').value) || 1;
+            const salarioMinimoBs = parseFloat(document.getElementById('nom-salario-minimo').value) || 130;
+            const empleadosActivos = appState.empleados.filter(e => Boolean(e.activo));
+
+            if (!fechaPago) {
+                showToast('Selecciona la fecha de la nómina', 'error');
+                return;
+            }
+
+            if (empleadosActivos.length === 0) {
+                showToast('No hay empleados activos para procesar', 'error');
+                return;
+            }
+
+            const registros = empleadosActivos.map(emp => {
+                const salarioBase = Number(emp.sueldo) || 0;
+                const bonoAlim = Number(emp.bono_alimentacion) || 0;
+                const otrosIng = Number(emp.otros_ingresos) || 0;
+                const salarioIntegral = salarioBase + bonoAlim + otrosIng;
+                const diarioIntegral = salarioIntegral / 30;
+                const quincenaBase = diarioIntegral * 15;
+
+                const diasFaltantes = parseFloat(document.getElementById(`df-${emp.id}`).value) || 0;
+                const otrasAsig = parseFloat(document.getElementById(`oa-${emp.id}`).value) || 0;
+                const horasDesc = parseFloat(document.getElementById(`hd-${emp.id}`).value) || 0;
+                const otrosDesc = parseFloat(document.getElementById(`od-${emp.id}`).value) || 0;
+                const adelantos = parseFloat(document.getElementById(`ad-${emp.id}`).value) || 0;
+                const prestamos = parseFloat(document.getElementById(`pr-${emp.id}`).value) || 0;
+
+                const montoDiasFaltantes = diarioIntegral * diasFaltantes;
+                const montoHorasDesc = (diarioIntegral / 8) * horasDesc;
+
+                const salarioBaseBs = salarioBase * tasaBCV;
+                const baseIVSS = Math.min(salarioBaseBs, 5 * salarioMinimoBs);
+                const baseRPE = Math.min(salarioBaseBs, 10 * salarioMinimoBs);
+
+                const ivssBs = (baseIVSS * 0.04) / 2;
+                const rpeBs = (baseRPE * 0.005) / 2;
+                const faovBs = (salarioBaseBs * 0.01) / 2;
+
+                const ivssUSD = ivssBs / tasaBCV;
+                const rpeUSD = rpeBs / tasaBCV;
+                const faovUSD = faovBs / tasaBCV;
+
+                const totalLeyUSD = ivssUSD + rpeUSD + faovUSD;
+
+                const netoUSD = quincenaBase - montoDiasFaltantes + otrasAsig - montoHorasDesc - otrosDesc - adelantos - prestamos - totalLeyUSD;
+                const netoBs = netoUSD * tasaBCV;
+
+                return {
+                    fecha_pago: fechaPago,
+                    empleado_id: emp.id,
+                    empleado: emp.nombre,
+                    cargo: emp.cargos ? emp.cargos.nombre : 'Sin asignación',
+                    tasa_bcv: tasaBCV,
+                    salario_minimo_bs: salarioMinimoBs,
+                    salario_base: salarioBase,
+                    bono_alimentacion: bonoAlim,
+                    otros_ingresos: otrosIng,
+                    dias_faltantes: diasFaltantes,
+                    otras_asignaciones: otrasAsig,
+                    horas_descuento: horasDesc,
+                    otros_descuentos: otrosDesc,
+                    adelantos: adelantos,
+                    prestamos: prestamos,
+                    ivss_usd: ivssUSD,
+                    rpe_usd: rpeUSD,
+                    faov_usd: faovUSD,
+                    descuentos_ley_usd: totalLeyUSD,
+                    neto_usd: netoUSD,
+                    neto_bs: netoBs,
+                    estado: 'Procesado'
+                };
+            });
+
+            const { error } = await supabaseClient.from('nominas').insert(registros);
+
+            if (error) {
+                showToast('Error al guardar la nómina: ' + error.message, 'error');
+            } else {
+                showToast('Nómina procesada y guardada exitosamente');
+                fetchAllData();
+            }
+        }
+
+        function renderHistoricoNominas() {
+            const tbody = document.getElementById('tabla-historico-body');
+            
+            const grupos = {};
+            appState.nominas.forEach(n => {
+                const fecha = n.fecha_pago || 'Sin Fecha';
+                if (!grupos[fecha]) {
+                    grupos[fecha] = {
+                        fecha_pago: fecha,
+                        registros: [],
+                        total_usd: 0,
+                        total_bs: 0,
+                        tasa_bcv: n.tasa_bcv || 0,
+                        salario_minimo_bs: n.salario_minimo_bs || 0
+                    };
+                }
+                grupos[fecha].registros.push(n);
+                grupos[fecha].total_usd += Number(n.neto_usd || n.neto || 0);
+                grupos[fecha].total_bs += Number(n.neto_bs || 0);
+            });
+
+            const fechas = Object.keys(grupos).sort().reverse();
+
+            if (fechas.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="p-6 text-center text-slate-500">No hay nóminas procesadas registradas.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = fechas.map(fecha => {
+                const g = grupos[fecha];
+                return `
+                <tr class="hover:bg-slate-900/50">
+                    <td class="p-3.5 font-bold text-white">${g.fecha_pago}</td>
+                    <td class="p-3.5 text-center text-sky-400 font-semibold">${g.registros.length}</td>
+                    <td class="p-3.5 text-slate-300">Bs. ${Number(g.tasa_bcv).toFixed(2)}</td>
+                    <td class="p-3.5 text-slate-300">Bs. ${Number(g.salario_minimo_bs).toFixed(2)}</td>
+                    <td class="p-3.5 font-bold text-emerald-400">$${g.total_usd.toFixed(2)}</td>
+                    <td class="p-3.5 font-bold text-emerald-400">Bs. ${g.total_bs.toFixed(2)}</td>
+                    <td class="p-3.5 text-right space-x-1 sm:space-x-2">
+                        <button onclick="verDetalleNomina('${g.fecha_pago}')" class="bg-sky-600/20 hover:bg-sky-600/40 text-sky-400 border border-sky-500/30 text-xs px-2.5 py-1 rounded-lg font-medium inline-flex items-center space-x-1 transition">
+                            <i class="fa-solid fa-list text-[11px]"></i>
+                            <span>Resumen</span>
+                        </button>
+                        <button onclick="verRecibosNomina('${g.fecha_pago}')" class="bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-400 border border-emerald-500/30 text-xs px-2.5 py-1 rounded-lg font-medium inline-flex items-center space-x-1 transition">
+                            <i class="fa-solid fa-receipt text-[11px]"></i>
+                            <span>Recibos</span>
+                        </button>
+                        <button onclick="eliminarNominaProcesada('${g.fecha_pago}')" class="bg-rose-600/20 hover:bg-rose-600/40 text-rose-400 border border-rose-500/30 text-xs px-2.5 py-1 rounded-lg font-medium inline-flex items-center space-x-1 transition">
+                            <i class="fa-solid fa-trash text-[11px]"></i>
+                            <span>Eliminar</span>
+                        </button>
+                    </td>
+                </tr>
+                `;
+            }).join('');
+        }
+
+        async function eliminarNominaProcesada(fechaPago) {
+            const confirmacion = confirm(`⚠️ ADVERTENCIA DE ELIMINACIÓN ⚠️\n\n¿Estás seguro de que deseas eliminar permanentemente la nómina con fecha de pago [ ${fechaPago} ]?\n\nEsta acción borrará todos los registros de los empleados asociados a esta nómina en la base de datos y no se podrá deshacer.`);
+            
+            if (!confirmacion) return;
+
+            const { error } = await supabaseClient
+                .from('nominas')
+                .delete()
+                .eq('fecha_pago', fechaPago);
+
+            if (error) {
+                showToast('Error al eliminar la nómina: ' + error.message, 'error');
+            } else {
+                showToast(`Nómina del ${fechaPago} eliminada correctamente`);
+                fetchAllData();
+            }
+        }
+
+        function verDetalleNomina(fecha) {
+            const registros = appState.nominas.filter(n => n.fecha_pago === fecha);
+            document.getElementById('detalle-fecha-pago').innerText = fecha;
+            document.getElementById('print-fecha-pago').innerText = fecha;
+
+            const tbody = document.getElementById('tabla-detalle-body');
+            const tfoot = document.getElementById('tabla-detalle-foot');
+
+            let totBase = 0, totAsig = 0, totIvss = 0, totRpe = 0, totFaov = 0, totOtrosDesc = 0, totUSD = 0, totBS = 0;
+
+            tbody.innerHTML = registros.map(r => {
+                const sBase = Number(r.salario_base || 0);
+                const salarioMinimoBs = Number(r.salario_minimo_bs || 130);
+                const tasa = Number(r.tasa_bcv || 1);
+                const salarioBaseBs = sBase * tasa;
+
+                const asig = Number(r.bono_alimentacion || 0) + Number(r.otros_ingresos || 0) + Number(r.otras_asignaciones || 0);
+                
+                // Recálculo dinámico o fallback por si registros antiguos carecen de ivss_usd, rpe_usd o faov_usd
+                let ivss = Number(r.ivss_usd || 0);
+                if (ivss === 0 && sBase > 0) {
+                    const baseIVSS = Math.min(salarioBaseBs, 5 * salarioMinimoBs);
+                    ivss = ((baseIVSS * 0.04) / 2) / tasa;
+                }
+
+                let rpe = Number(r.rpe_usd || 0);
+                if (rpe === 0 && sBase > 0) {
+                    const baseRPE = Math.min(salarioBaseBs, 10 * salarioMinimoBs);
+                    rpe = ((baseRPE * 0.005) / 2) / tasa;
+                }
+
+                let faov = Number(r.faov_usd || 0);
+                if (faov === 0 && sBase > 0) {
+                    faov = ((salarioBaseBs * 0.01) / 2) / tasa;
+                }
+
+                const otrosDesc = Number(r.otros_descuentos || 0) + Number(r.adelantos || 0) + Number(r.prestamos || 0);
+                const netoUSD = Number(r.neto_usd || r.neto || 0);
+                const netoBs = Number(r.neto_bs || 0);
+
+                totBase += sBase;
+                totAsig += asig;
+                totIvss += ivss;
+                totRpe += rpe;
+                totFaov += faov;
+                totOtrosDesc += otrosDesc;
+                totUSD += netoUSD;
+                totBS += netoBs;
+
+                return `
+                <tr class="hover:bg-slate-800/40">
+                    <td class="p-2.5 font-semibold text-white">${r.empleado}</td>
+                    <td class="p-2.5 text-slate-400">${r.cargo || '-'}</td>
+                    <td class="p-2.5 text-slate-300">$${sBase.toFixed(2)}</td>
+                    <td class="p-2.5 text-emerald-400">$${asig.toFixed(2)}</td>
+                    <td class="p-2.5 text-amber-400">$${ivss.toFixed(2)}</td>
+                    <td class="p-2.5 text-amber-400">$${rpe.toFixed(2)}</td>
+                    <td class="p-2.5 text-amber-400">$${faov.toFixed(2)}</td>
+                    <td class="p-2.5 text-rose-400">$${otrosDesc.toFixed(2)}</td>
+                    <td class="p-2.5 font-bold text-emerald-400">$${netoUSD.toFixed(2)}</td>
+                    <td class="p-2.5 font-bold text-emerald-400">Bs. ${netoBs.toFixed(2)}</td>
+                </tr>
+                `;
+            }).join('');
+
+            tfoot.innerHTML = `
+                <tr>
+                    <td colspan="2" class="p-2.5 text-slate-300 text-right uppercase">Totales:</td>
+                    <td class="p-2.5 text-white">$${totBase.toFixed(2)}</td>
+                    <td class="p-2.5 text-emerald-400">$${totAsig.toFixed(2)}</td>
+                    <td class="p-2.5 text-amber-400">$${totIvss.toFixed(2)}</td>
+                    <td class="p-2.5 text-amber-400">$${totRpe.toFixed(2)}</td>
+                    <td class="p-2.5 text-amber-400">$${totFaov.toFixed(2)}</td>
+                    <td class="p-2.5 text-rose-400">$${totOtrosDesc.toFixed(2)}</td>
+                    <td class="p-2.5 text-emerald-400">$${totUSD.toFixed(2)}</td>
+                    <td class="p-2.5 text-emerald-400">Bs. ${totBS.toFixed(2)}</td>
+                </tr>
+            `;
+
+            openModal('modal-detalle-nomina');
+        }
+
+        // GENERADOR DE RECIBOS DE PAGO CON FORMATO OFICIAL (BOCANADA CAFÉ / GRUPO PRALUM)
+        function verRecibosNomina(fecha) {
+            const registros = appState.nominas.filter(n => n.fecha_pago === fecha);
+            document.getElementById('recibos-fecha-pago').innerText = fecha;
+            const container = document.getElementById('area-impresion-recibos');
+
+            if (registros.length === 0) {
+                container.innerHTML = '<p class="text-white text-center py-4">No hay registros para esta fecha.</p>';
+                openModal('modal-recibos-nomina');
+                return;
+            }
+
+            container.innerHTML = registros.map(r => {
+                const emp = appState.empleados.find(e => e.id === r.empleado_id) || {};
+                const tasa = Number(r.tasa_bcv || 1);
+                const salarioMinimoBs = Number(r.salario_minimo_bs || 130);
+                const sueldoMensual = Number(r.salario_base || 0);
+                const salarioBaseBs = sueldoMensual * tasa;
+                
+                // ASIGNACIONES (Bs)
+                const sueldoQuincenalBs = (sueldoMensual / 2) * tasa;
+                const bonoAlimBs = Number(r.bono_alimentacion || 0) * tasa;
+                const otrosIngBs = (Number(r.otros_ingresos || 0) + Number(r.otras_asignaciones || 0)) * tasa;
+                const totalAsignacionesBs = sueldoQuincenalBs + bonoAlimBs + otrosIngBs;
+
+                // DEDUCCIONES DE LEY (Bs)
+                // IVSS (SSO 4% con tope de 5 Salarios Mínimos quincenal)
+                let ssoBs = Number(r.ivss_usd || 0) * tasa;
+                if (ssoBs === 0 && sueldoMensual > 0) {
+                    const baseIVSS = Math.min(salarioBaseBs, 5 * salarioMinimoBs);
+                    ssoBs = (baseIVSS * 0.04) / 2;
+                }
+
+                // FAOV (LPH 1% del Salario Base quincenal)
+                let lphBs = Number(r.faov_usd || 0) * tasa;
+                if (lphBs === 0 && sueldoMensual > 0) {
+                    lphBs = (salarioBaseBs * 0.01) / 2;
+                }
+
+                // RPE (Paro Forzoso 0,5% con tope de 10 Salarios Mínimos quincenal)
+                let rpeBs = Number(r.rpe_usd || 0) * tasa;
+                if (rpeBs === 0 && sueldoMensual > 0) {
+                    const baseRPE = Math.min(salarioBaseBs, 10 * salarioMinimoBs);
+                    rpeBs = (baseRPE * 0.005) / 2;
+                }
+
+                // OTRAS DEDUCCIONES
+                const diasFaltantes = Number(r.dias_faltantes || 0);
+                const montoDiasFaltantesBs = (((sueldoMensual * tasa) / 30) * diasFaltantes);
+                const prestamosBs = (Number(r.prestamos || 0) + Number(r.adelantos || 0)) * tasa;
+                const otrosDescBs = Number(r.otros_descuentos || 0) * tasa;
+                const horasDesc = Number(r.horas_descuento || 0);
+                const montoHorasDescBs = ((((sueldoMensual * tasa) / 30) / 8) * horasDesc);
+
+                const totalDeduccionesBs = montoDiasFaltantesBs + ssoBs + lphBs + rpeBs + prestamosBs + otrosDescBs + montoHorasDescBs;
+                const totalNetoBs = totalAsignacionesBs - totalDeduccionesBs;
+
+                // PERIODO DE QUINCENA
+                const fechaObj = new Date(fecha + 'T00:00:00');
+                const dia = fechaObj.getDate();
+                const mesNombre = fechaObj.toLocaleString('es-ES', { month: 'long' }).toUpperCase();
+                const anio = fechaObj.getFullYear();
+                const quincenaTexto = dia <= 15 ? '1ERA QUINCENA' : '2DA QUINCENA';
+                const tituloPeriodo = `RECIBO DE PAGO ${quincenaTexto} DE ${mesNombre} ${anio}`;
+
+                const formatNum = (num) => num.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+                return `
+                <div class="recibo-card bg-white text-black p-6 rounded-lg shadow-xl border border-slate-300 font-sans max-w-3xl mx-auto mb-8 page-break">
+                    <!-- ENCABEZADO EMPRESA -->
+                    <div class="flex justify-between items-start mb-2 pb-1 border-b-2 border-black">
+                        <div>
+                            <h2 class="text-2xl font-black tracking-widest text-black">BOCANADA</h2>
+                            <p class="text-xs font-bold tracking-widest text-slate-700 -mt-1">CAFÉ</p>
+                        </div>
+                        <div class="text-right">
+                            <h3 class="text-sm font-extrabold text-black">GRUPO PRALUM, C.A.</h3>
+                            <p class="text-xs text-slate-800 font-semibold">J-50088879-1</p>
+                        </div>
+                    </div>
+
+                    <!-- TÍTULO DE QUINCENA -->
+                    <div class="bg-[#dbece0] text-center font-bold text-xs py-1 border border-black mb-1 uppercase tracking-wider text-black">
+                        ${tituloPeriodo}
+                    </div>
+
+                    <!-- DATOS DEL EMPLEADO -->
+                    <table class="w-full text-[11px] border border-black mb-1 font-semibold">
+                        <tr>
+                            <td class="bg-slate-100 p-1 border-r border-b border-black w-32 font-bold">NOMBRE Y APELLIDO</td>
+                            <td class="p-1 border-r border-b border-black font-bold uppercase">${r.empleado}</td>
+                            <td class="bg-slate-100 p-1 border-r border-b border-black w-16 font-bold">CARGO</td>
+                            <td class="p-1 border-b border-black uppercase font-bold">${r.cargo || emp.cargos?.nombre || '-'}</td>
+                        </tr>
+                        <tr>
+                            <td class="bg-slate-100 p-1 border-r border-b border-black font-bold">CEDULA</td>
+                            <td class="p-1 border-r border-b border-black">${emp.cedula || r.cedula || '-'}</td>
+                            <td class="bg-slate-100 p-1 border-r border-b border-black font-bold">FECHA DE INGRESO</td>
+                            <td class="p-1 border-b border-black">${emp.fecha_ingreso || '-'}</td>
+                        </tr>
+                        <tr>
+                            <td class="bg-slate-100 p-1 border-r border-black font-bold">SALARIO MENSUAL</td>
+                            <td colspan="3" class="p-1 font-bold">$${sueldoMensual.toFixed(2)} / Bs. ${formatNum(sueldoMensual * tasa)}</td>
+                        </tr>
+                    </table>
+
+                    <!-- ASIGNACIONES -->
+                    <table class="w-full text-[11px] border border-black mb-1">
+                        <thead>
+                            <tr class="bg-[#dbece0] font-bold border-b border-black">
+                                <th class="p-1 text-left border-r border-black" colspan="2">DESCRIPCION</th>
+                                <th class="p-1 text-right w-36">ASIGNACION</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-300">
+                            <tr>
+                                <td class="p-1">Salario quincenal</td>
+                                <td class="p-1 text-center w-16 text-slate-600">15</td>
+                                <td class="p-1 text-right font-mono">${formatNum(sueldoQuincenalBs)}</td>
+                            </tr>
+                            <tr>
+                                <td class="p-1" colspan="2">Bono alimentación</td>
+                                <td class="p-1 text-right font-mono">${formatNum(bonoAlimBs)}</td>
+                            </tr>
+                            <tr>
+                                <td class="p-1" colspan="2">Subsidio / Otros ingresos</td>
+                                <td class="p-1 text-right font-mono">${formatNum(otrosIngBs)}</td>
+                            </tr>
+                        </tbody>
+                        <tfoot>
+                            <tr class="font-bold border-t border-black bg-slate-50">
+                                <td class="p-1" colspan="2">TOTAL ASIGNACIONES</td>
+                                <td class="p-1 text-right font-mono font-bold">${formatNum(totalAsignacionesBs)}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+
+                    <!-- DEDUCCIONES -->
+                    <table class="w-full text-[11px] border border-black mb-1">
+                        <tbody class="divide-y divide-slate-200">
+                            <tr>
+                                <td class="p-1">Días no trabajados (${diasFaltantes})</td>
+                                <td class="p-1 text-right font-mono w-36">${formatNum(montoDiasFaltantesBs)}</td>
+                            </tr>
+                            <tr>
+                                <td class="p-1">S.S.O / IVSS (4%)</td>
+                                <td class="p-1 text-right font-mono">${formatNum(ssoBs)}</td>
+                            </tr>
+                            <tr>
+                                <td class="p-1">L.P.H. / FAOV (1%)</td>
+                                <td class="p-1 text-right font-mono">${formatNum(lphBs)}</td>
+                            </tr>
+                            <tr>
+                                <td class="p-1">Paro Forzoso / RPE (0,5%)</td>
+                                <td class="p-1 text-right font-mono">${formatNum(rpeBs)}</td>
+                            </tr>
+                            <tr>
+                                <td class="p-1">Préstamos personal / Adelantos</td>
+                                <td class="p-1 text-right font-mono">${formatNum(prestamosBs)}</td>
+                            </tr>
+                            <tr>
+                                <td class="p-1">Descuento por producto / Otros desc.</td>
+                                <td class="p-1 text-right font-mono">${formatNum(otrosDescBs)}</td>
+                            </tr>
+                            <tr>
+                                <td class="p-1">Horas descontadas (${horasDesc} hrs)</td>
+                                <td class="p-1 text-right font-mono">${formatNum(montoHorasDescBs)}</td>
+                            </tr>
+                        </tbody>
+                        <tfoot>
+                            <tr class="font-bold border-t border-black bg-slate-50">
+                                <td class="p-1">TOTAL DEDUCCIONES</td>
+                                <td class="p-1 text-right font-mono font-bold">${formatNum(totalDeduccionesBs)}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+
+                    <!-- TOTAL A COBRAR -->
+                    <div class="flex justify-between items-center bg-[#dbece0] border border-black p-1.5 font-bold text-xs mb-6">
+                        <span>TOTAL A COBRAR</span>
+                        <span class="font-mono text-sm">${formatNum(totalNetoBs)} Bs</span>
+                    </div>
+
+                    <!-- RECIBO CONFORME -->
+                    <div class="border-t border-black pt-2">
+                        <h4 class="text-center font-extrabold text-sm tracking-wider mb-6">RECIBO CONFORME</h4>
+                        <div class="grid grid-cols-2 gap-8 text-[11px] font-semibold">
+                            <div class="flex items-end">
+                                <span class="mr-2">NOMBRE:</span>
+                                <span class="border-b border-black flex-1 uppercase font-bold">${r.empleado}</span>
+                            </div>
+                            <div></div>
+                            <div class="flex items-end">
+                                <span class="mr-2">FIRMA:</span>
+                                <span class="border-b border-black flex-1"></span>
+                            </div>
+                            <div class="flex items-end">
+                                <span class="mr-2">CÉDULA:</span>
+                                <span class="border-b border-black flex-1 font-bold">${emp.cedula || r.cedula || ''}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                `;
+            }).join('');
+
+            openModal('modal-recibos-nomina');
+        }
+
+        function imprimirDesglose() {
+            window.print();
+        }
+
+        function imprimirRecibos() {
+            window.print();
+        }
+
+        function populateSelects() {
+            document.getElementById('emp-depto-select').innerHTML = '<option value="">-- Seleccionar --</option>' + 
+                appState.departamentos.map(d => `<option value="${d.id}">${d.nombre}</option>`).join('');
+
+            document.getElementById('emp-cargo-select').innerHTML = '<option value="">-- Seleccionar --</option>' + 
+                appState.cargos.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('');
+        }
+
+        async function toggleEstadoEmpleado(id, estadoActual) {
+            const { error } = await supabaseClient.from('empleados').update({ activo: !estadoActual }).eq('id', id);
+            if (!error) {
+                showToast(`Empleado ${!estadoActual ? 'activado' : 'desactivado'}`);
+                fetchAllData();
+            } else {
+                showToast('Error al cambiar el estado', 'error');
+            }
+        }
+
+        function abrirCrearEmpleado() {
+            document.getElementById('emp-id').value = '';
+            document.getElementById('modal-emp-titulo').innerText = 'Registrar Empleado';
+            document.getElementById('emp-fecha').valueAsDate = new Date();
+            document.getElementById('emp-cedula').value = '';
+            document.getElementById('emp-nombre').value = '';
+            document.getElementById('emp-telefono').value = '';
+            document.getElementById('emp-depto-select').value = '';
+            document.getElementById('emp-cargo-select').value = '';
+            document.getElementById('emp-sueldo').value = '0.00';
+            document.getElementById('emp-bono-alim').value = '0.00';
+            document.getElementById('emp-otros-ing').value = '0.00';
+            document.getElementById('emp-activo').checked = true;
+            openModal('modal-empleado');
+        }
+
+        function editarEmpleado(id) {
+            const emp = appState.empleados.find(e => e.id === id);
+            if (!emp) return;
+
+            document.getElementById('emp-id').value = emp.id;
+            document.getElementById('modal-emp-titulo').innerText = 'Editar Empleado';
+            document.getElementById('emp-fecha').value = emp.fecha_ingreso || '';
+            document.getElementById('emp-cedula').value = emp.cedula || '';
+            document.getElementById('emp-nombre').value = emp.nombre || '';
+            document.getElementById('emp-telefono').value = emp.telefono || '';
+            document.getElementById('emp-depto-select').value = emp.departamento_id || '';
+            document.getElementById('emp-cargo-select').value = emp.cargo_id || '';
+            document.getElementById('emp-sueldo').value = emp.sueldo || 0;
+            document.getElementById('emp-bono-alim').value = emp.bono_alimentacion || 0;
+            document.getElementById('emp-otros-ing').value = emp.otros_ingresos || 0;
+            document.getElementById('emp-activo').checked = emp.activo;
+            openModal('modal-empleado');
+        }
+
+        async function guardarEmpleado() {
+            const id = document.getElementById('emp-id').value;
+            const fecha_ingreso = document.getElementById('emp-fecha').value;
+            const cedula = document.getElementById('emp-cedula').value.trim();
+            const nombre = document.getElementById('emp-nombre').value.trim();
+            const telefono = document.getElementById('emp-telefono').value.trim();
+            const departamento_id = document.getElementById('emp-depto-select').value || null;
+            const cargo_id = document.getElementById('emp-cargo-select').value || null;
+            const sueldo = parseFloat(document.getElementById('emp-sueldo').value) || 0;
+            const bono_alimentacion = parseFloat(document.getElementById('emp-bono-alim').value) || 0;
+            const otros_ingresos = parseFloat(document.getElementById('emp-otros-ing').value) || 0;
+            const activo = document.getElementById('emp-activo').checked;
+
+            if (!cedula || !nombre || !fecha_ingreso) { 
+                showToast('Ingresa la fecha, cédula y nombre', 'error'); 
+                return; 
+            }
+
+            const payload = { fecha_ingreso, cedula, nombre, telefono, departamento_id, cargo_id, sueldo, bono_alimentacion, otros_ingresos, activo };
+
+            let response = id 
+                ? await supabaseClient.from('empleados').update(payload).eq('id', id)
+                : await supabaseClient.from('empleados').insert([payload]);
+
+            if (response.error) {
+                showToast('Error: ' + response.error.message, 'error');
+            } else {
+                showToast(id ? 'Empleado actualizado' : 'Empleado creado');
+                closeModal('modal-empleado');
+                fetchAllData();
+            }
+        }
+
+        function abrirCrearDepartamento() {
+            document.getElementById('depto-id').value = '';
+            document.getElementById('depto-nombre').value = '';
+            document.getElementById('modal-depto-titulo').innerText = 'Crear Departamento';
+            openModal('modal-departamento');
+        }
+
+        function editarDepartamento(id) {
+            const depto = appState.departamentos.find(d => d.id === id);
+            if (!depto) return;
+            document.getElementById('depto-id').value = depto.id;
+            document.getElementById('depto-nombre').value = depto.nombre;
+            document.getElementById('modal-depto-titulo').innerText = 'Editar Departamento';
+            openModal('modal-departamento');
+        }
+
+        async function guardarDepartamento() {
+            const id = document.getElementById('depto-id').value;
+            const nombre = document.getElementById('depto-nombre').value.trim();
+            if (!nombre) { showToast('Ingresa un nombre', 'error'); return; }
+
+            let res = id 
+                ? await supabaseClient.from('departamentos').update({ nombre }).eq('id', id)
+                : await supabaseClient.from('departamentos').insert([{ nombre }]);
+
+            if (res.error) {
+                showToast('Error al procesar departamento', 'error');
+            } else {
+                showToast(id ? 'Departamento actualizado' : 'Departamento creado');
+                closeModal('modal-departamento');
+                fetchAllData();
+            }
+        }
+
+        function abrirCrearCargo() {
+            document.getElementById('cargo-id').value = '';
+            document.getElementById('cargo-nombre').value = '';
+            document.getElementById('modal-cargo-titulo').innerText = 'Crear Cargo';
+            openModal('modal-cargo');
+        }
+
+        function editarCargo(id) {
+            const cargo = appState.cargos.find(c => c.id === id);
+            if (!cargo) return;
+            document.getElementById('cargo-id').value = cargo.id;
+            document.getElementById('cargo-nombre').value = cargo.nombre;
+            document.getElementById('modal-cargo-titulo').innerText = 'Editar Cargo';
+            openModal('modal-cargo');
+        }
+
+        async function guardarCargo() {
+            const id = document.getElementById('cargo-id').value;
+            const nombre = document.getElementById('cargo-nombre').value.trim();
+            if (!nombre) { showToast('Ingresa un nombre', 'error'); return; }
+
+            let res = id 
+                ? await supabaseClient.from('cargos').update({ nombre }).eq('id', id)
+                : await supabaseClient.from('cargos').insert([{ nombre }]);
+
+            if (res.error) {
+                showToast('Error al procesar cargo', 'error');
+            } else {
+                showToast(id ? 'Cargo actualizado' : 'Cargo creado');
+                closeModal('modal-cargo');
+                fetchAllData();
+            }
+        }
+
+        async function eliminarEmpleado(id) {
+            if (!confirm('¿Eliminar empleado?')) return;
+            const { error } = await supabaseClient.from('empleados').delete().eq('id', id);
+            if (!error) { showToast('Empleado eliminado'); fetchAllData(); }
+        }
+
+        async function eliminarDepartamento(id) {
+            if (!confirm('¿Eliminar departamento?')) return;
+            const { error } = await supabaseClient.from('departamentos').delete().eq('id', id);
+            if (!error) { showToast('Departamento eliminado'); fetchAllData(); }
+        }
+
+        async function eliminarCargo(id) {
+            if (!confirm('¿Eliminar cargo?')) return;
+            const { error } = await supabaseClient.from('cargos').delete().eq('id', id);
+            if (!error) { showToast('Cargo eliminado'); fetchAllData(); }
+        }
+
+        function openModal(id) { document.getElementById(id).classList.remove('hidden'); document.getElementById(id).classList.add('flex'); }
+        function closeModal(id) { document.getElementById(id).classList.add('hidden'); document.getElementById(id).classList.remove('flex'); }
+
+        function showToast(msg, type = 'success') {
+            const toast = document.getElementById('toast');
+            toast.innerText = msg;
+            toast.className = `fixed bottom-5 right-5 z-50 px-4 py-3 rounded-lg text-xs font-semibold shadow-xl transition-all border ${type === 'error' ? 'bg-red-950 text-red-200 border-red-800' : 'bg-emerald-950 text-emerald-200 border-emerald-800'}`;
+            toast.classList.remove('hidden');
+            setTimeout(() => toast.classList.add('hidden'), 3000);
+        }
+    </script>
+</body>
+</html>
