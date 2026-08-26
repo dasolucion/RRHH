@@ -1001,8 +1001,8 @@
                 
                 // ASIGNACIONES (Bs)
                 const sueldoQuincenalBs = (sueldoMensual / 2) * tasa;
-                const bonoAlimBs = Number(r.bono_alimentacion || 0) * tasa;
-                const otrosIngBs = (Number(r.otros_ingresos || 0) + Number(r.otras_asignaciones || 0)) * tasa;
+                const bonoAlimBs = (Number(r.bono_alimentacion || 0) * tasa)/2;
+                const otrosIngBs = ((Number(r.otros_ingresos || 0) + Number(r.otras_asignaciones || 0)) * tasa)/2;
                 const totalAsignacionesBs = sueldoQuincenalBs + bonoAlimBs + otrosIngBs;
 
                 // DEDUCCIONES DE LEY (Bs)
