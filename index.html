@@ -180,7 +180,7 @@
                     <div class="overflow-x-auto overflow-y-auto max-h-[65vh] custom-scrollbar">
                         <table class="w-full text-left text-xs">
                             <thead class="bg-slate-950 text-slate-400 uppercase text-[10px] tracking-wider sticky top-0 z-20 shadow-[0_1px_0_0_#1e293b]">
-                                <tr><th class="p-3.5 text-center">Activo</th><th class="p-3.5">F. Ingreso</th><th class="p-3.5">Cédula</th><th class="p-3.5">Nombre</th><th class="p-3.5">Teléfono</th><th class="p-3.5">Departamento</th><th class="p-3.5">Cargo</th><th class="p-3.5">Sueldo Base</th><th class="p-3.5">Bono Alim.</th><th class="p-3.5">Subsidio</th><th class="p-3.5 text-right">Acciones</th></tr>
+                                <tr><th class="p-3.5 text-center">Activo</th><th class="p-3.5">F. Ingreso</th><th class="p-3.5">Cédula</th><th class="p-3.5">Nombre</th><th class="p-3.5">Teléfono</th><th class="p-3.5">Departamento</th><th class="p-3.5">Cargo</th><th class="p-3.5">Sueldo Base</th><th class="p-3.5">Bono Alim.</th><th class="p-3.5">Subsidio</th><th class="p-3.5 text-center">ID Dahua</th><th class="p-3.5 text-right">Acciones</th></tr>
                             </thead>
                             <tbody id="tabla-empleados-body" class="divide-y divide-slate-800/50"></tbody>
                         </table>
@@ -1292,9 +1292,9 @@ if (antProcesadas && antProcesadas.length > 0) {
 
         function renderDepartamentos() { gId('tabla-deptos-body').innerHTML = appState.departamentos.map(d => `<tr class="hover:bg-slate-900/50"><td class="p-3.5 font-mono text-slate-400 text-xs">#${d.id}</td><td class="p-3.5 font-semibold text-white">${d.nombre}</td><td class="p-3.5 text-right space-x-1"><button onclick="editarDepartamento(${d.id})" class="text-amber-400 p-1 hover:text-amber-300"><i class="fa-solid fa-pen"></i></button><button onclick="eliminarDepartamento(${d.id})" class="text-slate-500 hover:text-red-400 p-1"><i class="fa-solid fa-trash"></i></button></td></tr>`).join(''); }
         function renderCargos() { gId('tabla-cargos-body').innerHTML = appState.cargos.map(c => `<tr class="hover:bg-slate-900/50"><td class="p-3.5 font-mono text-slate-400 text-xs">#${c.id}</td><td class="p-3.5 font-semibold text-white">${c.nombre}</td><td class="p-3.5 text-right space-x-1"><button onclick="editarCargo(${c.id})" class="text-purple-400 p-1 hover:text-purple-300"><i class="fa-solid fa-pen"></i></button><button onclick="eliminarCargo(${c.id})" class="text-slate-500 hover:text-red-400 p-1"><i class="fa-solid fa-trash"></i></button></td></tr>`).join(''); }
-        function renderEmpleados() {
-            gId('tabla-empleados-body').innerHTML = appState.empleados.map(e => `<tr class="hover:bg-slate-900/50 ${!e.activo?'opacity-50':''}"><td class="p-3.5 text-center"><input type="checkbox" ${e.activo?'checked':''} onchange="toggleEstadoEmpleado(${e.id}, ${e.activo})" class="w-4 h-4 text-sky-500 rounded bg-slate-950 border-slate-800 cursor-pointer"></td><td class="p-3.5 font-mono text-slate-400 text-[11px]">${e.fecha_ingreso||''}</td><td class="p-3.5 font-semibold text-slate-200">${e.cedula}</td><td class="p-3.5 font-bold text-white">${e.nombre}</td><td class="p-3.5 text-slate-400">${e.telefono||'-'}</td><td class="p-3.5 text-amber-400">${e.departamentos?.nombre||'-'}</td><td class="p-3.5 text-purple-400">${e.cargos?.nombre||'-'}</td><td class="p-3.5 text-slate-300 font-medium">$${Number(e.sueldo).toFixed(2)}</td><td class="p-3.5 text-emerald-400">$${Number(e.bono_alimentacion).toFixed(2)}</td><td class="p-3.5 text-sky-400">$${Number(e.otros_ingresos).toFixed(2)}</td><td class="p-3.5 text-right space-x-1"><button onclick="editarEmpleado(${e.id})" class="text-sky-400 hover:text-sky-300 p-1"><i class="fa-solid fa-pen"></i></button><button onclick="eliminarEmpleado(${e.id})" class="text-slate-500 hover:text-red-400 p-1"><i class="fa-solid fa-trash"></i></button></td></tr>`).join('');
-        }
+function renderEmpleados() {
+    gId('tabla-empleados-body').innerHTML = appState.empleados.map(e => `<tr class="hover:bg-slate-900/50 ${!e.activo?'opacity-50':''}"><td class="p-3.5 text-center"><input type="checkbox" ${e.activo?'checked':''} onchange="toggleEstadoEmpleado(${e.id}, ${e.activo})" class="w-4 h-4 text-sky-500 rounded bg-slate-950 border-slate-800 cursor-pointer"></td><td class="p-3.5 font-mono text-slate-400 text-[11px]">${e.fecha_ingreso||''}</td><td class="p-3.5 font-semibold text-slate-200">${e.cedula}</td><td class="p-3.5 font-bold text-white">${e.nombre}</td><td class="p-3.5 text-slate-400">${e.telefono||'-'}</td><td class="p-3.5 text-amber-400">${e.departamentos?.nombre||'-'}</td><td class="p-3.5 text-purple-400">${e.cargos?.nombre||'-'}</td><td class="p-3.5 text-slate-300 font-medium">$${Number(e.sueldo).toFixed(2)}</td><td class="p-3.5 text-emerald-400">$${Number(e.bono_alimentacion).toFixed(2)}</td><td class="p-3.5 text-sky-400">$${Number(e.otros_ingresos).toFixed(2)}</td><td class="p-3.5 text-center font-mono text-xs ${e.device_user_id ? 'text-amber-400 font-bold' : 'text-slate-600'}">${e.device_user_id || '—'}</td><td class="p-3.5 text-right space-x-1"><button onclick="editarEmpleado(${e.id})" class="text-sky-400 hover:text-sky-300 p-1"><i class="fa-solid fa-pen"></i></button><button onclick="eliminarEmpleado(${e.id})" class="text-slate-500 hover:text-red-400 p-1"><i class="fa-solid fa-trash"></i></button></td></tr>`).join('');
+}
 
         async function toggleEstadoEmpleado(id, v) { try { await supabaseClient.from('empleados').update({ activo:!v }).eq('id',id); } catch(e){} const emp = appState.empleados.find(x => x.id === id); if (emp) emp.activo = !v; fetchAllData(); }
         async function eliminarEmpleado(id) { if(confirm('¿Eliminar empleado?')) { try { await supabaseClient.from('empleados').delete().eq('id',id); } catch(e){} appState.empleados = appState.empleados.filter(x => x.id !== id); fetchAllData(); } }
@@ -1307,6 +1307,16 @@ async function guardarEmpleado() {
     const id=gId('emp-id').value; 
     const p={ fecha_ingreso:gId('emp-fecha').value||null, cedula:gId('emp-cedula').value, nombre:gId('emp-nombre').value, telefono:gId('emp-telefono').value, departamento_id:gId('emp-depto-select').value||null, cargo_id:gId('emp-cargo-select').value||null, sueldo:parseFloat(gId('emp-sueldo').value)||0, bono_alimentacion:parseFloat(gId('emp-bono-alim').value)||0, otros_ingresos:parseFloat(gId('emp-otros-ing').value)||0, device_user_id: gId('emp-device-user-id').value.trim() || null, activo:gId('emp-activo').checked }; 
     if(!p.cedula||!p.nombre) return showToast('Faltan datos','error'); 
+    try { 
+        if (id) { await supabaseClient.from('empleados').update(p).eq('id', id); } 
+        else { await supabaseClient.from('empleados').insert([p]); } 
+    } catch(e) { console.warn('Error guardar empleado:', e); }
+    closeModal('modal-empleado'); 
+    fetchAllData(); 
+    showToast('Empleado guardado exitosamente');
+}
+
+function abrirCrearDepartamento() { gId('depto-id').value=''; gId('depto-nombre').value=''; openModal('modal-departamento'); }
 
         function abrirCrearDepartamento() { gId('depto-id').value=''; gId('depto-nombre').value=''; openModal('modal-departamento'); }
         function editarDepartamento(id) { const d=appState.departamentos.find(x=>String(x.id)===String(id)); if(d){ gId('depto-id').value=d.id; gId('depto-nombre').value=d.nombre; openModal('modal-departamento'); } }
