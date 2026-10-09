@@ -254,6 +254,7 @@
                             <input type="text" id="nom-total-usd" value="$0.00" readonly class="w-28 bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-emerald-400 font-bold outline-none cursor-not-allowed"></div>
                             <div><label class="text-[11px] font-semibold text-slate-400 block mb-1">Total a Pagar (Bs)</label>
                             <input type="text" id="nom-total-bs" value="Bs. 0.00" readonly class="w-32 bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-emerald-400 font-bold outline-none cursor-not-allowed"></div>
+                            <button onclick="aplicarAsistenciaANomina()" class="w-full sm:w-auto bg-amber-600/20 hover:bg-amber-600/40 text-amber-400 border border-amber-500/40 text-xs px-4 py-2.5 rounded-lg font-bold flex items-center justify-center space-x-1.5 transition xl:mt-5" title="Lee asistencia_registros de Supabase y calcula días faltantes"><i class="fa-solid fa-fingerprint"></i><span>Aplicar Asistencia</span></button>
                             <button onclick="guardarBorradorNominaManual()" class="w-full sm:w-auto bg-sky-600/20 hover:bg-sky-600/40 text-sky-400 border border-sky-500/40 text-xs px-4 py-2.5 rounded-lg font-bold flex items-center justify-center space-x-1.5 transition xl:mt-5" title="Guarda en la nube los valores para acceder desde cualquier dispositivo"><i class="fa-solid fa-cloud-arrow-up"></i><span>Guardar Pre-Nómina</span></button>
                             <button onclick="limpiarBorradorNomina()" class="w-full sm:w-auto bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-rose-400 border border-slate-700 text-xs px-3 py-2.5 rounded-lg font-medium flex items-center justify-center transition xl:mt-5" title="Limpiar los datos introducidos"><i class="fa-solid fa-eraser"></i></button>
                             <button onclick="procesarNominaGlobal()" class="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-5 py-2.5 rounded-lg font-bold flex items-center justify-center space-x-2 transition shadow-lg shadow-emerald-600/20 xl:mt-5"><i class="fa-solid fa-file-invoice-dollar"></i><span>Procesar Definitivo</span></button>
@@ -3539,6 +3540,139 @@ function enviarWhatsAppPrestaciones() {
             } catch (err) { showToast('No se pudieron obtener históricos de DolarApi', 'error'); }
             finally { if (btnSync) btnSync.innerHTML = '<i class="fa-solid fa-cloud-arrow-down mr-1"></i> Sincronizar Cierres BCV'; }
         }
+        // ============================================================
+// APLICAR ASISTENCIA → DÍAS FALTANTES EN NÓMINA
+// ============================================================
+function esFeriadoNacional(fecha) {
+    const y = fecha.getFullYear(), m = fecha.getMonth(), d = fecha.getDate();
+    const fj = [
+        {m:0,d:1},{m:3,d:19},{m:4,d:1},{m:5,d:24},
+        {m:6,d:5},{m:6,d:24},{m:9,d:12},{m:11,d:24},{m:11,d:25},{m:11,d:31}
+    ];
+    if (fj.some(f => f.m === m && f.d === d)) return true;
+    // Cálculo de Semana Santa
+    const a=y%19, b=Math.floor(y/100), c=y%100, d1=Math.floor(b/4), e1=b%4,
+          f1=Math.floor((b+8)/25), g1=Math.floor((b-f1+1)/3),
+          h=(19*a+b-d1-g1+15)%30, i=Math.floor(c/4), k=c%4,
+          l=(32+2*e1+2*i-h-k)%7, m1=Math.floor((a+11*h+22*l)/451),
+          month=Math.floor((h+l-7*m1+114)/31)-1, day=((h+l-7*m1+114)%31)+1;
+    const pas = new Date(y, month, day);
+    const cL = new Date(pas); cL.setDate(cL.getDate()-48);
+    const cM = new Date(pas); cM.setDate(cM.getDate()-47);
+    const jS = new Date(pas); jS.setDate(jS.getDate()-3);
+    const vS = new Date(pas); vS.setDate(vS.getDate()-2);
+    return [cL,cM,jS,vS].some(mov => mov.getFullYear() === y && mov.getMonth() === m && mov.getDate() === d);
+}
+
+// Devuelve array de días hábiles (Lun-Vie, no feriados) entre 2 fechas inclusivas
+function diasHabilesEnRango(desde, hasta) {
+    const dias = [];
+    const cursor = new Date(desde.getFullYear(), desde.getMonth(), desde.getDate());
+    const fin = new Date(hasta.getFullYear(), hasta.getMonth(), hasta.getDate());
+    while (cursor <= fin) {
+        const dw = cursor.getDay();
+        if (dw !== 0 && dw !== 6 && !esFeriadoNacional(cursor)) {
+            dias.push(new Date(cursor));
+        }
+        cursor.setDate(cursor.getDate() + 1);
+    }
+    return dias;
+}
+
+async function aplicarAsistenciaANomina() {
+    const fechaPagoStr = gId('nom-fecha-proceso')?.value;
+    if (!fechaPagoStr) return showToast('Falta la fecha de pago en la nómina', 'error');
+
+    // El período es la quincena que termina en fecha_pago:
+    // - Si pago el 15 → período del 1 al 15
+    // - Si pago el 30/31 → período del 16 al último día
+    const fechaPago = new Date(fechaPagoStr + 'T00:00:00');
+    const dia = fechaPago.getDate();
+    let inicioQuincena, finQuincena;
+
+    if (dia <= 15) {
+        inicioQuincena = new Date(fechaPago.getFullYear(), fechaPago.getMonth(), 1);
+        finQuincena = new Date(fechaPago.getFullYear(), fechaPago.getMonth(), 15);
+    } else {
+        inicioQuincena = new Date(fechaPago.getFullYear(), fechaPago.getMonth(), 16);
+        finQuincena = new Date(fechaPago.getFullYear(), fechaPago.getMonth() + 1, 0);
+    }
+
+    const isoIni = inicioQuincena.toISOString().split('T')[0];
+    const isoFin = finQuincena.toISOString().split('T')[0];
+
+    showToast(`Leyendo asistencia del ${isoIni} al ${isoFin}...`);
+
+    // 1) Traer registros de asistencia del período
+    const { data: asistencia, error } = await supabaseClient
+        .from('asistencia_registros')
+        .select('device_user_id, fecha_hora, tipo')
+        .gte('fecha_hora', isoIni + 'T00:00:00')
+        .lte('fecha_hora', isoFin + 'T23:59:59');
+
+    if (error) {
+        console.error('Error leyendo asistencia:', error);
+        return showToast('Error al leer asistencia de Supabase', 'error');
+    }
+
+    // 2) Agrupar por device_user_id → Set de días con marcaje
+    const diasAsistidos = {};
+    (asistencia || []).forEach(r => {
+        if (!r.device_user_id || !r.fecha_hora) return;
+        const fechaDia = r.fecha_hora.substring(0, 10);
+        if (!diasAsistidos[r.device_user_id]) diasAsistidos[r.device_user_id] = new Set();
+        diasAsistidos[r.device_user_id].add(fechaDia);
+    });
+
+    // 3) Calcular días hábiles totales del período
+    const habilesPeriodo = diasHabilesEnRango(inicioQuincena, finQuincena);
+    const totalHabiles = habilesPeriodo.length;
+
+    // 4) Para cada empleado activo, contar faltantes
+    const emps = appState.empleados.filter(e => e.activo);
+    let procesados = 0, sinID = 0;
+
+    for (const e of emps) {
+        const inputDf = gId(`df-${e.id}`);
+        if (!inputDf) continue;
+
+        if (!e.device_user_id) {
+            sinID++;
+            continue; // No tocamos empleados sin ID Dahua
+        }
+
+        const asistidosSet = diasAsistidos[String(e.device_user_id)] || new Set();
+        let faltantes = 0;
+
+        for (const diaHabil of habilesPeriodo) {
+            const clave = diaHabil.toISOString().split('T')[0];
+            if (!asistidosSet.has(clave)) faltantes++;
+        }
+
+        // Ajuste: si el empleado ingresó después del inicio de la quincena,
+        // solo contar desde su fecha de ingreso
+        if (e.fecha_ingreso) {
+            const fIng = new Date(e.fecha_ingreso + 'T00:00:00');
+            if (fIng > inicioQuincena) {
+                faltantes = 0;
+                for (const diaHabil of habilesPeriodo) {
+                    if (diaHabil < fIng) continue;
+                    const clave = diaHabil.toISOString().split('T')[0];
+                    if (!asistidosSet.has(clave)) faltantes++;
+                }
+            }
+        }
+
+        inputDf.value = faltantes;
+        procesados++;
+    }
+
+    // 5) Recalcular totales de la nómina
+    recalcularTodaLaNomina();
+    autoguardarBorradorNomina();
+
+    showToast(`Asistencia aplicada: ${procesados} empleados procesados (${totalHabiles} días hábiles en el período)${sinID > 0 ? `, ${sinID} sin ID Dahua` : ''}`);
+}
     </script>
 </body>
 </html>
