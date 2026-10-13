@@ -275,6 +275,29 @@
                 </section>
             </div>
 
+<!-- MODAL DESGLOSE UTILIDADES -->
+        <div id="modal-detalle-utilidades" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+            <div class="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-6xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+                <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-950">
+                    <div><h3 class="font-bold text-sm text-white"><i class="fa-solid fa-list text-rose-400 mr-2"></i> Desglose Utilidades <span id="detalle-uti-periodo" class="text-sky-400"></span></h3></div>
+                    <div class="flex space-x-2">
+                        <button onclick="imprimirDesgloseUtilidades()" class="bg-sky-600 hover:bg-sky-500 text-white text-xs px-3.5 py-1.5 rounded-lg font-semibold flex items-center space-x-1.5"><i class="fa-solid fa-print"></i><span>Imprimir</span></button>
+                        <button onclick="closeModal('modal-detalle-utilidades')" class="text-slate-400 px-2"><i class="fa-solid fa-xmark text-lg"></i></button>
+                    </div>
+                </div>
+                <div id="area-impresion-utilidades" class="p-4 overflow-y-auto custom-scrollbar">
+                    <div class="hidden print:block mb-4 border-b pb-2"><h2 class="text-lg font-bold">Reporte General de Utilidades</h2><p class="text-xs">Período: <span id="print-uti-periodo"></span> | Fecha Pago: <span id="print-uti-fecha"></span></p></div>
+                    <table class="w-full text-left text-xs whitespace-nowrap">
+                        <thead class="bg-slate-950 text-slate-400 uppercase text-[9px] sticky top-0 z-20 shadow-[0_1px_0_0_#1e293b]">
+                            <tr><th class="p-2.5">Empleado</th><th class="p-2.5">Cargo</th><th class="p-2.5 text-center">Días Trab.</th><th class="p-2.5 text-center">Días Pag.</th><th class="p-2.5 text-center">% Pagado</th><th class="p-2.5">Utilidad ($)</th><th class="p-2.5">Subsidio ($)</th><th class="p-2.5">Total ($)</th><th class="p-2.5">Total (Bs)</th></tr>
+                        </thead>
+                        <tbody id="tabla-detalle-utilidades-body" class="divide-y divide-slate-800/50"></tbody>
+                        <tfoot id="tabla-detalle-utilidades-foot" class="bg-slate-950 font-bold border-t border-slate-700"></tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+            
             <!-- NÓMINAS PROCESADAS -->
             <div id="tab-historico-content" class="tab-content hidden space-y-6">
                 <section class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
@@ -2535,39 +2558,40 @@ function renderHistoricoUtilidades() {
         gr[k].tsub += Number(u.subsidio_usd) || 0; 
         gr[k].tgt += Number(u.gran_total_usd || u.total_usd) || 0; 
         gr[k].tgtb += Number(u.gran_total_bs || u.total_bs) || 0;
-        const pct = Number(u.porcentaje_pagado !== undefined ? u.porcentaje_pagado : 100);
-        gr[k].porcentaje_pagado = pct; // Todos los registros del mismo lote tienen el mismo %
-        const pctAcum = Number(u.porcentaje_acumulado !== undefined ? u.porcentaje_acumulado : 100);
-        if(pctAcum < gr[k].porcentaje_acumulado_min) gr[k].porcentaje_acumulado_min = pctAcum;
-        if(pctAcum > gr[k].porcentaje_acumulado_max) gr[k].porcentaje_acumulado_max = pctAcum;
-    });
+            const pct = Number(u.porcentaje_pagado !== undefined ? u.porcentaje_pagado : 100);
+            gr[k].porcentaje_pagado = pct; // Todos los registros del mismo lote tienen el mismo %
+            const pctAcum = Number(u.porcentaje_acumulado !== undefined ? u.porcentaje_acumulado : 100);
+            if(pctAcum < gr[k].porcentaje_acumulado_min) gr[k].porcentaje_acumulado_min = pctAcum;
+            if(pctAcum > gr[k].porcentaje_acumulado_max) gr[k].porcentaje_acumulado_max = pctAcum;
+        });
 
-    gId('tabla-historico-utilidades-body').innerHTML = Object.keys(gr).sort().reverse().map(k => {
-        const g = gr[k];
-        let estadoBadge = '';
-        if(g.porcentaje_acumulado_min >= 100) {
-            estadoBadge = `<span class="text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-800 px-2 py-0.5 rounded font-bold"><i class="fa-solid fa-check"></i> Completado</span>`;
-        } else {
-            estadoBadge = `<span class="text-[10px] bg-amber-950 text-amber-300 border border-amber-800 px-2 py-0.5 rounded font-bold"><i class="fa-solid fa-clock"></i> Parcial</span>`;
-        }
-        return `<tr class="hover:bg-slate-900/50">
-            <td class="p-3.5 font-bold text-white">${g.p}</td>
-            <td class="p-3.5 text-slate-300 font-mono">${g.f}</td>
-            <td class="p-3.5 text-center text-sky-400 font-semibold">${g.c}</td>
-            <td class="p-3.5 text-center text-rose-300 font-bold font-mono">${g.porcentaje_pagado.toFixed(2)}%</td>
-            <td class="p-3.5 text-center text-amber-300 font-bold font-mono">${g.porcentaje_acumulado_min.toFixed(2)}%${g.porcentaje_acumulado_max !== g.porcentaje_acumulado_min ? ` - ${g.porcentaje_acumulado_max.toFixed(2)}%` : ''}</td>
-            <td class="p-3.5 text-center">${estadoBadge}</td>
-            <td class="p-3.5 text-slate-300 font-mono">$${g.tu.toFixed(2)}</td>
-            <td class="p-3.5 text-amber-400 font-mono">$${g.tsub.toFixed(2)}</td>
-            <td class="p-3.5 font-bold text-emerald-400 font-mono">$${g.tgt.toFixed(2)}</td>
-            <td class="p-3.5 font-bold text-emerald-400 font-mono">Bs. ${fNum(g.tgtb)}</td>
-            <td class="p-3.5 text-right space-x-1">
-                <button onclick="verRecibosUtilidadesHistorico('${g.p}', '${g.f}')" class="bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-400 border border-emerald-500/30 text-xs px-2.5 py-1 rounded-lg font-medium inline-flex items-center space-x-1 transition"><i class="fa-solid fa-receipt text-[11px]"></i><span>Ver Recibos</span></button>
-                ${isMaster ? `<button onclick="eliminarUtilidadesProcesadas('${g.p}', '${g.f}')" class="bg-rose-600/20 hover:bg-rose-600/40 text-rose-400 border border-rose-500/30 text-xs px-2.5 py-1 rounded-lg font-medium inline-flex items-center space-x-1 transition"><i class="fa-solid fa-trash text-[11px]"></i></button>` : ''}
-            </td>
-        </tr>`;
-    }).join('');
-}
+        gId('tabla-historico-utilidades-body').innerHTML = Object.keys(gr).sort().reverse().map(k => {
+            const g = gr[k];
+            let estadoBadge = '';
+            if(g.porcentaje_acumulado_min >= 100) {
+                estadoBadge = `<span class="text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-800 px-2 py-0.5 rounded font-bold"><i class="fa-solid fa-check"></i> Completado</span>`;
+            } else {
+                estadoBadge = `<span class="text-[10px] bg-amber-950 text-amber-300 border border-amber-800 px-2 py-0.5 rounded font-bold"><i class="fa-solid fa-clock"></i> Parcial</span>`;
+            }
+            return `<tr class="hover:bg-slate-900/50">
+                <td class="p-3.5 font-bold text-white">${g.p}</td>
+                <td class="p-3.5 text-slate-300 font-mono">${g.f}</td>
+                <td class="p-3.5 text-center text-sky-400 font-semibold">${g.c}</td>
+                <td class="p-3.5 text-center text-rose-300 font-bold font-mono">${g.porcentaje_pagado.toFixed(2)}%</td>
+                <td class="p-3.5 text-center text-amber-300 font-bold font-mono">${g.porcentaje_acumulado_min.toFixed(2)}%${g.porcentaje_acumulado_max !== g.porcentaje_acumulado_min ? ` - ${g.porcentaje_acumulado_max.toFixed(2)}%` : ''}</td>
+                <td class="p-3.5 text-center">${estadoBadge}</td>
+                <td class="p-3.5 text-slate-300 font-mono">$${g.tu.toFixed(2)}</td>
+                <td class="p-3.5 text-amber-400 font-mono">$${g.tsub.toFixed(2)}</td>
+                <td class="p-3.5 font-bold text-emerald-400 font-mono">$${g.tgt.toFixed(2)}</td>
+                <td class="p-3.5 font-bold text-emerald-400 font-mono">Bs. ${fNum(g.tgtb)}</td>
+                <td class="p-3.5 text-right space-x-1">
+                    <button onclick="verDetalleUtilidades('${g.p}', '${g.f}')" class="bg-sky-600/20 hover:bg-sky-600/40 text-sky-400 border border-sky-500/30 text-xs px-2.5 py-1 rounded-lg font-medium inline-flex items-center space-x-1 transition"><i class="fa-solid fa-list text-[11px]"></i><span>Resumen</span></button>
+                    <button onclick="verRecibosUtilidadesHistorico('${g.p}', '${g.f}')" class="bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-400 border border-emerald-500/30 text-xs px-2.5 py-1 rounded-lg font-medium inline-flex items-center space-x-1 transition"><i class="fa-solid fa-receipt text-[11px]"></i><span>Recibos</span></button>
+                    ${isMaster ? `<button onclick="eliminarUtilidadesProcesadas('${g.p}', '${g.f}')" class="bg-rose-600/20 hover:bg-rose-600/40 text-rose-400 border border-rose-500/30 text-xs px-2.5 py-1 rounded-lg font-medium inline-flex items-center space-x-1 transition"><i class="fa-solid fa-trash text-[11px]"></i></button>` : ''}
+                </td>
+            </tr>`;
+        }).join('');
+    }
 
 async function eliminarUtilidadesProcesadas(p, f) { 
     if (appState.usuarioActual?.rol !== 'master') return showToast('No tiene permisos para eliminar registros', 'error');
@@ -3673,6 +3697,56 @@ async function aplicarAsistenciaANomina() {
 
     showToast(`Asistencia aplicada: ${procesados} empleados procesados (${totalHabiles} días hábiles en el período)${sinID > 0 ? `, ${sinID} sin ID Dahua` : ''}`);
 }
+
+        function verDetalleUtilidades(p, f) {
+            const regs = appState.utilidades.filter(u => u.periodo === p && u.fecha_pago === f); 
+            gId('detalle-uti-periodo').innerText = `${p} (${f})`; 
+            gId('print-uti-periodo').innerText = p;
+            gId('print-uti-fecha').innerText = f;
+            
+            let tUti = 0, tSub = 0, tTotU = 0, tTotB = 0;
+
+            gId('tabla-detalle-utilidades-body').innerHTML = regs.map(r => {const dTrab = r.dias_trabajados || 0;
+                const dPag = Number(r.dias_pagados) || 0;
+                const pct = Number(r.porcentaje_pagado !== undefined ? r.porcentaje_pagado : 100);
+                const utiU = Number(r.total_usd) || 0;
+                const subU = Number(r.subsidio_usd) || 0;
+                const totU = Number(r.gran_total_usd || (utiU + subU));
+                const totB = Number(r.gran_total_bs || r.total_bs);
+
+                tUti += utiU; 
+                tSub += subU; 
+                tTotU += totU; 
+                tTotB += totB;
+
+                return `<tr class="hover:bg-slate-800/40">
+                    <td class="p-2.5 font-semibold text-white">${r.empleado}</td>
+                    <td class="p-2.5 text-slate-400">${r.cargo || '-'}</td>
+                    <td class="p-2.5 text-center text-rose-400">${dTrab} d</td>
+                    <td class="p-2.5 text-center text-teal-400">${dPag.toFixed(2)} d</td>
+                    <td class="p-2.5 text-center text-sky-400 font-mono">${pct.toFixed(2)}%</td>
+                    <td class="p-2.5 text-slate-300 font-mono">$${utiU.toFixed(2)}</td>
+                    <td class="p-2.5 text-amber-400 font-mono">$${subU.toFixed(2)}</td>
+                    <td class="p-2.5 font-bold text-emerald-400 font-mono">$${totU.toFixed(2)}</td>
+                    <td class="p-2.5 font-bold text-emerald-400 font-mono">Bs. ${fNum(totB)}</td>
+                </tr>`;
+            }).join('');
+
+            gId('tabla-detalle-utilidades-foot').innerHTML = `<tr>
+                <td colspan="5" class="p-2.5 text-slate-300 text-right uppercase">Totales:</td>
+                <td class="p-2.5 text-white font-mono">$${tUti.toFixed(2)}</td>
+                <td class="p-2.5 text-amber-400 font-mono">$${tSub.toFixed(2)}</td>
+                <td class="p-2.5 text-emerald-400 font-bold font-mono">$${tTotU.toFixed(2)}</td>
+                <td class="p-2.5 text-emerald-400 font-bold font-mono">Bs. ${fNum(tTotB)}</td>
+            </tr>`;
+            
+            openModal('modal-detalle-utilidades');
+        }
+
+        function imprimirDesgloseUtilidades() { 
+            gId('print-container').innerHTML = `<div class="p-4">${gId('area-impresion-utilidades').innerHTML}</div>`; 
+            window.print(); 
+        }
     </script>
 </body>
 </html>
