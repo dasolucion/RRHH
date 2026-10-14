@@ -1258,8 +1258,17 @@ else if(tab === 'liquidaciones-historico') renderHistoricoPrestaciones();
                 localStorage.setItem('nomina_vacaciones_cache', JSON.stringify(appState.vacaciones));
             } else { const localV = localStorage.getItem('nomina_vacaciones_cache'); if (localV) { try { appState.vacaciones = JSON.parse(localV).map(normalizarRegistroJson); } catch(e){} } }
             const utis = await safeQuery(supabaseClient.from('utilidades').select('*').order('id', {ascending: false}), 'utilidades');
-            if (utis && utis.length > 0) { appState.utilidades = utis; localStorage.setItem('nomina_utilidades', JSON.stringify(utis)); }
-            else { const localU = localStorage.getItem('nomina_utilidades'); if (localU) appState.utilidades = JSON.parse(localU); }
+            if (utis && utis.length > 0) { 
+                appState.utilidades = utis.map(u => {
+                    const det = typeof u.detalle_calculo === 'string' ? JSON.parse(u.detalle_calculo) : (u.detalle_calculo || {});
+                    return { ...det, ...u }; // Extrae los datos del JSON a la raíz
+                });
+                localStorage.setItem('nomina_utilidades', JSON.stringify(appState.utilidades)); 
+            }
+            else { 
+                const localU = localStorage.getItem('nomina_utilidades'); 
+                if (localU) appState.utilidades = JSON.parse(localU); 
+            }
             const prest = await safeQuery(supabaseClient.from('prestaciones').select('*').order('id', {ascending: false}), 'prestaciones');
             if (prest && prest.length > 0) { appState.prestaciones = prest; localStorage.setItem('nomina_prestaciones', JSON.stringify(prest)); }
             else { const localP = localStorage.getItem('nomina_prestaciones'); if (localP) appState.prestaciones = JSON.parse(localP); }
@@ -2490,7 +2499,9 @@ function verificarEstadoPeriodo() {
 async function procesarUtilidadesGlobal() {
     if(appState.calculoUtilidadesActual.length === 0) return;
     
-    const r = appState.calculoUtilidadesActual.map(x => ({ 
+    // 1. Empaquetar SOLO las columnas que sabemos que existen en la BD.
+    // Todo lo nuevo (porcentajes, subsidios) va dentro del JSON "detalle_calculo"
+    const payloadSupabase = appState.calculoUtilidadesActual.map(x => ({ 
         periodo: x.periodo, 
         fecha_pago: x.fecha_pago, 
         empleado_id: x.empleado.id, 
@@ -2502,37 +2513,33 @@ async function procesarUtilidadesGlobal() {
         dias_pagados: x.dias_pagados, 
         total_usd: x.total_usd, 
         total_bs: x.total_bs, 
-        subsidio_usd: x.subsidio_usd, 
-        subsidio_bs: x.subsidio_bs, 
-        gran_total_usd: x.gran_total_usd, 
-        gran_total_bs: x.gran_total_bs,
-        porcentaje_pagado: x.porcentaje_pagado,
-        porcentaje_acumulado: x.porcentaje_acumulado,
-        total_usd_anual: x.total_usd_anual,
-        total_bs_anual: x.total_bs_anual,
-        gran_total_usd_anual: x.gran_total_usd_anual,
-        gran_total_bs_anual: x.gran_total_bs_anual,
         detalle_calculo: x 
     }));
     
-    // Intentar guardar en Supabase (si falla, seguimos con local)
-    const insertado = await safeQuery(supabaseClient.from('utilidades').insert(r).select(), 'insert_utilidades');
+    // 2. Insertar en Supabase
+    const insertado = await safeQuery(supabaseClient.from('utilidades').insert(payloadSupabase).select(), 'insert_utilidades');
     
-    // ⚡ Si Supabase falló, guardamos localmente con IDs temporales
+    // 3. Procesar respuesta y expandir el JSON a la raíz para que el frontend lo lea fácil
+    let registrosNuevos = [];
     if (insertado && insertado.length > 0) {
-        insertado.forEach(reg => appState.utilidades.unshift(reg));
+        registrosNuevos = insertado.map(reg => {
+            const det = typeof reg.detalle_calculo === 'string' ? JSON.parse(reg.detalle_calculo) : (reg.detalle_calculo || {});
+            return { ...det, ...reg }; // Mezcla las propiedades nuevas hacia la raíz
+        });
     } else {
-        // Fallback: guardar en cache local
-        const nuevos = r.map((reg, idx) => ({ 
+        // Fallback si falla Supabase
+        registrosNuevos = payloadSupabase.map((reg, idx) => ({ 
+            ...reg.detalle_calculo, 
             ...reg, 
             id: Date.now() + idx, 
             created_at: new Date().toISOString(),
             _local: true 
         }));
-        nuevos.forEach(reg => appState.utilidades.unshift(reg));
         console.warn('[Utilidades] Guardado solo en local (Supabase falló)');
     }
     
+    // 4. Actualizar estado y UI
+    registrosNuevos.forEach(reg => appState.utilidades.unshift(reg));
     localStorage.setItem('nomina_utilidades', JSON.stringify(appState.utilidades));
     
     gId('uti-resultados').classList.add('hidden'); 
