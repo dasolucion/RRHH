@@ -38,7 +38,7 @@
             .print-page { page-break-after: always; break-after: page; display: flex !important; flex-direction: column !important; justify-content: space-between !important; height: 268mm !important; width: 100% !important; padding: 0 !important; margin: 0 !important; box-sizing: border-box !important; }
             .print-page:last-child { page-break-after: auto; break-after: auto; }
             .recibo-card { page-break-inside: avoid !important; break-inside: avoid !important; border: 1px solid #000 !important; box-shadow: none !important; margin: 0 auto !important; width: 100% !important; height: 129mm !important; max-width: none !important; border-radius: 0 !important; box-sizing: border-box !important; padding: 4px 8px !important; overflow: hidden !important; display: flex !important; flex-direction: column !important; justify-content: space-between !important; background: #fff !important; color: #000 !important; }
-            .recibo-vacaciones-print, .recibo-utilidades-print, .recibo-prestaciones-print, .recibo-antiguedad-print { border: 1px solid #000 !important; padding: 8px !important; width: 100% !important; box-sizing: border-box !important; background: #fff !important; color: #000 !important; }
+            .recibo-vacaciones-print, .recibo--print, .recibo-prestaciones-print, .recibo-antiguedad-print { border: 1px solid #000 !important; padding: 8px !important; width: 100% !important; box-sizing: border-box !important; background: #fff !important; color: #000 !important; }
             .divisor-recibo { border-top: 1px dashed #000 !important; height: 1px !important; margin: auto 0 !important; display: block !important; width: 100% !important; }
             #print-container table { border-collapse: collapse !important; width: 100% !important; color: #000 !important; }
             #print-container th, #print-container td { border: 1px solid #ccc !important; padding: 2px 3px !important; color: #000 !important; }
@@ -424,9 +424,9 @@
                 <label class="text-[11px] font-semibold text-slate-400 block mb-1" title="Porcentaje que se paga en esta fecha del total anual">% a Pagar Ahora</label>
                 <input type="number" step="0.01" min="0" max="100" id="uti-porcentaje" value="100" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-rose-500 font-bold text-rose-300">
             </div>
-            <div>
-                <label class="text-[11px] font-semibold text-slate-400 block mb-1">Tasa BCV</label>
-                <input type="text" id="uti-tasa-bcv-readonly" readonly class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-slate-400 outline-none cursor-not-allowed">
+<div>
+                <label class="text-[11px] font-semibold text-slate-400 block mb-1" title="Tasa aplicable para este pago">Tasa BCV (Bs/$)</label>
+                <input type="number" step="0.01" id="uti-tasa-bcv" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-rose-500 transition-colors">
             </div>
             <div class="flex items-end">
                 <button onclick="generarUtilidades()" class="w-full bg-rose-600 hover:bg-rose-500 text-white text-xs px-4 py-2.5 rounded-lg font-bold flex items-center justify-center space-x-2 transition">
@@ -2307,7 +2307,7 @@ function enviarWhatsAppVacaciones() {
 function generarUtilidades() {
     const p = gId('uti-periodo').value; 
     const f = gId('uti-fecha-pago').value; 
-    const t = parseFloat(gId('nom-tasa-bcv').value) || 36.5;
+    const t = parseFloat(gId('uti-tasa-bcv').value) || parseFloat(gId('nom-tasa-bcv').value) || 36.5;
     const porcentajeSolicitado = parseFloat(gId('uti-porcentaje').value);
     
     if(!p || !f) return showToast('Indique el período y la fecha de pago', 'error'); 
@@ -3536,9 +3536,9 @@ function enviarWhatsAppPrestaciones() {
             if(gId('icon-sync-bcv')) gId('icon-sync-bcv').classList.remove('fa-spin');
         }
 
-        function aplicarTasaEnVistas(tasa) {
+function aplicarTasaEnVistas(tasa) {
             if(gId('nom-tasa-bcv')) gId('nom-tasa-bcv').value = tasa.toFixed(2);
-            if(gId('uti-tasa-bcv-readonly')) gId('uti-tasa-bcv-readonly').value = `${tasa.toFixed(2)} Bs/$`;
+            if(gId('uti-tasa-bcv')) gId('uti-tasa-bcv').value = tasa.toFixed(2);
             if(gId('tasa-dolar-mes-input')) gId('tasa-dolar-mes-input').value = tasa.toFixed(2);
             recalcularTodaLaNomina();
         }
