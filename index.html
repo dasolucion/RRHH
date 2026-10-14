@@ -2499,8 +2499,7 @@ function verificarEstadoPeriodo() {
 async function procesarUtilidadesGlobal() {
     if(appState.calculoUtilidadesActual.length === 0) return;
     
-    // 1. Empaquetar SOLO las columnas que sabemos que existen en la BD.
-    // Todo lo nuevo (porcentajes, subsidios) va dentro del JSON "detalle_calculo"
+    // Empaquetar TODOS los datos para Supabase
     const payloadSupabase = appState.calculoUtilidadesActual.map(x => ({ 
         periodo: x.periodo, 
         fecha_pago: x.fecha_pago, 
@@ -2512,24 +2511,29 @@ async function procesarUtilidadesGlobal() {
         dias_trabajados: x.dias_trabajados, 
         dias_pagados: x.dias_pagados, 
         total_usd: x.total_usd, 
-        total_bs: x.total_bs, 
+        total_bs: x.total_bs,
+        subsidio_usd: x.subsidio_usd,
+        subsidio_bs: x.subsidio_bs,
+        gran_total_usd: x.gran_total_usd,
+        gran_total_bs: x.gran_total_bs,
+        porcentaje_pagado: x.porcentaje_pagado,
+        porcentaje_acumulado: x.porcentaje_acumulado,
+        total_usd_anual: x.total_usd_anual,
+        total_bs_anual: x.total_bs_anual,
+        gran_total_usd_anual: x.gran_total_usd_anual,
+        gran_total_bs_anual: x.gran_total_bs_anual,
         detalle_calculo: x 
     }));
     
-    // 2. Insertar en Supabase
+    // Insertar en Supabase
     const insertado = await safeQuery(supabaseClient.from('utilidades').insert(payloadSupabase).select(), 'insert_utilidades');
     
-    // 3. Procesar respuesta y expandir el JSON a la raíz para que el frontend lo lea fácil
     let registrosNuevos = [];
     if (insertado && insertado.length > 0) {
-        registrosNuevos = insertado.map(reg => {
-            const det = typeof reg.detalle_calculo === 'string' ? JSON.parse(reg.detalle_calculo) : (reg.detalle_calculo || {});
-            return { ...det, ...reg }; // Mezcla las propiedades nuevas hacia la raíz
-        });
+        registrosNuevos = insertado;
     } else {
-        // Fallback si falla Supabase
+        // Fallback si falla Supabase (por falta de internet, etc)
         registrosNuevos = payloadSupabase.map((reg, idx) => ({ 
-            ...reg.detalle_calculo, 
             ...reg, 
             id: Date.now() + idx, 
             created_at: new Date().toISOString(),
@@ -2538,13 +2542,13 @@ async function procesarUtilidadesGlobal() {
         console.warn('[Utilidades] Guardado solo en local (Supabase falló)');
     }
     
-    // 4. Actualizar estado y UI
+    // Actualizar estado y UI
     registrosNuevos.forEach(reg => appState.utilidades.unshift(reg));
     localStorage.setItem('nomina_utilidades', JSON.stringify(appState.utilidades));
     
     gId('uti-resultados').classList.add('hidden'); 
     renderHistoricoUtilidades();
-    showToast('Pago parcial de utilidades guardado');
+    showToast('Pago parcial de utilidades guardado en la nube');
 }
 
 function renderHistoricoUtilidades() {
