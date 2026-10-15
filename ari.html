@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Formulario AR-I - Determinación de I.S.L.R.</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans antialiased min-h-screen p-4 sm:p-6 flex items-center justify-center">
+
+    <!-- ESTADO: CARGANDO -->
+    <div id="pantalla-cargando" class="text-center space-y-3">
+        <i class="fa-solid fa-spinner fa-spin text-3xl text-emerald-400"></i>
+        <p class="text-xs text-slate-400">Validando enlace de seguridad...</p>
+    </div>
+
+    <!-- ESTADO: ENLACE INVÁLIDO O USADO -->
+    <div id="pantalla-invalido" class="hidden bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 text-center space-y-4 shadow-2xl">
+        <div class="inline-flex bg-rose-500/20 text-rose-400 p-4 rounded-full text-2xl">
+            <i class="fa-solid fa-shield-halved"></i>
+        </div>
+        <h2 class="text-base font-bold text-white">Enlace No Válido o Expirado</h2>
+        <p class="text-xs text-slate-400 leading-relaxed" id="mensaje-error-token">
+            Este enlace único ya fue utilizado para registrar la declaración o ha caducado por motivos de seguridad legal.
+        </p>
+    </div>
+
+    <!-- ESTADO: FORMULARIO AR-I ACTIVO -->
+    <div id="pantalla-formulario" class="hidden bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-5 sm:p-8 space-y-6 shadow-2xl">
+        <div class="border-b border-slate-800 pb-4 text-center sm:text-left flex flex-col sm:flex-row justify-between items-center gap-3">
+            <div>
+                <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-950/60 border border-emerald-800/80 px-2 py-0.5 rounded">Formulario AR-I (Decreto 1808)</span>
+                <h1 class="text-lg font-black text-white mt-1">Estimación de Retención de I.S.L.R.</h1>
+                <p class="text-xs text-slate-400" id="empresa-nombre-label">Empresa</p>
+            </div>
+            <div class="text-right font-mono text-xs bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800">
+                <span class="text-slate-500 block text-[9px] uppercase font-bold">U.T. Vigente</span>
+                <span class="text-emerald-400 font-bold" id="lbl-ut-vigente">Bs. 9.00</span>
+            </div>
+        </div>
+
+        <div class="bg-slate-950/60 border border-slate-800 p-3.5 rounded-xl grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+            <div><span class="text-slate-500 text-[10px] uppercase font-bold block">Trabajador:</span><span id="lbl-emp-nombre" class="font-bold text-white">-</span></div>
+            <div><span class="text-slate-500 text-[10px] uppercase font-bold block">Cédula:</span><span id="lbl-emp-cedula" class="font-mono text-slate-200">-</span></div>
+            <div><span class="text-slate-500 text-[10px] uppercase font-bold block">Cargo:</span><span id="lbl-emp-cargo" class="text-purple-300">-</span></div>
+        </div>
+
+        <form id="form-ari" onsubmit="enviarDeclaracionARI(event)" class="space-y-4 text-xs">
+            <!-- A. Remuneración Anual Estimada -->
+            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+                <label class="block font-bold text-white text-[11px] uppercase tracking-wide">
+                    1. Remuneraciones Anuales Estimadas (En Bolívares)
+                </label>
+                <p class="text-[10px] text-amber-400 leading-tight">
+                    <i class="fa-solid fa-triangle-exclamation mr-1"></i> Ley de I.S.L.R. Art. 31: Solo debe incluir salario base y horas extras proyectadas. <strong>No incluya CestaTicket ni subsidios no salariales</strong>.
+                </p>
+                <div class="relative">
+                    <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500 font-bold">Bs.</span>
+                    <input type="number" step="0.01" id="ari-ingreso-bs" required oninput="calcularPorcentajeARI()" class="w-full bg-slate-900 border border-slate-700 rounded-lg pl-10 pr-3 py-2 text-white font-mono font-bold focus:border-emerald-500 outline-none">
+                </div>
+                <div class="text-[10px] text-slate-400 flex justify-between pt-1">
+                    <span>Equivalente en U.T.:</span>
+                    <span id="ari-ingreso-ut" class="font-bold font-mono text-sky-400">0.00 U.T.</span>
+                </div>
+            </div>
+
+            <!-- B. Desgravamen -->
+            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
+                <label class="block font-bold text-white text-[11px] uppercase tracking-wide">
+                    2. Modalidad de Desgravamen (Art. 59 LISLR)
+                </label>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <label class="flex items-center space-x-2 bg-slate-900 border border-slate-700 p-2.5 rounded-lg cursor-pointer hover:border-emerald-500">
+                        <input type="radio" name="ari-desgravamen" value="unico" checked onchange="calcularPorcentajeARI()" class="text-emerald-500">
+                        <div>
+                            <span class="font-bold text-white block">Desgravamen Único</span>
+                            <span class="text-[10px] text-slate-400">774 U.T. sin necesidad de soportes</span>
+                        </div>
+                    </label>
+                    <label class="flex items-center space-x-2 bg-slate-900 border border-slate-700 p-2.5 rounded-lg cursor-pointer hover:border-emerald-500">
+                        <input type="radio" name="ari-desgravamen" value="cero" onchange="calcularPorcentajeARI()" class="text-emerald-500">
+                        <div>
+                            <span class="font-bold text-white block">Sin Desgravamen</span>
+                            <span class="text-[10px] text-slate-400">0 U.T. (Tributación completa)</span>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <!-- C. Cargas Familiares -->
+            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+                <label class="block font-bold text-white text-[11px] uppercase tracking-wide">
+                    3. Cargas Familiares (10 U.T. por cada una - Art. 61 LISLR)
+                </label>
+                <p class="text-[10px] text-slate-400">
+                    Cónyuge no separado(a) de bienes, ascendientes (padres/abuelos) y descendientes directos (hijos menores o estudiantes hasta 25 años).
+                </p>
+                <div class="flex items-center space-x-3">
+                    <input type="number" id="ari-cargas" min="0" max="20" value="0" oninput="calcularPorcentajeARI()" class="w-24 bg-slate-900 border border-slate-700 rounded-lg p-2 text-center text-white font-mono font-bold focus:border-emerald-500 outline-none">
+                    <span class="text-slate-400">Carga(s) declarada(s) = <strong id="lbl-cargas-ut" class="text-sky-400 font-mono">0 U.T.</strong></span>
+                </div>
+            </div>
+
+            <!-- D. Resultado en Vivo -->
+            <div class="bg-gradient-to-r from-emerald-950/60 to-slate-900 border-2 border-emerald-500/40 p-4 rounded-xl flex justify-between items-center">
+                <div>
+                    <span class="text-[10px] uppercase font-bold text-slate-400 block">Porcentaje de Retención Determinado</span>
+                    <span class="text-[9px] text-emerald-400">Aplicable en cada recibo de pago quincenal</span>
+                </div>
+                <div class="text-right">
+                    <span id="lbl-porcentaje-final" class="text-3xl font-black text-emerald-400 font-mono">0.00%</span>
+                </div>
+            </div>
+
+            <button type="submit" id="btn-enviar-ari" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl transition shadow-lg shadow-emerald-600/30 flex items-center justify-center space-x-2 text-xs uppercase tracking-wider">
+                <i class="fa-solid fa-file-export"></i><span>Firmar y Enviar Declaración</span>
+            </button>
+        </form>
+    </div>
+
+    <!-- ESTADO: ENVÍO EXITOSO -->
+    <div id="pantalla-exito" class="hidden bg-slate-900 border border-emerald-500/40 rounded-2xl max-w-md w-full p-8 text-center space-y-4 shadow-2xl">
+        <div class="inline-flex bg-emerald-500/20 text-emerald-400 p-4 rounded-full text-3xl animate-bounce">
+            <i class="fa-solid fa-check"></i>
+        </div>
+        <h2 class="text-lg font-bold text-white">Declaración Recibida con Éxito</h2>
+        <p class="text-xs text-slate-300 leading-relaxed">
+            Se ha determinado un porcentaje de retención de <strong id="lbl-porcentaje-confirmado" class="text-emerald-400 font-mono text-sm">0.00%</strong> para su ficha de nómina.
+        </p>
+        <p class="text-[11px] text-slate-500 bg-slate-950 p-3 rounded-lg border border-slate-800">
+            <i class="fa-solid fa-lock mr-1"></i> Por motivos de seguridad y validez jurídica, este enlace ha quedado invalidado para futuras modificaciones.
+        </p>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://nrfplwpmwplpbskidtqs.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yZnBsd3Btd3BscGJza2lkdHFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc1OTA4MjIsImV4cCI6MjEwMzE2NjgyMn0.PZXrE9KtAVF2e4RbyM3-m1ClS8R8QaTCctLzZKAAYdQ';
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        const gId = (id) => document.getElementById(id);
+        const VALOR_UT = 9.00; // Unidad Tributaria vigente en Venezuela
+
+        let solicitudActiva = null;
+        let porcentajeCalculadoFinal = 0;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const token = urlParams.get('t');
+
+            if (!token) {
+                mostrarError('No se ha suministrado un token de acceso válido.');
+                return;
+            }
+
+            try {
+                const { data, error } = await supabase
+                    .from('solicitudes_ari')
+                    .select('*, empleados(*)')
+                    .eq('token', token)
+                    .maybeSingle();
+
+                if (error || !data) {
+                    mostrarError('El enlace no existe o es incorrecto.');
+                    return;
+                }
+
+                if (data.usado) {
+                    mostrarError('Esta declaración ya fue completada y firmada previamente. El enlace está cerrado.');
+                    return;
+                }
+
+                if (new Date(data.expira_en) < new Date()) {
+                    mostrarError('Este enlace de seguridad ha caducado. Solicite uno nuevo a Gestión Humana.');
+                    return;
+                }
+
+                solicitudActiva = data;
+                inicializarFormulario(data);
+            } catch (err) {
+                mostrarError('Error de conexión al servidor de base de datos.');
+            }
+        });
+
+        function mostrarError(msg) {
+            gId('pantalla-cargando').classList.add('hidden');
+            gId('pantalla-formulario').classList.add('hidden');
+            gId('pantalla-invalido').classList.remove('hidden');
+            gId('mensaje-error-token').innerText = msg;
+        }
+
+        function inicializarFormulario(data) {
+            const emp = data.empleados;
+            gId('pantalla-cargando').classList.add('hidden');
+            gId('pantalla-formulario').classList.remove('hidden');
+
+            gId('lbl-emp-nombre').innerText = emp.nombre;
+            gId('lbl-emp-cedula').innerText = emp.cedula;
+            gId('lbl-emp-cargo').innerText = emp.cargos?.nombre || 'Trabajador';
+            
+            // Sugerir ingreso anual proyectado (Salario Base Mensual * 12 * Tasa BCV estimada 36.5)
+            const sueldoAnualUSD = (Number(emp.sueldo) || 0) * 12;
+            const sueldoAnualBsEstimado = sueldoAnualUSD * 36.50;
+            gId('ari-ingreso-bs').value = sueldoAnualBsEstimado.toFixed(2);
+            
+            calcularPorcentajeARI();
+        }
+
+        function calcularPorcentajeARI() {
+            const ingresoBs = parseFloat(gId('ari-ingreso-bs').value) || 0;
+            const modalidadDesgravamen = document.querySelector('input[name="ari-desgravamen"]:checked')?.value || 'unico';
+            const cantCargas = parseInt(gId('ari-cargas').value) || 0;
+
+            const ingresoUT = ingresoBs / VALOR_UT;
+            gId('ari-ingreso-ut').innerText = `${ingresoUT.toFixed(2)} U.T.`;
+
+            // Si el ingreso no supera 1.000 UT, no está sujeto a retención según la Ley
+            if (ingresoUT <= 1000) {
+                actualizarResultado(0);
+                return;
+            }
+
+            // Desgravamen (Único 774 UT o Cero)
+            const desgravamenUT = modalidadDesgravamen === 'unico' ? 774 : 0;
+            const rentaNetaGravableUT = Math.max(0, ingresoUT - desgravamenUT);
+
+            // Tarifa 1 (Art. 50 Ley de I.S.L.R.)
+            let porcentajeTarifa = 0.06;
+            let sustraendoUT = 0;
+
+            if (rentaNetaGravableUT <= 1000) { porcentajeTarifa = 0.06; sustraendoUT = 0; }
+            else if (rentaNetaGravableUT <= 1500) { porcentajeTarifa = 0.09; sustraendoUT = 30; }
+            else if (rentaNetaGravableUT <= 2000) { porcentajeTarifa = 0.12; sustraendoUT = 75; }
+            else if (rentaNetaGravableUT <= 2500) { porcentajeTarifa = 0.16; sustraendoUT = 155; }
+            else if (rentaNetaGravableUT <= 3000) { porcentajeTarifa = 0.20; sustraendoUT = 255; }
+            else if (rentaNetaGravableUT <= 4000) { porcentajeTarifa = 0.24; sustraendoUT = 375; }
+            else if (rentaNetaGravableUT <= 6000) { porcentajeTarifa = 0.29; sustraendoUT = 575; }
+            else { porcentajeTarifa = 0.34; sustraendoUT = 875; }
+
+            const impuestoTarifa1UT = (rentaNetaGravableUT * porcentajeTarifa) - sustraendoUT;
+
+            // Rebajas de Ley (Art. 61 LISLR: 10 UT personal + 10 UT por carga familiar)
+            const rebajaPersonalUT = 10;
+            const rebajaCargasUT = cantCargas * 10;
+            gId('lbl-cargas-ut').innerText = `${rebajaCargasUT} U.T.`;
+
+            const totalRebajasUT = rebajaPersonalUT + rebajaCargasUT;
+            const impuestoDeterminadoUT = Math.max(0, impuestoTarifa1UT - totalRebajasUT);
+
+            // Porcentaje Final = (Impuesto / Ingreso Total) * 100
+            let porcentajeFinal = (impuestoDeterminadoUT / ingresoUT) * 100;
+            porcentajeFinal = Math.max(0, Math.min(34, Math.round(porcentajeFinal * 100) / 100));
+
+            actualizarResultado(porcentajeFinal);
+        }
+
+        function actualizarResultado(pct) {
+            porcentajeCalculadoFinal = pct;
+            gId('lbl-porcentaje-final').innerText = `${pct.toFixed(2)}%`;
+        }
+
+        async function enviarDeclaracionARI(e) {
+            e.preventDefault();
+            if (!solicitudActiva) return;
+
+            const btn = gId('btn-enviar-ari');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Procesando...';
+
+            const payloadDatos = {
+                ingreso_anual_bs: parseFloat(gId('ari-ingreso-bs').value) || 0,
+                ingreso_anual_ut: (parseFloat(gId('ari-ingreso-bs').value) || 0) / VALOR_UT,
+                desgravamen_tipo: document.querySelector('input[name="ari-desgravamen"]:checked')?.value,
+                cargas_familiares: parseInt(gId('ari-cargas').value) || 0,
+                porcentaje_determinado: porcentajeCalculadoFinal,
+                valor_ut_aplicado: VALOR_UT
+            };
+
+            try {
+                // 1. Invalidar token y resguardar declaración
+                await supabase
+                    .from('solicitudes_ari')
+                    .update({
+                        usado: true,
+                        fecha_completado: new Date().toISOString(),
+                        porcentaje_calculado: porcentajeCalculadoFinal,
+                        datos_declaracion: payloadDatos
+                    })
+                    .eq('id', solicitudActiva.id);
+
+                // 2. Actualizar porcentaje en la ficha del empleado
+                await supabase
+                    .from('empleados')
+                    .update({ islr_porcentaje: porcentajeCalculadoFinal })
+                    .eq('id', solicitudActiva.empleado_id);
+
+                gId('pantalla-formulario').classList.add('hidden');
+                gId('pantalla-exito').classList.remove('hidden');
+                gId('lbl-porcentaje-confirmado').innerText = `${porcentajeCalculadoFinal.toFixed(2)}%`;
+            } catch (err) {
+                alert('Ocurrió un error al registrar la declaración.');
+                btn.disabled = false;
+                btn.innerHTML = 'Reintentar Enviar';
+            }
+        }
+    </script>
+</body>
+</html>
