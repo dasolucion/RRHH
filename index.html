@@ -180,7 +180,8 @@
                     <div class="overflow-x-auto overflow-y-auto max-h-[65vh] custom-scrollbar">
                         <table class="w-full text-left text-xs">
                             <thead class="bg-slate-950 text-slate-400 uppercase text-[10px] tracking-wider sticky top-0 z-20 shadow-[0_1px_0_0_#1e293b]">
-                                <tr><th class="p-3.5 text-center">Activo</th><th class="p-3.5">F. Ingreso</th><th class="p-3.5">Cédula</th><th class="p-3.5">Nombre</th><th class="p-3.5">Teléfono</th><th class="p-3.5">Departamento</th><th class="p-3.5">Cargo</th><th class="p-3.5">Sueldo Base</th><th class="p-3.5">Bono Alim.</th><th class="p-3.5">Subsidio</th><th class="p-3.5 text-center">ID Dahua</th><th class="p-3.5 text-right">Acciones</th></tr>
+                                <tr><th class="p-3.5 text-center">Activo</th><th class="p-3.5">F. Ingreso</th><th class="p-3.5">Cédula</th><th class="p-3.5">Nombre</th><th class="p-3.5">Teléfono</th><th class="p-3.5">Departamento</th><th class="p-3.5">Cargo</th><th class="p-3.5">Sueldo Base</th><th class="p-3.5">Bono Alim.</th><th class="p-3.5">Subsidio</th><th class="p-3.5 text-center">ID Dahua</th><th clas<th class="p-3.5 text-center min-w-[85px] whitespace-nowrap">ID Dahua</th>
+<th class="p-3.5 text-center min-w-[140px] whitespace-nowrap">Acciones</th>s="p-3.5 text-right">Acciones</th></tr>
                             </thead>
                             <tbody id="tabla-empleados-body" class="divide-y divide-slate-800/50"></tbody>
                         </table>
@@ -1593,8 +1594,7 @@ function renderEmpleados() {
             <td class="p-3.5 text-emerald-400">$${Number(e.bono_alimentacion).toFixed(2)}</td>
             <td class="p-3.5 text-sky-400" data-feature="empleados.subsidio">$${Number(e.otros_ingresos).toFixed(2)}</td>
             <td class="p-3.5 text-center font-mono text-xs ${e.device_user_id ? 'text-amber-400 font-bold' : 'text-slate-600'}" data-feature="empleados.dahua">${e.device_user_id || '—'}</td>
-            <td class="p-3.5 text-right space-x-1 whitespace-nowrap">
-            <td class="p-3.5 text-right space-x-1 whitespace-nowrap">
+            <td class="p-3.5 text-center min-w-[140px] space-x-1.5 whitespace-nowrap">
                 <button onclick="abrirModalGestionARI(${e.id})" class="text-amber-400 hover:text-amber-300 p-1.5 transition" title="Gestionar Formulario AR-I (I.S.L.R.)"><i class="fa-solid fa-receipt"></i></button>
                 <button data-feature="documentos.constancias" onclick="abrirModalDocumentoLaboral(${e.id})" class="text-teal-400 hover:text-teal-300 p-1.5 transition" title="Emitir Constancia o Amonestación"><i class="fa-solid fa-file-contract"></i></button>
                 <button onclick="editarEmpleado(${e.id})" class="text-sky-400 hover:text-sky-300 p-1.5 transition" title="Editar"><i class="fa-solid fa-pen"></i></button>
