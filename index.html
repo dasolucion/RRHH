@@ -102,7 +102,6 @@
                     <div id="sep-nomina" class="pt-2 my-1 border-t border-slate-800"></div>
                     <button id="nav-nomina" onclick="switchTab('nomina')" class="tab-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition"><i class="fa-solid fa-calculator w-5 text-center"></i><span>Procesar Nómina</span></button>
                     <button id="nav-historico" onclick="switchTab('historico')" class="tab-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition"><i class="fa-solid fa-clock-rotate-left w-5 text-center"></i><span>Nóminas Procesadas</span></button>
-                    <button id="nav-impuestos" onclick="switchTab('impuestos')" class="tab-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition"><i class="fa-solid fa-building-columns w-5 text-center text-emerald-400"></i><span>Deberes Formales / Cargas</span></button>
                     <div id="sep-vacaciones" class="pt-2 my-1 border-t border-slate-800"></div>
                     <button id="nav-vacaciones" onclick="switchTab('vacaciones')" class="tab-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition"><i class="fa-solid fa-umbrella-beach w-5 text-center text-teal-400"></i><span>Calcular Vacaciones</span></button>
                     <button id="nav-vacaciones-historico" onclick="switchTab('vacaciones-historico')" class="tab-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition"><i class="fa-solid fa-folder-open w-5 text-center text-teal-600"></i><span>Vacaciones Procesadas</span></button>
@@ -115,6 +114,8 @@
                     <div id="sep-liquidaciones" class="pt-2 my-1 border-t border-slate-800"></div>
                     <button id="nav-liquidaciones" onclick="switchTab('liquidaciones')" class="tab-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition"><i class="fa-solid fa-scale-balanced w-5 text-center text-amber-500"></i><span>Liquidaciones</span></button>
                     <button id="nav-liquidaciones-historico" onclick="switchTab('liquidaciones-historico')" class="tab-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition"><i class="fa-solid fa-file-signature w-5 text-center text-amber-700"></i><span>Liquidaciones Procesadas</span></button>
+                    <div id="sep-impuestos" class="pt-2 my-1 border-t border-slate-800"></div>
+                    <button id="nav-impuestos" onclick="switchTab('impuestos')" class="tab-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition"><i class="fa-solid fa-building-columns w-5 text-center text-emerald-400"></i><span>Deberes Formales / Cargas</span></button>
                     <div id="sep-usuarios" class="pt-2 my-1 border-t border-slate-800"></div>
                     <button id="nav-usuarios" onclick="switchTab('usuarios')" class="tab-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition"><i class="fa-solid fa-users-gear w-5 text-center text-indigo-400"></i><span>Usuarios</span></button>
                     <button id="nav-parametros" onclick="switchTab('parametros')" class="tab-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition"><i class="fa-solid fa-sliders w-5 text-center text-blue-400"></i><span>Parámetros</span></button>
@@ -1387,7 +1388,7 @@ function aplicarPermisosSegunRol() {
                 'historico','vacaciones-historico','utilidades-historico',
                 'antiguedad-historico','liquidaciones-historico','impuestos'
             ];
-            const separadores = ['sep-personal','sep-salarios','sep-nomina','sep-vacaciones','sep-utilidades','sep-antiguedad','sep-liquidaciones','sep-usuarios'];
+            const separadores = ['sep-personal','sep-salarios','sep-nomina','sep-vacaciones','sep-utilidades','sep-antiguedad','sep-liquidaciones','sep-impuestos','sep-usuarios'];
 
             if (tienePoderOperativo) {
                 modulosOperativos.forEach(m => { const btn = gId(`nav-${m}`); if(btn) btn.classList.remove('hidden'); });
