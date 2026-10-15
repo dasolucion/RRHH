@@ -102,6 +102,7 @@
                     <div id="sep-nomina" class="pt-2 my-1 border-t border-slate-800"></div>
                     <button id="nav-nomina" onclick="switchTab('nomina')" class="tab-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition"><i class="fa-solid fa-calculator w-5 text-center"></i><span>Procesar Nómina</span></button>
                     <button id="nav-historico" onclick="switchTab('historico')" class="tab-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition"><i class="fa-solid fa-clock-rotate-left w-5 text-center"></i><span>Nóminas Procesadas</span></button>
+                    <button id="nav-impuestos" onclick="switchTab('impuestos')" class="tab-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition"><i class="fa-solid fa-building-columns w-5 text-center text-emerald-400"></i><span>Deberes Formales / Cargas</span></button>
                     <div id="sep-vacaciones" class="pt-2 my-1 border-t border-slate-800"></div>
                     <button id="nav-vacaciones" onclick="switchTab('vacaciones')" class="tab-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition"><i class="fa-solid fa-umbrella-beach w-5 text-center text-teal-400"></i><span>Calcular Vacaciones</span></button>
                     <button id="nav-vacaciones-historico" onclick="switchTab('vacaciones-historico')" class="tab-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition"><i class="fa-solid fa-folder-open w-5 text-center text-teal-600"></i><span>Vacaciones Procesadas</span></button>
@@ -337,6 +338,75 @@
                                 <tr><th class="p-3.5">Fecha de Pago</th><th class="p-3.5 text-center">Empleados</th><th class="p-3.5">Tasa BCV</th><th class="p-3.5">Salario Mín. (Bs)</th><th class="p-3.5">Total ($)</th><th class="p-3.5">Total (Bs)</th><th class="p-3.5 text-right">Acciones</th></tr>
                             </thead>
                             <tbody id="tabla-historico-body" class="divide-y divide-slate-800/50"></tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <!-- DEBERES FORMALES Y CARGAS PATRONALES -->
+            <div id="tab-impuestos-content" class="tab-content hidden space-y-6">
+                <section class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl space-y-5">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-800 pb-3">
+                        <div>
+                            <h3 class="font-bold text-sm text-white flex items-center">
+                                <i class="fa-solid fa-building-columns text-emerald-400 mr-2 text-base"></i> Resumen de Obligaciones Fiscales y Cargas Patronales
+                            </h3>
+                            <p class="text-[11px] text-slate-400">Determinación mensual de retenciones al personal y aportes patronales (IVSS, RPE, BANAVIH, INCES, LPP SENIAT)</p>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <button onclick="imprimirReporteFiscalMensual()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-4 py-2 rounded-lg font-bold flex items-center space-x-1.5 transition shadow">
+                                <i class="fa-solid fa-print"></i><span>Imprimir Reporte Contable</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Filtro del Mes -->
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-slate-950 p-4 rounded-xl border border-slate-800 items-end">
+                        <div>
+                            <label class="text-[11px] font-semibold text-slate-400 block mb-1">Seleccionar Mes de Liquidación Fiscal</label>
+                            <input type="month" id="imp-mes-select" onchange="renderCuadroImpuestosMes()" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-emerald-500 font-mono font-bold">
+                        </div>
+                        <div class="sm:col-span-2 text-xs text-slate-400 flex flex-wrap gap-4 items-center justify-start sm:justify-end">
+                            <div>Riesgo IVSS: <strong id="lbl-riesgo-ivss-tag" class="text-white">9% (Mínimo)</strong></div>
+                            <div>Pensiones LPP: <strong id="lbl-lpp-tag" class="text-emerald-400">Activo (9%)</strong></div>
+                        </div>
+                    </div>
+
+                    <!-- KPIs Consolidados -->
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div class="bg-slate-950 border border-slate-800 p-4 rounded-xl">
+                            <span class="text-[10px] uppercase font-bold text-slate-400 block mb-1">Total Retenciones a Trabajadores</span>
+                            <div class="text-xl font-black text-amber-400 font-mono" id="kpi-imp-retenciones">Bs. 0.00</div>
+                            <span class="text-[10px] text-slate-500" id="kpi-imp-retenciones-usd">$0.00</span>
+                        </div>
+                        <div class="bg-slate-950 border border-slate-800 p-4 rounded-xl">
+                            <span class="text-[10px] uppercase font-bold text-slate-400 block mb-1">Total Aportes Patronales (Empresa)</span>
+                            <div class="text-xl font-black text-rose-400 font-mono" id="kpi-imp-patronal">Bs. 0.00</div>
+                            <span class="text-[10px] text-slate-500" id="kpi-imp-patronal-usd">$0.00</span>
+                        </div>
+                        <div class="bg-slate-950 border-2 border-emerald-500/40 p-4 rounded-xl bg-gradient-to-r from-emerald-950/40 to-slate-950">
+                            <span class="text-[10px] uppercase font-extrabold text-emerald-400 block mb-1">Gran Total a Enterar a los Entes</span>
+                            <div class="text-2xl font-black text-emerald-400 font-mono" id="kpi-imp-total">Bs. 0.00</div>
+                            <span class="text-[11px] font-bold text-emerald-300 font-mono" id="kpi-imp-total-usd">$0.00</span>
+                        </div>
+                    </div>
+
+                    <!-- Tabla de Determinación por Ente -->
+                    <div class="overflow-x-auto overflow-y-auto max-h-[calc(100vh-320px)] border border-slate-800 rounded-xl custom-scrollbar shadow-inner">
+                        <table class="w-full text-left text-xs whitespace-nowrap">
+                            <thead class="bg-slate-950 text-slate-400 uppercase text-[9px] tracking-wider sticky top-0 z-20 shadow-[0_1px_0_0_#1e293b]">
+                                <tr>
+                                    <th class="p-3">Concepto / Obligación Legal</th>
+                                    <th class="p-3">Ente Receptor</th>
+                                    <th class="p-3 text-right">Base Imponible (Bs)</th>
+                                    <th class="p-3 text-right text-amber-400">Retención Personal (Bs)</th>
+                                    <th class="p-3 text-right text-rose-400">Aporte Empresa (Bs)</th>
+                                    <th class="p-3 text-right text-emerald-400 font-bold">Total a Enterar (Bs)</th>
+                                    <th class="p-3 text-right text-emerald-400 font-bold">Equivalente ($)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabla-impuestos-body" class="divide-y divide-slate-800/50"></tbody>
+                            <tfoot id="tabla-impuestos-foot" class="bg-slate-950 font-bold border-t-2 border-slate-700 text-white"></tfoot>
                         </table>
                     </div>
                 </section>
@@ -728,7 +798,19 @@
                         <div><label class="text-[11px] font-semibold text-slate-400 block mb-1">RIF de la Empresa</label><input type="text" id="param-empresa-rif" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-blue-500"></div>
                         <div><label class="text-[11px] font-semibold text-slate-400 block mb-1">Días Utilidades Base</label><input type="number" id="param-dias-utilidades" value="30" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-blue-500"></div>
                         <div><label class="text-[11px] font-semibold text-slate-400 block mb-1">Valor U.T. Vigente (SENIAT Bs.)</label><input type="number" step="0.01" id="param-valor-ut" value="9.00" class="w-full bg-slate-900 border border-amber-500/40 rounded-lg p-2 text-xs text-amber-300 font-bold font-mono outline-none focus:border-amber-500"></div>
-                    </div>
+                        <div>
+                            <label class="text-[11px] font-semibold text-slate-400 block mb-1">Riesgo IVSS (Aporte Empresa)</label>
+                            <select id="param-riesgo-ivss" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-blue-500">
+                                <option value="9">Riesgo Mínimo (9% Patronal)</option>
+                                <option value="10">Riesgo Medio (10% Patronal)</option>
+                                <option value="11">Riesgo Máximo (11% Patronal)</option>
+                            </select>
+                        </div>
+                        <div class="flex items-center pt-5">
+                            <input type="checkbox" id="param-aplica-lpp" checked class="w-4 h-4 text-emerald-600 rounded bg-slate-950 border-slate-800">
+                            <label for="param-aplica-lpp" class="ml-2 text-xs text-slate-300 font-medium">Aplicar Ley Protección Pensiones (9% SENIAT)</label>
+                        </div>
+                   </div>
                     <div class="space-y-3">
                         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                             <h4 class="text-xs font-bold text-blue-400 uppercase tracking-wider flex items-center"><i class="fa-solid fa-calendar-days mr-1.5"></i> Tasas Mensuales BCV (Columna E - 1_3_18.xlsx) y Cierre Dólar Oficial</h4>
@@ -872,7 +954,9 @@
                     <div><label class="text-[11px] text-slate-300 font-semibold block mb-1">Nombre de Usuario (Login)</label><input type="text" id="usr-login" placeholder="Ej: maria.rrhh" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white outline-none focus:border-indigo-500"></div>
                     <div><label class="text-[11px] text-slate-300 font-semibold block mb-1">Contraseña</label><input type="password" id="usr-clave" placeholder="Ingresa contraseña" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white outline-none focus:border-indigo-500"></div>
                     <div><label class="text-[11px] text-slate-300 font-semibold block mb-1">Nivel / Rol de Acceso</label>
-                    <select id="usr-rol" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white outline-none focus:border-indigo-500"><option value="master">Master - Acceso Total</option><option value="consulta">Consulta - Solo Históricos</option></select></div>
+                    <select id="usr-rol" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white outline-none focus:border-indigo-500"><option value="master">Master (Control Total + Licencias de Software)</option>
+<option value="administrador">Administrador (Gestión Completa de la Empresa)</option>
+<option value="consulta">Consulta (Solo Reportes e Históricos)</option></select></div>
                     <div class="pt-1 flex items-center"><input type="checkbox" id="usr-activo" class="mr-2 w-4 h-4 text-indigo-600 rounded bg-slate-950 border-slate-800"><label for="usr-activo" class="text-xs text-slate-300 font-medium">Usuario Activo (Permite iniciar sesión)</label></div>
                 </div>
                 <div class="p-4 border-t border-slate-800 flex justify-end space-x-2 bg-slate-950">
@@ -1272,38 +1356,58 @@ async function guardarFeatureFlagsConfig() {
             fetchAllData();
         }
 
-        function aplicarPermisosSegunRol() {
+function aplicarPermisosSegunRol() {
             const usr = appState.usuarioActual;
             if(!usr) return;
+            
             const isMaster = usr.rol === 'master';
+            const isAdmin = usr.rol === 'administrador';
+            const tienePoderOperativo = isMaster || isAdmin;
+
             if(gId('user-badge-name')) gId('user-badge-name').innerText = usr.nombre || usr.usuario;
             if(gId('user-badge-role')) {
-                gId('user-badge-role').innerText = isMaster ? 'Acceso Total (Master)' : 'Solo Históricos (Consulta)';
-                gId('user-badge-role').className = isMaster ? 'text-[10px] text-emerald-400 font-bold truncate' : 'text-[10px] text-sky-400 font-semibold truncate';
+                if (isMaster) {
+                    gId('user-badge-role').innerText = 'Master (Superadmin)';
+                    gId('user-badge-role').className = 'text-[10px] text-emerald-400 font-bold truncate';
+                } else if (isAdmin) {
+                    gId('user-badge-role').innerText = 'Administrador (RRHH)';
+                    gId('user-badge-role').className = 'text-[10px] text-indigo-400 font-bold truncate';
+                } else {
+                    gId('user-badge-role').innerText = 'Consulta (Auditor)';
+                    gId('user-badge-role').className = 'text-[10px] text-sky-400 font-semibold truncate';
+                }
             }
-            const modulosMaster = ['dashboard','departamentos','cargos','empleados','salarios','prestamos','nomina','vacaciones','utilidades','antiguedad','liquidaciones','usuarios','parametros'];
-            const modulosConsulta = ['historico','vacaciones-historico','utilidades-historico','antiguedad-historico','liquidaciones-historico'];
+
+            const modulosOperativos = [
+                'dashboard','departamentos','cargos','empleados','salarios',
+                'prestamos','nomina','vacaciones','utilidades','antiguedad',
+                'liquidaciones','impuestos','usuarios','parametros'
+            ];
+            const modulosConsulta = [
+                'historico','vacaciones-historico','utilidades-historico',
+                'antiguedad-historico','liquidaciones-historico','impuestos'
+            ];
             const separadores = ['sep-personal','sep-salarios','sep-nomina','sep-vacaciones','sep-utilidades','sep-antiguedad','sep-liquidaciones','sep-usuarios'];
-            if (isMaster) {
-                modulosMaster.forEach(m => { const btn = gId(`nav-${m}`); if(btn) btn.classList.remove('hidden'); });
+
+            if (tienePoderOperativo) {
+                modulosOperativos.forEach(m => { const btn = gId(`nav-${m}`); if(btn) btn.classList.remove('hidden'); });
                 modulosConsulta.forEach(m => { const btn = gId(`nav-${m}`); if(btn) btn.classList.remove('hidden'); });
                 separadores.forEach(s => { const el = gId(s); if(el) el.classList.remove('hidden'); });
                 switchTab('dashboard');
             } else {
-                modulosMaster.forEach(m => { const btn = gId(`nav-${m}`); if(btn) btn.classList.add('hidden'); });
+                modulosOperativos.forEach(m => { const btn = gId(`nav-${m}`); if(btn) btn.classList.add('hidden'); });
                 modulosConsulta.forEach(m => { const btn = gId(`nav-${m}`); if(btn) btn.classList.remove('hidden'); });
-                if(gId('sep-personal')) gId('sep-personal').classList.add('hidden');
-                if(gId('sep-salarios')) gId('sep-salarios').classList.add('hidden');
-                if(gId('sep-usuarios')) gId('sep-usuarios').classList.add('hidden');
+                separadores.forEach(s => { const el = gId(s); if(el) el.classList.add('hidden'); });
                 switchTab('historico');
             }
-            const panelFlags = gId('panel-superadmin-features');
-    if (panelFlags) {
-        if (isMaster) panelFlags.classList.remove('hidden');
-        else panelFlags.classList.add('hidden');
-    }
-        }
 
+            // SEGURIDAD ESTRICTA: El panel de licencias/flags SOLO es visible para MASTER
+            const panelFlags = gId('panel-superadmin-features');
+            if (panelFlags) {
+                if (isMaster) panelFlags.classList.remove('hidden');
+                else panelFlags.classList.add('hidden');
+            }
+        }
         function cargarCacheLocal() {
             const p = localStorage.getItem('nomina_parametros');
             if(p) appState.parametros = JSON.parse(p);
@@ -1341,19 +1445,27 @@ function aplicarParametrosEnVista() {
             if(gId('param-empresa-rif')) gId('param-empresa-rif').value = appState.parametros.rif_empresa;
             if(gId('param-dias-utilidades')) gId('param-dias-utilidades').value = appState.parametros.dias_utilidades;
             if(gId('param-valor-ut')) gId('param-valor-ut').value = Number(appState.parametros.valor_ut || 9.00).toFixed(2);
+            if(gId('param-riesgo-ivss')) gId('param-riesgo-ivss').value = String(appState.parametros.riesgo_ivss || 9);
+            if(gId('param-aplica-lpp')) gId('param-aplica-lpp').checked = appState.parametros.aplica_lpp !== false;
+
             if(gId('brand-sidebar-title')) gId('brand-sidebar-title').innerText = appState.parametros.nombre_empresa.split('/')[0].trim();
             if(gId('brand-sidebar-rif')) gId('brand-sidebar-rif').innerText = appState.parametros.rif_empresa;
             if(gId('badge-uti-dias-base')) gId('badge-uti-dias-base').innerHTML = `<i class="fa-solid fa-scale-balanced mr-1.5"></i> Base: ${appState.parametros.dias_utilidades} Días`;
+            
             renderTablaTasasMensuales();
             renderTablaUsuarios();
         }
 
         async function guardarParametrosGenerales() {
-            if (appState.usuarioActual?.rol !== 'master') return showToast('No tiene permisos para modificar parámetros', 'error');
+            const rol = appState.usuarioActual?.rol;
+            if (rol !== 'master' && rol !== 'administrador') return showToast('No tiene permisos para modificar parámetros', 'error');
+            
             appState.parametros.nombre_empresa = gId('param-empresa-nombre').value || 'EMPRESA';
             appState.parametros.rif_empresa = gId('param-empresa-rif').value || 'J-00000000-0';
             appState.parametros.dias_utilidades = parseInt(gId('param-dias-utilidades').value) || 30;
             appState.parametros.valor_ut = parseFloat(gId('param-valor-ut').value) || 9.00;
+            appState.parametros.riesgo_ivss = parseFloat(gId('param-riesgo-ivss').value) || 9;
+            appState.parametros.aplica_lpp = gId('param-aplica-lpp').checked;
             
             try { 
                 await supabaseClient.from('parametros_config').upsert([{ 
@@ -1361,23 +1473,35 @@ function aplicarParametrosEnVista() {
                     nombre_empresa: appState.parametros.nombre_empresa, 
                     rif_empresa: appState.parametros.rif_empresa, 
                     dias_utilidades: appState.parametros.dias_utilidades,
-                    valor_ut: appState.parametros.valor_ut
+                    valor_ut: appState.parametros.valor_ut,
+                    riesgo_ivss: appState.parametros.riesgo_ivss,
+                    aplica_lpp: appState.parametros.aplica_lpp
                 }]); 
             } catch(e) {}
             
             localStorage.setItem('nomina_parametros', JSON.stringify(appState.parametros));
             aplicarParametrosEnVista();
-            showToast('Parámetros guardados exitosamente');
+            showToast('Parámetros corporativos guardados exitosamente');
         }
+        
         function renderTablaUsuarios() {
             const tbody = gId('tabla-usuarios-body');
             if(!tbody) return;
             tbody.innerHTML = appState.usuarios.map(u => {
-                const esMaster = u.rol === 'master';
-                const rolBadge = esMaster 
-                    ? `<span class="bg-emerald-950 text-emerald-300 border border-emerald-800 px-2 py-0.5 rounded text-[10px] font-bold"><i class="fa-solid fa-shield-halved mr-1"></i>Master (Total)</span>`
-                    : `<span class="bg-sky-950 text-sky-300 border border-sky-800 px-2 py-0.5 rounded text-[10px] font-semibold"><i class="fa-solid fa-eye mr-1"></i>Consulta / Históricos</span>`;
-                const modulosTxt = esMaster ? `<span class="text-slate-300">Todos los módulos habilitados</span>` : `<span class="text-sky-300/80">Solo Históricos (Ver e Imprimir)</span>`;
+                let rolBadge = '';
+                let modulosTxt = '';
+
+                if (u.rol === 'master') {
+                    rolBadge = `<span class="bg-emerald-950 text-emerald-300 border border-emerald-800 px-2 py-0.5 rounded text-[10px] font-bold"><i class="fa-solid fa-shield-halved mr-1"></i>Master (Total + Licencias)</span>`;
+                    modulosTxt = `<span class="text-emerald-300">Acceso Completo + Control de Licencias</span>`;
+                } else if (u.rol === 'administrador') {
+                    rolBadge = `<span class="bg-indigo-950 text-indigo-300 border border-indigo-800 px-2 py-0.5 rounded text-[10px] font-bold"><i class="fa-solid fa-user-gear mr-1"></i>Administrador (Empresa)</span>`;
+                    modulosTxt = `<span class="text-slate-300">Gestión Operativa de la Empresa</span>`;
+                } else {
+                    rolBadge = `<span class="bg-sky-950 text-sky-300 border border-sky-800 px-2 py-0.5 rounded text-[10px] font-semibold"><i class="fa-solid fa-eye mr-1"></i>Consulta / Auditor</span>`;
+                    modulosTxt = `<span class="text-sky-300/80">Solo Históricos y Recibos</span>`;
+                }
+
                 return `<tr class="hover:bg-slate-900/50 ${!u.activo ? 'opacity-50' : ''}">
                     <td class="p-3.5 text-center"><input type="checkbox" ${u.activo ? 'checked' : ''} ${u.usuario === 'master' ? 'disabled' : ''} onchange="toggleEstadoUsuario(${u.id}, ${u.activo})" class="w-4 h-4 text-indigo-600 rounded bg-slate-950 border-slate-800 cursor-pointer"></td>
                     <td class="p-3.5 font-bold text-white">${u.nombre}</td>
@@ -1391,7 +1515,6 @@ function aplicarParametrosEnVista() {
                 </tr>`;
             }).join('');
         }
-
         function abrirCrearUsuario() {
             if (appState.usuarioActual?.rol !== 'master') return showToast('Solo el usuario Master puede crear usuarios', 'error');
             gId('usr-id').value = ''; gId('usr-nombre').value = ''; gId('usr-login').value = ''; gId('usr-clave').value = '';
@@ -1466,7 +1589,7 @@ function aplicarParametrosEnVista() {
         async function switchTab(tab) {
             const usr = appState.usuarioActual;
             const isMaster = usr?.rol === 'master';
-            const modulosConsultaPermitidos = ['historico','vacaciones-historico','utilidades-historico','antiguedad-historico','liquidaciones-historico'];
+           const modulosConsultaPermitidos = ['historico','vacaciones-historico','utilidades-historico','antiguedad-historico','liquidaciones-historico','impuestos'];
             if(!isMaster && !modulosConsultaPermitidos.includes(tab)) { showToast('No tiene permisos para acceder a esta sección', 'error'); return; }
             document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
             document.querySelectorAll('.tab-btn').forEach(btn => { btn.classList.remove('bg-slate-800','text-sky-400','border','border-slate-700'); btn.classList.add('text-slate-400'); });
@@ -1482,6 +1605,7 @@ function aplicarParametrosEnVista() {
             else if(tab === 'usuarios') renderTablaUsuarios();
             else if(tab === 'parametros') renderTablaTasasMensuales();
             else if(tab === 'vacaciones-historico') renderHistoricoVacaciones();
+                else if(tab === 'impuestos') inicializarTabImpuestos();
 else if(tab === 'utilidades-historico') renderHistoricoUtilidades();
 else if(tab === 'antiguedad-historico') renderHistoricoAntiguedad();
 else if(tab === 'liquidaciones-historico') renderHistoricoPrestaciones();
@@ -4507,6 +4631,286 @@ async function imprimirPlanillaARISENIAT() {
     gId('print-container').innerHTML = html;
     window.print();
 }
+
+        // ==========================================================================
+// MÓDULO DE DEBERES FORMALES Y CARGAS PATRONALES (OBLIGACIONES FISCALES)
+// ==========================================================================
+let datosImpuestosMesActual = null;
+
+function inicializarTabImpuestos() {
+    const inputMes = gId('imp-mes-select');
+    if (inputMes && !inputMes.value) {
+        const hoy = new Date();
+        inputMes.value = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
+    }
+    renderCuadroImpuestosMes();
+}
+
+function renderCuadroImpuestosMes() {
+    const mesClave = gId('imp-mes-select')?.value;
+    if (!mesClave) return;
+
+    const [anioStr, mesStr] = mesClave.split('-');
+    const riesgoIvssPct = Number(appState.parametros?.riesgo_ivss || 9) / 100;
+    const aplicaLPP = appState.parametros?.aplica_lpp !== false;
+
+    // Actualizar badges informativos
+    const nombresRiesgo = { 9: '9% (Mínimo)', 10: '10% (Medio)', 11: '11% (Máximo)' };
+    if (gId('lbl-riesgo-ivss-tag')) gId('lbl-riesgo-ivss-tag').innerText = nombresRiesgo[appState.parametros?.riesgo_ivss] || '9% (Mínimo)';
+    if (gId('lbl-lpp-tag')) gId('lbl-lpp-tag').innerText = aplicaLPP ? 'Activo (9% SENIAT)' : 'No configurado';
+
+    // 1. Filtrar las nóminas procesadas que correspondan a este mes
+    const nominasDelMes = (appState.nominas || []).filter(n => n.fecha_pago && n.fecha_pago.startsWith(mesClave));
+
+    let tasaBCVMes = 36.50;
+    let salarioMinimoBs = 130.00;
+    let totalBaseSalarialBs = 0;
+    let totalSubsidiosBs = 0;
+    let totalIvssRetenidoBs = 0;
+    let totalRpeRetenidoBs = 0;
+    let totalFaovRetenidoBs = 0;
+    let totalIslrRetenidoBs = 0;
+    let cantTrabajadores = new Set();
+
+    nominasDelMes.forEach(n => {
+        const t = Number(n.tasa_bcv || 1);
+        tasaBCVMes = t;
+        if (n.salario_minimo_bs) salarioMinimoBs = Number(n.salario_minimo_bs);
+        
+        cantTrabajadores.add(n.empleado_id);
+
+        const sbBs = (Number(n.salario_base || 0) / 2) * t;
+        const subBs = (Number(n.otros_ingresos || 0) / 2) * t;
+        
+        totalBaseSalarialBs += sbBs;
+        totalSubsidiosBs += subBs;
+
+        totalIvssRetenidoBs += (Number(n.ivss_usd || 0) * t);
+        totalRpeRetenidoBs += (Number(n.rpe_usd || 0) * t);
+        totalFaovRetenidoBs += (Number(n.faov_usd || 0) * t);
+        
+        // Retenciones ISLR si existen en el registro
+        if (n.detalle_calculo?.islrUSD) {
+            totalIslrRetenidoBs += (Number(n.detalle_calculo.islrUSD) * t);
+        }
+    });
+
+    // Cálculos patronales legales
+    // IVSS Patronal: Proporcional a la retención del 4% (Aporte = Retención / 0.04 * %riesgo)
+    const totalIvssPatronalBs = totalIvssRetenidoBs > 0 ? (totalIvssRetenidoBs / 0.04) * riesgoIvssPct : 0;
+    
+    // RPE Patronal (2% vs 0.5% retención = factor 4)
+    const totalRpePatronalBs = totalRpeRetenidoBs * 4;
+
+    // FAOV Patronal (2% patronal vs 1% retención = factor 2)
+    const totalFaovPatronalBs = totalFaovRetenidoBs * 2;
+
+    // INCES Patronal (2% mensual estimado sobre el total de sueldos)
+    const baseIncesBs = totalBaseSalarialBs;
+    const totalIncesPatronalBs = baseIncesBs * 0.02;
+
+    // LPP (Ley de Protección de Pensiones - 9% sobre Salario + Bonos/Subsidios)
+    // Con piso mínimo legal de 3 Salarios Mínimos por trabajador
+    let totalLppPatronalBs = 0;
+    if (aplicaLPP && cantTrabajadores.size > 0) {
+        const baseRealLPP = totalBaseSalarialBs + totalSubsidiosBs;
+        const baseMinimaLPP = cantTrabajadores.size * (salarioMinimoBs * 3);
+        const baseImponibleLPP = Math.max(baseRealLPP, baseMinimaLPP);
+        totalLppPatronalBs = baseImponibleLPP * 0.09;
+    }
+
+    const obligaciones = [
+        {
+            concepto: 'I.V.S.S. Seguro Social (Salud y Pensiones)',
+            ente: 'IVSS (Portal TIUNA)',
+            baseBs: totalIvssRetenidoBs > 0 ? (totalIvssRetenidoBs / 0.04) : 0,
+            retencionBs: totalIvssRetenidoBs,
+            aporteBs: totalIvssPatronalBs,
+            totalBs: totalIvssRetenidoBs + totalIvssPatronalBs
+        },
+        {
+            concepto: 'R.P.E. Régimen Prestacional de Empleo (Paro Forzoso)',
+            ente: 'IVSS (Factura Conjunta)',
+            baseBs: totalRpeRetenidoBs > 0 ? (totalRpeRetenidoBs / 0.005) : 0,
+            retencionBs: totalRpeRetenidoBs,
+            aporteBs: totalRpePatronalBs,
+            totalBs: totalRpeRetenidoBs + totalRpePatronalBs
+        },
+        {
+            concepto: 'F.A.O.V. Fondo de Ahorro para la Vivienda (3% Total)',
+            ente: 'BANAVIH (Portal Oficial)',
+            baseBs: totalFaovRetenidoBs > 0 ? (totalFaovRetenidoBs / 0.01) : 0,
+            retencionBs: totalFaovRetenidoBs,
+            aporteBs: totalFaovPatronalBs,
+            totalBs: totalFaovRetenidoBs + totalFaovPatronalBs
+        },
+        {
+            concepto: 'I.N.C.E.S. Aporte Trimestral Patronal (2%)',
+            ente: 'INCES Tributos',
+            baseBs: baseIncesBs,
+            retencionBs: 0,
+            aporteBs: totalIncesPatronalBs,
+            totalBs: totalIncesPatronalBs
+        },
+        {
+            concepto: 'Ley de Protección de Pensiones LPP (9% Decreto 4.952)',
+            ente: 'SENIAT',
+            baseBs: totalBaseSalarialBs + totalSubsidiosBs,
+            retencionBs: 0,
+            aporteBs: totalLppPatronalBs,
+            totalBs: totalLppPatronalBs
+        },
+        {
+            concepto: 'I.S.L.R. Retenciones a Sueldos y Salarios (AR-I)',
+            ente: 'SENIAT',
+            baseBs: totalBaseSalarialBs,
+            retencionBs: totalIslrRetenidoBs,
+            aporteBs: 0,
+            totalBs: totalIslrRetenidoBs
+        }
+    ];
+
+    let sumRet = 0, sumApo = 0, sumTot = 0;
+    obligaciones.forEach(o => {
+        sumRet += o.retencionBs;
+        sumApo += o.aporteBs;
+        sumTot += o.totalBs;
+    });
+
+    datosImpuestosMesActual = {
+        mes: mesClave,
+        tasa: tasaBCVMes,
+        trabajadores: cantTrabajadores.size,
+        sumRet, sumApo, sumTot,
+        obligaciones
+    };
+
+    // Actualizar KPIs
+    gId('kpi-imp-retenciones').innerText = `Bs. ${fNum(sumRet)}`;
+    gId('kpi-imp-retenciones-usd').innerText = `$${(sumRet / tasaBCVMes).toFixed(2)}`;
+    
+    gId('kpi-imp-patronal').innerText = `Bs. ${fNum(sumApo)}`;
+    gId('kpi-imp-patronal-usd').innerText = `$${(sumApo / tasaBCVMes).toFixed(2)}`;
+    
+    gId('kpi-imp-total').innerText = `Bs. ${fNum(sumTot)}`;
+    gId('kpi-imp-total-usd').innerText = `$${(sumTot / tasaBCVMes).toFixed(2)}`;
+
+    // Renderizar tabla
+    const tbody = gId('tabla-impuestos-body');
+    if (!tbody) return;
+
+    if (nominasDelMes.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="p-6 text-center text-slate-500">No hay nóminas definitivas procesadas en el período ${mesClave}.</td></tr>`;
+        gId('tabla-impuestos-foot').innerHTML = '';
+        return;
+    }
+
+    tbody.innerHTML = obligaciones.map(o => `
+        <tr class="hover:bg-slate-900/50">
+            <td class="p-3 font-semibold text-white">${o.concepto}</td>
+            <td class="p-3 font-mono text-slate-400 text-[11px]">${o.ente}</td>
+            <td class="p-3 text-right font-mono text-slate-300">Bs. ${fNum(o.baseBs)}</td>
+            <td class="p-3 text-right font-mono text-amber-400">Bs. ${fNum(o.retencionBs)}</td>
+            <td class="p-3 text-right font-mono text-rose-400">Bs. ${fNum(o.aporteBs)}</td>
+            <td class="p-3 text-right font-mono font-bold text-emerald-400">Bs. ${fNum(o.totalBs)}</td>
+            <td class="p-3 text-right font-mono font-bold text-emerald-300">$${(o.totalBs / tasaBCVMes).toFixed(2)}</td>
+        </tr>
+    `).join('');
+
+    gId('tabla-impuestos-foot').innerHTML = `
+        <tr>
+            <td colspan="3" class="p-3 text-right uppercase text-slate-300 font-bold">TOTALES CONSOLIDADOS DEL MES:</td>
+            <td class="p-3 text-right font-mono text-amber-400 font-bold">Bs. ${fNum(sumRet)}</td>
+            <td class="p-3 text-right font-mono text-rose-400 font-bold">Bs. ${fNum(sumApo)}</td>
+            <td class="p-3 text-right font-mono text-emerald-400 text-sm font-black">Bs. ${fNum(sumTot)}</td>
+            <td class="p-3 text-right font-mono text-emerald-300 text-sm font-black">$${(sumTot / tasaBCVMes).toFixed(2)}</td>
+        </tr>
+    `;
+}
+
+function imprimirReporteFiscalMensual() {
+    const d = datosImpuestosMesActual;
+    if (!d || !d.obligaciones || d.obligaciones.length === 0) {
+        showToast('No hay datos disponibles para imprimir en este mes', 'error');
+        return;
+    }
+
+    const [anio, mes] = d.mes.split('-');
+    const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    const nombreMes = meses[parseInt(mes, 10) - 1] || d.mes;
+
+    const html = `
+    <div class="bg-white text-black p-8 font-sans max-w-4xl mx-auto border-2 border-black text-xs leading-tight space-y-4">
+        <div class="flex justify-between items-start border-b-2 border-black pb-3">
+            <div>
+                <h2 class="text-base font-black uppercase tracking-wider text-black">${appState.parametros.nombre_empresa}</h2>
+                <p class="text-xs text-slate-800 font-semibold">${appState.parametros.rif_empresa}</p>
+                <p class="text-[10px] text-slate-600 font-bold uppercase mt-1">INFORME GERENCIAL DE APORTES PATRONALES Y RETENCIONES FISCALES</p>
+            </div>
+            <div class="text-right">
+                <span class="text-[10px] text-slate-600 uppercase font-bold block">PERÍODO FISCAL:</span>
+                <span class="text-sm font-black uppercase text-black font-mono">${nombreMes} ${anio}</span>
+                <p class="text-[9px] text-slate-600 font-mono mt-0.5">Tasa BCV Referencial: ${d.tasa.toFixed(2)} Bs/$</p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-2 text-center text-[10px]">
+            <div class="border border-black p-2 bg-slate-50"><span class="block text-slate-600">RETENCIONES AL TRABAJADOR:</span><strong class="font-mono text-xs">Bs. ${fNum(d.sumRet)}</strong></div>
+            <div class="border border-black p-2 bg-slate-50"><span class="block text-slate-600">APORTE PATRONAL (COSTO EMPRESA):</span><strong class="font-mono text-xs">Bs. ${fNum(d.sumApo)}</strong></div>
+            <div class="border-2 border-black p-2 bg-slate-200"><span class="block font-black">TOTAL OBLIGACIÓN A ENTERAR:</span><strong class="font-mono text-xs font-black">Bs. ${fNum(d.sumTot)} ($${(d.sumTot / d.tasa).toFixed(2)})</strong></div>
+        </div>
+
+        <table class="w-full border-2 border-black text-[10px] mt-2">
+            <thead>
+                <tr class="bg-slate-200 border-b border-black font-bold">
+                    <th class="p-2 text-left border-r border-black">OBLIGACIÓN LEGAL</th>
+                    <th class="p-2 border-r border-black">ENTE RECEPTOR</th>
+                    <th class="p-2 text-right border-r border-black">BASE CÁLCULO (BS)</th>
+                    <th class="p-2 text-right border-r border-black">RETENIDO (BS)</th>
+                    <th class="p-2 text-right border-r border-black">APORTE EMPRESA (BS)</th>
+                    <th class="p-2 text-right">TOTAL A PAGAR (BS)</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-300">
+                ${d.obligaciones.map(o => `
+                    <tr>
+                        <td class="p-1.5 font-semibold">${o.concepto}</td>
+                        <td class="p-1.5 text-center font-mono text-[9px]">${o.ente}</td>
+                        <td class="p-1.5 text-right font-mono">${fNum(o.baseBs)}</td>
+                        <td class="p-1.5 text-right font-mono">${fNum(o.retencionBs)}</td>
+                        <td class="p-1.5 text-right font-mono">${fNum(o.aporteBs)}</td>
+                        <td class="p-1.5 text-right font-mono font-bold">${fNum(o.totalBs)}</td>
+                    </tr>
+                `).join('')}
+            </tbody>
+            <tfoot>
+                <tr class="bg-slate-100 font-bold border-t-2 border-black">
+                    <td colspan="3" class="p-2 text-right">TOTALES DEL MES:</td>
+                    <td class="p-2 text-right font-mono">Bs. ${fNum(d.sumRet)}</td>
+                    <td class="p-2 text-right font-mono">Bs. ${fNum(d.sumApo)}</td>
+                    <td class="p-2 text-right font-mono text-xs font-black">Bs. ${fNum(d.sumTot)}</td>
+                </tr>
+            </tfoot>
+        </table>
+
+        <div class="pt-8 border-t border-black mt-8 text-[10px] font-bold">
+            <div class="grid grid-cols-2 gap-12 text-center">
+                <div>
+                    <div class="border-t border-black pt-1">RECURSOS HUMANOS / NÓMINA</div>
+                    <p class="text-[9px] font-normal">Elaborado y Certificado</p>
+                </div>
+                <div>
+                    <div class="border-t border-black pt-1">ADMINISTRACIÓN Y FINANZAS</div>
+                    <p class="text-[9px] font-normal">Revisado para Programación de Pagos</p>
+                </div>
+            </div>
+        </div>
+    </div>`;
+
+    gId('print-container').innerHTML = html;
+    window.print();
+}
+        
     </script>
 </body>
 </html>
