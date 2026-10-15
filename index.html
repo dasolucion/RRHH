@@ -111,11 +111,12 @@
                     <div id="sep-antiguedad" class="pt-2 my-1 border-t border-slate-800"></div>
                     <button id="nav-antiguedad" onclick="switchTab('antiguedad')" class="tab-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition"><i class="fa-solid fa-piggy-bank w-5 text-center text-cyan-400"></i><span>Prestaciones Antigüedad</span></button>
                     <button id="nav-antiguedad-historico" onclick="switchTab('antiguedad-historico')" class="tab-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition"><i class="fa-solid fa-coins w-5 text-center text-cyan-600"></i><span>Prestaciones Procesadas</span></button>
-                    <div id="sep-liquidaciones" class="pt-2 my-1 border-t border-slate-800"></div>
-                    <button id="nav-liquidaciones" onclick="switchTab('liquidaciones')" class="tab-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition"><i class="fa-solid fa-scale-balanced w-5 text-center text-amber-500"></i><span>Liquidaciones</span></button>
-                    <button id="nav-liquidaciones-historico" onclick="switchTab('liquidaciones-historico')" class="tab-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition"><i class="fa-solid fa-file-signature w-5 text-center text-amber-700"></i><span>Liquidaciones Procesadas</span></button>
-                    <div id="sep-impuestos" class="pt-2 my-1 border-t border-slate-800"></div>
-                    <button id="nav-impuestos" onclick="switchTab('impuestos')" class="tab-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition"><i class="fa-solid fa-building-columns w-5 text-center text-emerald-400"></i><span>Deberes Formales / Cargas</span></button>
+                   <div id="sep-liquidaciones" data-feature="liquidaciones.modulo" class="pt-2 my-1 border-t border-slate-800"></div>
+                    <button id="nav-liquidaciones" data-feature="liquidaciones.modulo" onclick="switchTab('liquidaciones')" class="tab-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition"><i class="fa-solid fa-scale-balanced w-5 text-center text-amber-500"></i><span>Liquidaciones</span></button>
+                    <button id="nav-liquidaciones-historico" data-feature="liquidaciones.modulo" onclick="switchTab('liquidaciones-historico')" class="tab-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition"><i class="fa-solid fa-file-signature w-5 text-center text-amber-700"></i><span>Liquidaciones Procesadas</span></button>
+                    
+                    <div id="sep-impuestos" data-feature="impuestos.modulo" class="pt-2 my-1 border-t border-slate-800"></div>
+                    <button id="nav-impuestos" data-feature="impuestos.modulo" onclick="switchTab('impuestos')" class="tab-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition"><i class="fa-solid fa-building-columns w-5 text-center text-emerald-400"></i><span>Deberes Formales / Cargas</span></button>
                     <div id="sep-usuarios" class="pt-2 my-1 border-t border-slate-800"></div>
                     <button id="nav-usuarios" onclick="switchTab('usuarios')" class="tab-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition"><i class="fa-solid fa-users-gear w-5 text-center text-indigo-400"></i><span>Usuarios</span></button>
                     <button id="nav-parametros" onclick="switchTab('parametros')" class="tab-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition"><i class="fa-solid fa-sliders w-5 text-center text-blue-400"></i><span>Parámetros</span></button>
@@ -1181,31 +1182,43 @@
 // MATRIZ DE CONFIGURACIÓN DECLARATIVA (FEATURE FLAGS)
 // ==========================================================================
 const DEFAULT_FEATURES = {
-    // 1. Empleados
-    'empleados.subsidio': { label: 'Subsidio Especial en Ficha', cat: 'Empleados', default: true },
-    'empleados.dahua': { label: 'Integración ID Reloj Dahua', cat: 'Empleados', default: true },
-// 2. Procesar Nómina
-    'nomina.dahua_asistencia': { label: 'Botón Aplicar Asistencia Biométrica', cat: 'Nómina', default: true },
-    'nomina.prenomina': { label: 'Pre-Nómina y Borradores en Nube', cat: 'Nómina', default: true },
-    'nomina.recargos_lottt': { label: 'Recargos LOTTT (Extras, Nocturnidad, Feriados)', cat: 'Nómina', default: true },
-    'nomina.islr': { label: 'Retención I.S.L.R. (%) [AR-I]', cat: 'Nómina', default: true },
-    'nomina.subsidio': { label: 'Columna Subsidio Especial', cat: 'Nómina', default: true },
-    'nomina.prestamos': { label: 'Descuento de Préstamos y Saldos', cat: 'Nómina', default: true },
-    'nomina.adelantos': { label: 'Descuento de Adelantos', cat: 'Nómina', default: true },
-    'nomina.txt_banco': { label: 'Generación TXT Bancario (Alim/Sub)', cat: 'Nómina', default: true },
-    'documentos.constancias': { label: 'Generador de Constancias de Trabajo', cat: 'Personal', default: true },
+    // 1. Personal y Empleados
+    'empleados.subsidio': { label: 'Subsidio Especial en Ficha', cat: '1. Empleados', default: true },
+    'empleados.dahua': { label: 'Integración ID Reloj Dahua', cat: '1. Empleados', default: true },
+    'empleados.ari': { label: 'Gestión y Enlaces Formulario AR-I (SENIAT)', cat: '1. Empleados', default: true },
+    'documentos.constancias': { label: 'Constancias de Trabajo y Amonestaciones', cat: '1. Empleados', default: true },
+
+    // 2. Procesar Nómina
+    'nomina.dahua_asistencia': { label: 'Botón Aplicar Asistencia Biométrica', cat: '2. Nómina', default: true },
+    'nomina.prenomina': { label: 'Pre-Nómina y Borradores en Nube', cat: '2. Nómina', default: true },
+    'nomina.recargos_lottt': { label: 'Recargos LOTTT (Extras, Nocturnidad, Feriados)', cat: '2. Nómina', default: true },
+    'nomina.islr': { label: 'Retención I.S.L.R. (%) [AR-I]', cat: '2. Nómina', default: true },
+    'nomina.subsidio': { label: 'Columna Subsidio Especial', cat: '2. Nómina', default: true },
+    'nomina.prestamos': { label: 'Descuento de Préstamos y Saldos', cat: '2. Nómina', default: true },
+    'nomina.adelantos': { label: 'Descuento de Adelantos', cat: '2. Nómina', default: true },
+    'nomina.txt_banco': { label: 'Generación TXT Bancario (Alim/Sub)', cat: '2. Nómina', default: true },
+
     // 3. Vacaciones
-    'vacaciones.subsidio': { label: 'Subsidio Especial de Vacaciones', cat: 'Vacaciones', default: true },
-    'vacaciones.whatsapp': { label: 'Botón Envío Recibo por WhatsApp', cat: 'Vacaciones', default: true },
+    'vacaciones.subsidio': { label: 'Subsidio Especial de Vacaciones', cat: '3. Vacaciones', default: true },
+    'vacaciones.whatsapp': { label: 'Botón Envío Recibo por WhatsApp', cat: '3. Vacaciones', default: true },
+
     // 4. Utilidades
-    'utilidades.pagos_parciales': { label: 'Modalidad Pagos Parciales (%)', cat: 'Utilidades', default: true },
-    'utilidades.subsidio': { label: 'Subsidio Especial en Utilidades', cat: 'Utilidades', default: true },
-    'utilidades.inces': { label: 'Retención Legal 0.5% INCES (Art. 14)', cat: 'Utilidades', default: true },
-    'utilidades.imprimir_resumen': { label: 'Botón Imprimir Resumen General', cat: 'Utilidades', default: true },
+    'utilidades.pagos_parciales': { label: 'Modalidad Pagos Parciales (%)', cat: '4. Utilidades', default: true },
+    'utilidades.subsidio': { label: 'Subsidio Especial en Utilidades', cat: '4. Utilidades', default: true },
+    'utilidades.inces': { label: 'Retención Legal 0.5% INCES (Art. 14)', cat: '4. Utilidades', default: true },
+    'utilidades.imprimir_resumen': { label: 'Botón Imprimir Resumen General', cat: '4. Utilidades', default: true },
+
     // 5. Antigüedad y Prestaciones
-    'antiguedad.tope_75_anticipos': { label: 'Bloquear Anticipos > 75% Capital (Art. 144)', cat: 'Prestaciones', default: true },
-    'antiguedad.conciliacion': { label: 'Módulo Conciliación Mes a Mes', cat: 'Prestaciones', default: true },
-    'antiguedad.intereses_bcv': { label: 'Devengo de Intereses Mensuales BCV', cat: 'Prestaciones', default: true }
+    'antiguedad.tope_75_anticipos': { label: 'Bloquear Anticipos > 75% Capital (Art. 144)', cat: '5. Prestaciones', default: true },
+    'antiguedad.conciliacion': { label: 'Módulo Conciliación Mes a Mes', cat: '5. Prestaciones', default: true },
+    'antiguedad.intereses_bcv': { label: 'Devengo de Intereses Mensuales BCV', cat: '5. Prestaciones', default: true },
+
+    // 6. Deberes Formales e Impuestos Patronales
+    'impuestos.modulo': { label: 'Módulo Deberes Formales / Cargas Patronales', cat: '6. Deberes Formales', default: true },
+    'impuestos.lpp': { label: 'Contribución Especial 9% Pensiones (LPP)', cat: '6. Deberes Formales', default: true },
+
+    // 7. Liquidaciones
+    'liquidaciones.modulo': { label: 'Módulo de Liquidaciones Definitivas (Finiquitos)', cat: '7. Liquidaciones', default: true }
 };
 
 function getFeatureFlag(key) {
@@ -1744,7 +1757,7 @@ function renderEmpleados() {
             <td class="p-3.5 text-sky-400" data-feature="empleados.subsidio">$${Number(e.otros_ingresos).toFixed(2)}</td>
             <td class="p-3.5 text-center font-mono text-xs ${e.device_user_id ? 'text-amber-400 font-bold' : 'text-slate-600'}" data-feature="empleados.dahua">${e.device_user_id || '—'}</td>
             <td class="p-3.5 text-center min-w-[140px] space-x-1.5 whitespace-nowrap">
-                <button onclick="abrirModalGestionARI(${e.id})" class="text-amber-400 hover:text-amber-300 p-1.5 transition" title="Gestionar Formulario AR-I (I.S.L.R.)"><i class="fa-solid fa-receipt"></i></button>
+                <button data-feature="empleados.ari" onclick="abrirModalGestionARI(${e.id})" class="text-amber-400 hover:text-amber-300 p-1.5 transition" title="Gestionar Formulario AR-I (I.S.L.R.)"><i class="fa-solid fa-receipt"></i></button>
                 <button data-feature="documentos.constancias" onclick="abrirModalDocumentoLaboral(${e.id})" class="text-teal-400 hover:text-teal-300 p-1.5 transition" title="Emitir Constancia o Amonestación"><i class="fa-solid fa-file-contract"></i></button>
                 <button onclick="editarEmpleado(${e.id})" class="text-sky-400 hover:text-sky-300 p-1.5 transition" title="Editar"><i class="fa-solid fa-pen"></i></button>
                 <button onclick="eliminarEmpleado(${e.id})" class="text-slate-500 hover:text-red-400 p-1.5 transition" title="Eliminar"><i class="fa-solid fa-trash"></i></button>
@@ -1813,8 +1826,6 @@ async function guardarEmpleado() {
     fetchAllData(); 
     showToast('Empleado guardado exitosamente');
 }
-
-function abrirCrearDepartamento() { gId('depto-id').value=''; gId('depto-nombre').value=''; openModal('modal-departamento'); }
 
         function abrirCrearDepartamento() { gId('depto-id').value=''; gId('depto-nombre').value=''; openModal('modal-departamento'); }
         function editarDepartamento(id) { const d=appState.departamentos.find(x=>String(x.id)===String(id)); if(d){ gId('depto-id').value=d.id; gId('depto-nombre').value=d.nombre; openModal('modal-departamento'); } }
@@ -2129,7 +2140,10 @@ function calcularNominaFila(id) {
     const baseSalarialImponibleUSD = Math.max(0, (salarioBaseDia * (15 - df)) + totalRecargosUSD);
     const islrUSD = baseSalarialImponibleUSD * (islrPct / 100);
 
-    // Salario Neto
+    // Total Asignaciones en USD (Salario base quincenal neto de faltas + recargos + subsidio + otras asignaciones)
+    const totalAsignacionesUSD = base - (dia * df) + totalRecargosUSD + oa;
+
+    // Salario Neto Definitivo
     const netoU = totalAsignacionesUSD - ((dia / 8) * hd) - od - ad - pr - leyU - islrUSD; 
     const netoB = netoU * t;
 
@@ -2214,58 +2228,8 @@ function renderTablaNominaEditable() {
     recalcularTodaLaNomina();
     aplicarFeatureFlagsDOM();
 }
-        async function procesarNominaGlobal() {
-            const f = gId('nom-fecha-proceso').value; 
-            const t = parseFloat(gId('nom-tasa-bcv').value) || 36.5; 
-            const sM = parseFloat(gId('nom-salario-minimo').value) || 130; 
-            const lun = parseInt(gId('nom-lunes').value) || 2;
-            if(!f) return showToast('Falta fecha de pago', 'error'); 
-            const act = appState.empleados.filter(e => e.activo); 
-            if(!act.length) return;
-            const regs = []; const empUpdates = [];
-            for (const e of act) {
-                const sb = Number(e.sueldo) || 0; 
-                const si = sb + (Number(e.bono_alimentacion) || 0) + (Number(e.otros_ingresos) || 0); 
-                const dia = si / 30; const base = dia * 15;
-                const df = parseFloat(gId(`df-${e.id}`).value) || 0; 
-                const oa = parseFloat(gId(`oa-${e.id}`).value) || 0; 
-                const hd = parseFloat(gId(`hd-${e.id}`).value) || 0; 
-                const od = parseFloat(gId(`od-${e.id}`).value) || 0; 
-                const ad = parseFloat(gId(`ad-${e.id}`).value) || 0; 
-                const pr = parseFloat(gId(`pr-${e.id}`).value) || 0;
-                const sbBs = sb * t; 
-                const ivss = (Math.min(sbBs, 5 * sM) * 12 / 52) * 0.04 * lun; 
-                const rpe = (Math.min(sbBs, 10 * sM) * 12 / 52) * 0.005 * lun; 
-                const faov = (sbBs * 0.01) / 2; 
-                const leyU = (ivss + rpe + faov) / t; 
-                const netoU = base - (dia * df) + oa - ((dia / 8) * hd) - od - ad - pr - leyU;
-                if (pr > 0) {
-                    const nuevoSaldo = Math.max(0, (Number(e.saldo_prestamo) || 0) - pr);
-                    e.saldo_prestamo = nuevoSaldo;
-                    empUpdates.push(supabaseClient.from('empleados').update({ saldo_prestamo: nuevoSaldo }).eq('id', e.id));
-                }
-                regs.push({ 
-                    fecha_pago: f, empleado_id: e.id, empleado: e.nombre, cargo: e.cargos?.nombre || '-', 
-                    tasa_bcv: t, salario_minimo_bs: sM, salario_base: sb, 
-                    bono_alimentacion: Number(e.bono_alimentacion) || 0, otros_ingresos: Number(e.otros_ingresos) || 0, 
-                    dias_faltantes: df, otras_asignaciones: oa, horas_descuento: hd, otros_descuentos: od, adelantos: ad, prestamos: pr, 
-                    ivss_usd: ivss / t, rpe_usd: rpe / t, faov_usd: faov / t, descuentos_ley_usd: leyU, 
-                    neto_usd: netoU, neto_bs: netoU * t, estado: 'Procesado' 
-                });
-            }
-            if (empUpdates.length > 0) await Promise.all(empUpdates);
-            await supabaseClient.from('nominas').insert(regs); 
-            await safeQuery(supabaseClient.from('prenomina_borrador').delete().eq('id', 1), 'clear_prenomina');
-            localStorage.removeItem('nomina_borrador_global');
-            const [yStr, mStr, dStr] = f.split('-');
-            if (parseInt(dStr) >= 20) {
-                const mesClave = `${yStr}-${mStr}`;
-                const salariosFinMes = act.map(e => ({ empleado_id: e.id, mes: mesClave, sueldo_base: Number(e.sueldo) || 0, bono_alimentacion: Number(e.bono_alimentacion) || 0, subsidio: Number(e.otros_ingresos) || 0 }));
-                try { await supabaseClient.from('historico_salarios').upsert(salariosFinMes, { onConflict: 'empleado_id,mes' }); } catch(e) {}
-            }
-            showToast('Nómina procesada definitivamente con éxito'); 
-            fetchAllData();
-        }
+
+2233
 
         function renderHistoricoNominas() {
             const gr = {}; 
