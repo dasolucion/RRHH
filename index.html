@@ -264,8 +264,8 @@
                         <span><i class="fa-solid fa-cloud mr-1.5"></i> <strong>Pre-Nómina en la Nube:</strong> Cualquier ajuste que hagas queda almacenado en Supabase y disponible en cualquier dispositivo.</span>
                         <span id="txt-ultima-prenomina" class="text-[11px] font-mono text-slate-400">Sin borrador guardado</span>
                     </div>
-                    <div class="overflow-x-auto overflow-y-auto max-h-[65vh] custom-scrollbar">
-                        <table class="w-full text-left text-xs whitespace-nowrap relative">
+                   <div class="overflow-x-auto overflow-y-auto max-h-[calc(100vh-300px)] border border-slate-800 rounded-xl custom-scrollbar shadow-inner">
+    <table class="w-full text-left text-xs whitespace-nowrap relative">
                            <thead class="bg-slate-950 text-slate-400 uppercase text-[10px] tracking-wider sticky top-0 z-20 shadow-[0_1px_0_0_#1e293b]">
                                <tr>
                                     <th class="p-3 min-w-[170px]">Empleado</th>
@@ -877,7 +877,7 @@
                     <div class="grid grid-cols-2 gap-3"><div><label class="text-[11px] text-slate-400 block mb-1">F. Ingreso</label><input type="date" id="emp-fecha" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white"></div><div><label class="text-[11px] text-slate-400 block mb-1">Cédula</label><input type="text" id="emp-cedula" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white"></div></div>
                     <div class="grid grid-cols-2 gap-3"><div><label class="text-[11px] text-slate-400 block mb-1">Nombre</label><input type="text" id="emp-nombre" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white"></div><div><label class="text-[11px] text-slate-400 block mb-1">Teléfono</label><input type="text" id="emp-telefono" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white"></div></div>
                     <div class="grid grid-cols-2 gap-3"><div><label class="text-[11px] text-slate-400 block mb-1">Departamento</label><select id="emp-depto-select" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white"></select></div><div><label class="text-[11px] text-slate-400 block mb-1">Cargo</label><select id="emp-cargo-select" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white"></select></div></div>
-                    <div class="grid grid-cols-3 gap-3 border-t border-slate-800 pt-2"><div><label class="text-[11px] text-slate-400 block mb-1">Salario ($)</label><input type="number" step="0.01" id="emp-sueldo" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white"></div><div><label class="text-[11px] text-slate-400 block mb-1">B. Alim ($)</label><input type="number" step="0.01" id="emp-bono-alim" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white"></div><div><label class="text-[11px] text-slate-400 block mb-1">Subsidio ($)</label><input type="number" step="0.01" id="emp-otros-ing" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white"></div></div>
+                    <div class="grid grid-cols-3 gap-3 border-t border-slate-800 pt-2"><div><label class="text-[11px] text-slate-400 block mb-1">Salario ($)</label><input type="number" step="0.01" id="emp-sueldo" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white"></div><div><label class="text-[11px] text-slate-400 block mb-1">B. Alim ($)</label><input type="number" step="0.01" id="emp-bono-alim" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white"></div><div><label class="text-[11px] text-slate-400 block mb-1">Subsidio ($)</label><input type="number" step="0.01" id="emp-otros-ing" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white"></div><div><label class="text-[11px] text-slate-400 block mb-1">% Retención ISLR (AR-I)</label><input type="number" step="0.01" id="emp-islr" placeholder="0.00" min="0" max="100" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-amber-300 font-bold font-mono outline-none focus:border-amber-500"></div></div>
                     <div class="border-t border-slate-800 pt-2">
 <label class="text-[11px] text-amber-400 block mb-1"><i class="fa-solid fa-fingerprint mr-1"></i>ID Dispositivo Dahua (asistencia)</label>
 <input type="text" id="emp-device-user-id" placeholder="Ej: 7 (UserID que aparece en el reloj)" class="w-full bg-slate-950 border border-amber-500/30 rounded-lg p-2 text-xs text-white">
@@ -896,35 +896,58 @@
         <div id="modal-cargo" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
             <div class="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-sm overflow-hidden shadow-2xl"><div class="p-4 border-b border-slate-800 flex justify-between"><h3 id="modal-cargo-titulo" class="font-bold text-white">Cargo</h3><button onclick="closeModal('modal-cargo')" class="text-slate-400"><i class="fa-solid fa-xmark"></i></button></div><div class="p-4"><input type="hidden" id="cargo-id"><input type="text" id="cargo-nombre" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white"></div><div class="p-4 border-t border-slate-800 flex justify-end space-x-2"><button onclick="closeModal('modal-cargo')" class="px-3 py-1.5 bg-slate-800 text-xs rounded-lg text-slate-300">Cancelar</button><button onclick="guardarCargo()" class="px-3 py-1.5 bg-purple-600 text-white text-xs font-bold rounded-lg">Guardar</button></div></div>
         </div>
-<!-- MODAL GENERADOR DE CONSTANCIAS DE TRABAJO (ART. 84 LOTTT) -->
+<!-- MODAL GENERADOR DE DOCUMENTOS LABORALES (CONSTANCIAS Y AMONESTACIONES) -->
         <div id="modal-constancia" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
-            <div class="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh]">
+            <div class="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-4xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh]">
                 <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-950">
                     <h3 class="font-bold text-sm text-white flex items-center">
-                        <i class="fa-solid fa-file-signature text-teal-400 mr-2"></i> Emitir Constancia de Trabajo (Art. 84 LOTTT)
+                        <i class="fa-solid fa-file-contract text-teal-400 mr-2"></i> Gestión de Documentos Laborales - <span id="doc-emp-nombre" class="ml-1 text-teal-300"></span>
                     </h3>
                     <div class="flex space-x-2">
-                        <button onclick="imprimirConstanciaLaboral()" class="bg-teal-600 hover:bg-teal-500 text-white text-xs px-3.5 py-1.5 rounded-lg font-semibold flex items-center space-x-1.5 transition shadow">
-                            <i class="fa-solid fa-print"></i><span>Imprimir Constancia</span>
+                        <button onclick="imprimirDocumentoLaboral()" class="bg-teal-600 hover:bg-teal-500 text-white text-xs px-3.5 py-1.5 rounded-lg font-semibold flex items-center space-x-1.5 transition shadow">
+                            <i class="fa-solid fa-print"></i><span>Imprimir Documento</span>
                         </button>
                         <button onclick="closeModal('modal-constancia')" class="text-slate-400 px-2"><i class="fa-solid fa-xmark text-lg"></i></button>
                     </div>
                 </div>
-                <div class="p-4 bg-slate-950 border-b border-slate-800 grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div>
-                        <label class="text-[11px] font-semibold text-slate-400 block mb-1">Tipo de Constancia</label>
-                        <select id="const-tipo" onchange="actualizarVistaPreviaConstancia()" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-teal-500">
-                            <option value="con_sueldo">Con Mención de Salario</option>
-                            <option value="sin_sueldo">Sin Mención de Salario</option>
-                        </select>
+                <div class="p-4 bg-slate-950 border-b border-slate-800 space-y-3">
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                            <label class="text-[11px] font-semibold text-slate-400 block mb-1">Tipo de Documento</label>
+                            <select id="doc-tipo" onchange="toggleFormulariosDocumento()" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-teal-500 font-bold">
+                                <option value="constancia_con_sueldo">Constancia de Trabajo (Con Salario)</option>
+                                <option value="constancia_sin_sueldo">Constancia de Trabajo (Sin Salario)</option>
+                                <option value="amonestacion">Amonestación Escrita (Art. 79 LOTTT)</option>
+                            </select>
+                        </div>
+                        <div id="campo-dirigido">
+                            <label class="text-[11px] font-semibold text-slate-400 block mb-1">Destinatario</label>
+                            <input type="text" id="const-dirigido" value="A QUIEN PUEDA INTERESAR" oninput="actualizarVistaPreviaDocumento()" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-teal-500">
+                        </div>
+                        <div>
+                            <label class="text-[11px] font-semibold text-slate-400 block mb-1">Ciudad de Emisión</label>
+                            <input type="text" id="const-ciudad" value="Caracas" oninput="actualizarVistaPreviaDocumento()" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-teal-500">
+                        </div>
                     </div>
-                    <div>
-                        <label class="text-[11px] font-semibold text-slate-400 block mb-1">Destinatario</label>
-                        <input type="text" id="const-dirigido" value="A QUIEN PUEDA INTERESAR" oninput="actualizarVistaPreviaConstancia()" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-teal-500">
-                    </div>
-                    <div>
-                        <label class="text-[11px] font-semibold text-slate-400 block mb-1">Ciudad de Emisión</label>
-                        <input type="text" id="const-ciudad" value="Caracas" oninput="actualizarVistaPreviaConstancia()" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-teal-500">
+                    <!-- Formulario específico para Amonestaciones -->
+                    <div id="form-amonestacion-opciones" class="hidden grid grid-cols-1 sm:grid-cols-12 gap-3 pt-2 border-t border-slate-800">
+                        <div class="sm:col-span-5">
+                            <label class="text-[11px] font-semibold text-rose-400 block mb-1">Causal Legal (Art. 79 LOTTT)</label>
+                            <select id="amon-causal" onchange="actualizarVistaPreviaDocumento()" class="w-full bg-slate-900 border border-rose-900/60 rounded-lg p-2 text-xs text-white outline-none focus:border-rose-500">
+                                <option value="art79_f">Art. 79 lit. f: Inasistencia injustificada al trabajo</option>
+                                <option value="art79_i">Art. 79 lit. i: Impuntualidad o abandono reiterado</option>
+                                <option value="art79_a">Art. 79 lit. a: Falta de probidad o conducta inmoral</option>
+                                <option value="art79_c">Art. 79 lit. c: Falta grave de respeto o desobediencia</option>
+                            </select>
+                        </div>
+                        <div class="sm:col-span-2">
+                            <label class="text-[11px] font-semibold text-rose-400 block mb-1">Fecha de la Falta</label>
+                            <input type="date" id="amon-fecha-falta" onchange="actualizarVistaPreviaDocumento()" class="w-full bg-slate-900 border border-rose-900/60 rounded-lg p-2 text-xs text-white outline-none focus:border-rose-500">
+                        </div>
+                        <div class="sm:col-span-5">
+                            <label class="text-[11px] font-semibold text-rose-400 block mb-1">Relato Concreto de los Hechos</label>
+                            <input type="text" id="amon-hechos" placeholder="Ej: No se presentó a su jornada laboral sin presentar justificativo médico." oninput="actualizarVistaPreviaDocumento()" class="w-full bg-slate-900 border border-rose-900/60 rounded-lg p-2 text-xs text-white outline-none focus:border-rose-500">
+                        </div>
                     </div>
                 </div>
                 <div id="area-impresion-constancia" class="p-6 overflow-y-auto bg-slate-900 h-full custom-scrollbar"></div>
@@ -1510,11 +1533,29 @@ if (antProcesadas && antProcesadas.length > 0) {
         function renderDepartamentos() { gId('tabla-deptos-body').innerHTML = appState.departamentos.map(d => `<tr class="hover:bg-slate-900/50"><td class="p-3.5 font-mono text-slate-400 text-xs">#${d.id}</td><td class="p-3.5 font-semibold text-white">${d.nombre}</td><td class="p-3.5 text-right space-x-1"><button onclick="editarDepartamento(${d.id})" class="text-amber-400 p-1 hover:text-amber-300"><i class="fa-solid fa-pen"></i></button><button onclick="eliminarDepartamento(${d.id})" class="text-slate-500 hover:text-red-400 p-1"><i class="fa-solid fa-trash"></i></button></td></tr>`).join(''); }
         function renderCargos() { gId('tabla-cargos-body').innerHTML = appState.cargos.map(c => `<tr class="hover:bg-slate-900/50"><td class="p-3.5 font-mono text-slate-400 text-xs">#${c.id}</td><td class="p-3.5 font-semibold text-white">${c.nombre}</td><td class="p-3.5 text-right space-x-1"><button onclick="editarCargo(${c.id})" class="text-purple-400 p-1 hover:text-purple-300"><i class="fa-solid fa-pen"></i></button><button onclick="eliminarCargo(${c.id})" class="text-slate-500 hover:text-red-400 p-1"><i class="fa-solid fa-trash"></i></button></td></tr>`).join(''); }
 function renderEmpleados() {
-    gId('tabla-empleados-body').innerHTML = appState.empleados.map(e => `<tr class="hover:bg-slate-900/50 ${!e.activo?'opacity-50':''}"><td class="p-3.5 text-center"><input type="checkbox" ${e.activo?'checked':''} onchange="toggleEstadoEmpleado(${e.id}, ${e.activo})" class="w-4 h-4 text-sky-500 rounded bg-slate-950 border-slate-800 cursor-pointer"></td><td class="p-3.5 font-mono text-slate-400 text-[11px]">${e.fecha_ingreso||''}</td><td class="p-3.5 font-semibold text-slate-200">${e.cedula}</td><td class="p-3.5 font-bold text-white">${e.nombre}</td><td class="p-3.5 text-slate-400">${e.telefono||'-'}</td><td class="p-3.5 text-amber-400">${e.departamentos?.nombre||'-'}</td><td class="p-3.5 text-purple-400">${e.cargos?.nombre||'-'}</td><td class="p-3.5 text-slate-300 font-medium">$${Number(e.sueldo).toFixed(2)}</td><td class="p-3.5 text-emerald-400">$${Number(e.bono_alimentacion).toFixed(2)}</td><td class="p-3.5 text-sky-400">$${Number(e.otros_ingresos).toFixed(2)}</td><td class="p-3.5 text-center font-mono text-xs ${e.device_user_id ? 'text-amber-400 font-bold' : 'text-slate-600'}">${e.device_user_id || '—'}</td><td class="p-3.5 text-right space-x-1"><button onclick="editarEmpleado(${e.id})" class="text-sky-400 hover:text-sky-300 p-1"><i class="fa-solid fa-pen"></i></button><button onclick="eliminarEmpleado(${e.id})" class="text-slate-500 hover:text-red-400 p-1"><i class="fa-solid fa-trash"></i></button></td><td class="p-3.5 text-right space-x-1">
-                        <button data-feature="documentos.constancias" onclick="abrirModalConstancia(${e.id})" class="text-teal-400 hover:text-teal-300 p-1" title="Emitir Constancia de Trabajo (Art. 84)"><i class="fa-solid fa-file-contract"></i></button>
-                        <button onclick="editarEmpleado(${e.id})" class="text-sky-400 hover:text-sky-300 p-1"><i class="fa-solid fa-pen"></i></button>
-                        <button onclick="eliminarEmpleado(${e.id})" class="text-slate-500 hover:text-red-400 p-1"><i class="fa-solid fa-trash"></i></button>
-                    </td></tr>`).join('');
+    gId('tabla-empleados-body').innerHTML = appState.empleados.map(e => `
+        <tr class="hover:bg-slate-900/50 ${!e.activo ? 'opacity-50' : ''}">
+            <td class="p-3.5 text-center">
+                <input type="checkbox" ${e.activo ? 'checked' : ''} onchange="toggleEstadoEmpleado(${e.id}, ${e.activo})" class="w-4 h-4 text-sky-500 rounded bg-slate-950 border-slate-800 cursor-pointer">
+            </td>
+            <td class="p-3.5 font-mono text-slate-400 text-[11px]">${e.fecha_ingreso || ''}</td>
+            <td class="p-3.5 font-semibold text-slate-200">${e.cedula}</td>
+            <td class="p-3.5 font-bold text-white">${e.nombre}</td>
+            <td class="p-3.5 text-slate-400">${e.telefono || '-'}</td>
+            <td class="p-3.5 text-amber-400">${e.departamentos?.nombre || '-'}</td>
+            <td class="p-3.5 text-purple-400">${e.cargos?.nombre || '-'}</td>
+            <td class="p-3.5 text-slate-300 font-medium">$${Number(e.sueldo).toFixed(2)}</td>
+            <td class="p-3.5 text-emerald-400">$${Number(e.bono_alimentacion).toFixed(2)}</td>
+            <td class="p-3.5 text-sky-400" data-feature="empleados.subsidio">$${Number(e.otros_ingresos).toFixed(2)}</td>
+            <td class="p-3.5 text-center font-mono text-xs ${e.device_user_id ? 'text-amber-400 font-bold' : 'text-slate-600'}" data-feature="empleados.dahua">${e.device_user_id || '—'}</td>
+            <td class="p-3.5 text-right space-x-1 whitespace-nowrap">
+                <button data-feature="documentos.constancias" onclick="abrirModalDocumentoLaboral(${e.id})" class="text-teal-400 hover:text-teal-300 p-1.5 transition" title="Emitir Constancia o Amonestación"><i class="fa-solid fa-file-contract"></i></button>
+                <button onclick="editarEmpleado(${e.id})" class="text-sky-400 hover:text-sky-300 p-1.5 transition" title="Editar"><i class="fa-solid fa-pen"></i></button>
+                <button onclick="eliminarEmpleado(${e.id})" class="text-slate-500 hover:text-red-400 p-1.5 transition" title="Eliminar"><i class="fa-solid fa-trash"></i></button>
+            </td>
+        </tr>
+    `).join('');
+    aplicarFeatureFlagsDOM();
 }
 
         async function toggleEstadoEmpleado(id, v) { try { await supabaseClient.from('empleados').update({ activo:!v }).eq('id',id); } catch(e){} const emp = appState.empleados.find(x => x.id === id); if (emp) emp.activo = !v; fetchAllData(); }
@@ -1522,16 +1563,56 @@ function renderEmpleados() {
         async function eliminarDepartamento(id) { if(confirm('¿Eliminar depto?')) { try { await supabaseClient.from('departamentos').delete().eq('id',id); } catch(e){} appState.departamentos = appState.departamentos.filter(x => x.id !== id); fetchAllData(); } }
         async function eliminarCargo(id) { if(confirm('¿Eliminar cargo?')) { try { await supabaseClient.from('cargos').delete().eq('id',id); } catch(e){} appState.cargos = appState.cargos.filter(x => x.id !== id); fetchAllData(); } }
 
-        function abrirCrearEmpleado() { ['emp-id','emp-fecha','emp-cedula','emp-nombre','emp-telefono','emp-device-user-id'].forEach(id=>gId(id).value=''); ['emp-sueldo','emp-bono-alim','emp-otros-ing'].forEach(id=>gId(id).value='0'); gId('emp-depto-select').value=''; gId('emp-cargo-select').value=''; gId('emp-activo').checked=true; openModal('modal-empleado'); }
-        function editarEmpleado(id) { const e = appState.empleados.find(x=>String(x.id)===String(id)); if(e){ gId('emp-id').value=e.id; gId('emp-fecha').value=e.fecha_ingreso||''; gId('emp-cedula').value=e.cedula||''; gId('emp-nombre').value=e.nombre||''; gId('emp-telefono').value=e.telefono||''; gId('emp-depto-select').value=e.departamento_id||''; gId('emp-cargo-select').value=e.cargo_id||''; gId('emp-sueldo').value=e.sueldo||0; gId('emp-bono-alim').value=e.bono_alimentacion||0; gId('emp-otros-ing').value=e.otros_ingresos||0; gId('emp-device-user-id').value=e.device_user_id||''; gId('emp-activo').checked=e.activo; openModal('modal-empleado'); } }
+function abrirCrearEmpleado() { 
+    ['emp-id','emp-fecha','emp-cedula','emp-nombre','emp-telefono','emp-device-user-id'].forEach(id => gId(id).value = ''); 
+    ['emp-sueldo','emp-bono-alim','emp-otros-ing','emp-islr'].forEach(id => gId(id).value = '0'); 
+    gId('emp-depto-select').value = ''; 
+    gId('emp-cargo-select').value = ''; 
+    gId('emp-activo').checked = true; 
+    openModal('modal-empleado'); 
+}
+
+function editarEmpleado(id) { 
+    const e = appState.empleados.find(x => String(x.id) === String(id)); 
+    if(e){ 
+        gId('emp-id').value = e.id; 
+        gId('emp-fecha').value = e.fecha_ingreso || ''; 
+        gId('emp-cedula').value = e.cedula || ''; 
+        gId('emp-nombre').value = e.nombre || ''; 
+        gId('emp-telefono').value = e.telefono || ''; 
+        gId('emp-depto-select').value = e.departamento_id || ''; 
+        gId('emp-cargo-select').value = e.cargo_id || ''; 
+        gId('emp-sueldo').value = e.sueldo || 0; 
+        gId('emp-bono-alim').value = e.bono_alimentacion || 0; 
+        gId('emp-otros-ing').value = e.otros_ingresos || 0; 
+        gId('emp-device-user-id').value = e.device_user_id || ''; 
+        gId('emp-islr').value = e.islr_porcentaje || 0;
+        gId('emp-activo').checked = e.activo; 
+        openModal('modal-empleado'); 
+    } 
+}
+
 async function guardarEmpleado() { 
-    const id=gId('emp-id').value; 
-    const p={ fecha_ingreso:gId('emp-fecha').value||null, cedula:gId('emp-cedula').value, nombre:gId('emp-nombre').value, telefono:gId('emp-telefono').value, departamento_id:gId('emp-depto-select').value||null, cargo_id:gId('emp-cargo-select').value||null, sueldo:parseFloat(gId('emp-sueldo').value)||0, bono_alimentacion:parseFloat(gId('emp-bono-alim').value)||0, otros_ingresos:parseFloat(gId('emp-otros-ing').value)||0, device_user_id: gId('emp-device-user-id').value.trim() || null, activo:gId('emp-activo').checked }; 
-    if(!p.cedula||!p.nombre) return showToast('Faltan datos','error'); 
+    const id = gId('emp-id').value; 
+    const p = { 
+        fecha_ingreso: gId('emp-fecha').value || null, 
+        cedula: gId('emp-cedula').value, 
+        nombre: gId('emp-nombre').value, 
+        telefono: gId('emp-telefono').value, 
+        departamento_id: gId('emp-depto-select').value || null, 
+        cargo_id: gId('emp-cargo-select').value || null, 
+        sueldo: parseFloat(gId('emp-sueldo').value) || 0, 
+        bono_alimentacion: parseFloat(gId('emp-bono-alim').value) || 0, 
+        otros_ingresos: parseFloat(gId('emp-otros-ing').value) || 0, 
+        device_user_id: gId('emp-device-user-id').value.trim() || null, 
+        islr_porcentaje: parseFloat(gId('emp-islr').value) || 0,
+        activo: gId('emp-activo').checked 
+    }; 
+    if(!p.cedula || !p.nombre) return showToast('Faltan datos obligatorios', 'error'); 
     try { 
         if (id) { await supabaseClient.from('empleados').update(p).eq('id', id); } 
         else { await supabaseClient.from('empleados').insert([p]); } 
-    } catch(e) { console.warn('Error guardar empleado:', e); }
+    } catch(e) { console.warn('Error al guardar empleado:', e); }
     closeModal('modal-empleado'); 
     fetchAllData(); 
     showToast('Empleado guardado exitosamente');
@@ -1846,9 +1927,11 @@ function calcularNominaFila(id) {
     const faov = (sbBs * 0.01) / 2;
     const leyU = (ivss + rpe + faov) / t; 
 
-    // Retención I.S.L.R. en base a asignaciones devengadas
-    const totalAsignacionesUSD = base - (dia * df) + totalRecargosUSD + oa;
-    const islrUSD = totalAsignacionesUSD * (islrPct / 100);
+// Retención I.S.L.R. Automática (Solo sobre Salario Normal: Base + Recargos - Días no laborados)
+    // Se excluyen estrictamente Bono de Alimentación y Subsidio Especial por orden legal
+    const salarioBaseDia = sb / 30;
+    const baseSalarialImponibleUSD = Math.max(0, (salarioBaseDia * (15 - df)) + totalRecargosUSD);
+    const islrUSD = baseSalarialImponibleUSD * (islrPct / 100);
 
     // Salario Neto
     const netoU = totalAsignacionesUSD - ((dia / 8) * hd) - od - ad - pr - leyU - islrUSD; 
@@ -1908,7 +1991,7 @@ function renderTablaNominaEditable() {
         const hdVal = safeInt(bEmp.hd);
         const odVal = safeNum(bEmp.od);
         const adVal = safeNum(bEmp.ad);
-        const islrVal = safeNum(bEmp.islr);
+        const islrVal = bEmp.islr !== undefined ? safeNum(bEmp.islr) : safeNum(e.islr_porcentaje || 0);
         
         let prVal = prestamoSugeridoDef;
         if (bEmp.pr !== undefined) { const parsedPr = parseFloat(bEmp.pr); if (!isNaN(parsedPr)) prVal = parsedPr.toFixed(2); }
@@ -4057,69 +4140,138 @@ async function aplicarAsistenciaANomina() {
 
         let empleadoConstanciaActual = null;
 
-function abrirModalConstancia(empId) {
+let empleadoDocumentoActual = null;
+
+function abrirModalDocumentoLaboral(empId) {
     const emp = appState.empleados.find(e => String(e.id) === String(empId));
     if (!emp) return showToast('Empleado no encontrado', 'error');
-    empleadoConstanciaActual = emp;
-    actualizarVistaPreviaConstancia();
+    empleadoDocumentoActual = emp;
+    gId('doc-emp-nombre').innerText = emp.nombre;
+    gId('amon-fecha-falta').valueAsDate = new Date();
+    toggleFormulariosDocumento();
     openModal('modal-constancia');
 }
 
-function actualizarVistaPreviaConstancia() {
-    const emp = empleadoConstanciaActual;
+function toggleFormulariosDocumento() {
+    const tipo = gId('doc-tipo').value;
+    const esAmonestacion = tipo === 'amonestacion';
+    
+    gId('form-amonestacion-opciones').classList.toggle('hidden', !esAmonestacion);
+    gId('campo-dirigido').classList.toggle('hidden', esAmonestacion);
+    
+    actualizarVistaPreviaDocumento();
+}
+
+function actualizarVistaPreviaDocumento() {
+    const emp = empleadoDocumentoActual;
     if (!emp) return;
 
-    const tipo = gId('const-tipo').value;
-    const dirigido = gId('const-dirigido').value.trim() || 'A QUIEN PUEDA INTERESAR';
+    const tipo = gId('doc-tipo').value;
     const ciudad = gId('const-ciudad').value.trim() || 'Caracas';
-
     const hoy = new Date();
     const meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
     const fechaLetras = `${hoy.getDate()} días del mes de ${meses[hoy.getMonth()]} de ${hoy.getFullYear()}`;
-
     const [iy, im, id] = (emp.fecha_ingreso || '').split('-');
-    const fechaIngresoFmt = (iy && im && id) ? `${id}/${im}/${iy}` : 'la fecha de su contrato';
-
+    const fechaIngresoFmt = (iy && im && id) ? `${id}/${im}/${iy}` : 'la fecha de ingreso';
     const cargo = emp.cargos?.nombre || emp.departamentos?.nombre || 'Trabajador(a)';
-    const salarioBase = Number(emp.sueldo || 0);
-    const salarioIntegral = salarioBase + Number(emp.bono_alimentacion || 0) + Number(emp.otros_ingresos || 0);
+    const tasa = parseFloat(gId('nom-tasa-bcv')?.value) || 36.5;
 
-    const parrafoSalarial = tipo === 'con_sueldo' 
-        ? `percibiendo un ingreso mensual de <strong>$${salarioIntegral.toFixed(2)}</strong> (equivalente en bolívares calculados a la tasa oficial fijada por el Banco Central de Venezuela).`
-        : `demostrando durante su permanencia honestidad, compromiso y alto sentido de responsabilidad.`;
+    let html = '';
 
-    const html = `
-    <div class="bg-white text-black p-8 font-serif max-w-2xl mx-auto border border-black shadow-lg text-sm leading-relaxed" id="documento-constancia-papel">
-        <div class="text-center border-b-2 border-black pb-4 mb-6">
-            <h2 class="text-lg font-black uppercase tracking-wider text-black">${appState.parametros.nombre_empresa}</h2>
-            <p class="text-xs text-slate-800 font-sans font-semibold">${appState.parametros.rif_empresa}</p>
-            <p class="text-[10px] text-slate-600 font-sans">DEPARTAMENTO DE GESTIÓN HUMANA Y RELACIONES LABORALES</p>
-        </div>
+    if (tipo === 'amonestacion') {
+        const causalTexto = gId('amon-causal').options[gId('amon-causal').selectedIndex].text;
+        const hechos = gId('amon-hechos').value.trim() || 'Haber incurrido en incumplimiento de sus deberes laborales estipulados en su contrato.';
+        const fechaFalta = gId('amon-fecha-falta').value || 'reciente';
 
-        <div class="text-center my-6">
-            <h3 class="text-base font-bold uppercase tracking-widest underline underline-offset-4 text-black">CONSTANCIA DE TRABAJO</h3>
-        </div>
+        html = `
+        <div class="bg-white text-black p-8 font-serif max-w-2xl mx-auto border border-black shadow-lg text-xs leading-relaxed" id="documento-impresion-papel">
+            <div class="text-center border-b-2 border-black pb-3 mb-5 font-sans">
+                <h2 class="text-base font-black uppercase tracking-wider text-black">${appState.parametros.nombre_empresa}</h2>
+                <p class="text-[11px] text-slate-800 font-semibold">${appState.parametros.rif_empresa}</p>
+                <p class="text-[9px] text-slate-600">DEPARTAMENTO DE GESTIÓN HUMANA Y RELACIONES LABORALES</p>
+            </div>
 
-        <p class="mb-4 text-xs font-bold font-sans uppercase">${dirigido}:</p>
+            <div class="text-center my-4">
+                <h3 class="text-sm font-bold uppercase tracking-widest text-rose-700 underline underline-offset-4">NOTIFICACIÓN DE AMONESTACIÓN ESCRITA</h3>
+            </div>
 
-        <p class="text-justify mb-6 indent-8">
-            Por medio de la presente se hace constar que el (la) ciudadano(a) <strong>${emp.nombre}</strong>, titular de la Cédula de Identidad N° <strong>${emp.cedula}</strong>, presta sus servicios en esta empresa desde el <strong>${fechaIngresoFmt}</strong>, desempeñando actualmente el cargo de <strong>${cargo}</strong>, ${parrafoSalarial}
-        </p>
+            <p class="text-justify mb-4">
+                En la ciudad de ${ciudad}, a los ${fechaLetras}, la empresa <strong>${appState.parametros.nombre_empresa}</strong> hace entrega formal de la presente <strong>AMONESTACIÓN ESCRITA</strong> al (la) ciudadano(a) <strong>${emp.nombre}</strong>, titular de la Cédula de Identidad N° <strong>${emp.cedula}</strong>, quien desempeña el cargo de <strong>${cargo}</strong>.
+            </p>
 
-        <p class="text-justify mb-10 indent-8">
-            Constancia que se expide en cumplimiento del Artículo 84 de la Ley Orgánica del Trabajo, los Trabajadores y las Trabajadoras (LOTTT), a petición de la parte interesada, en la ciudad de ${ciudad}, a los ${fechaLetras}.
-        </p>
+            <div class="border border-black bg-slate-50 p-3 mb-4 space-y-1">
+                <p><strong>CAUSAL LEGAL APLICADA:</strong> ${causalTexto}.</p>
+                <p><strong>FECHA DE OCURRENCIA:</strong> ${fechaFalta}</p>
+                <p class="text-justify"><strong>DESCRIPCIÓN DE LOS HECHOS:</strong> ${hechos}</p>
+            </div>
 
-        <div class="pt-16 text-center border-t border-black mt-12 w-64 mx-auto font-sans">
-            <p class="font-bold text-xs uppercase">${appState.parametros.nombre_empresa.split('/')[0].trim()}</p>
-            <p class="text-[10px] text-slate-700">Recursos Humanos / Administración</p>
-        </div>
-    </div>`;
+            <p class="text-justify mb-4 indent-4">
+                Se le exhorta formalmente a corregir dicha conducta y dar fiel cumplimiento a las obligaciones contractuales y de ley. De persistir en faltas similares, la empresa se reserva el derecho de rescindir la relación laboral conforme a lo estipulado en la Ley Orgánica del Trabajo, los Trabajadores y las Trabajadoras (LOTTT).
+            </p>
+
+            <div class="pt-8 border-t border-black mt-8 text-[10px] font-sans">
+                <div class="grid grid-cols-2 gap-8 mb-8">
+                    <div class="text-center border-t border-black pt-1">
+                        <p class="font-bold">POR LA EMPRESA</p>
+                        <p class="text-[9px] text-slate-600">Gestión Humana / Administración</p>
+                    </div>
+                    <div class="text-center border-t border-black pt-1">
+                        <p class="font-bold">EL TRABAJADOR</p>
+                        <p class="text-[9px] text-slate-600">Firma en señal de Notificación</p>
+                    </div>
+                </div>
+                <div class="border-t border-dashed border-slate-400 pt-3 text-center">
+                    <p class="font-bold text-[9px] mb-6 uppercase text-slate-500">En caso de negativa del trabajador a firmar su notificación:</p>
+                    <div class="grid grid-cols-2 gap-8 text-[9px]">
+                        <div class="border-t border-black pt-1">Firma Testigo 1 / C.I.:</div>
+                        <div class="border-t border-black pt-1">Firma Testigo 2 / C.I.:</div>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+    } else {
+        // Constancia de Trabajo (Excluye completamente el Subsidio Especial)
+        const dirigido = gId('const-dirigido').value.trim() || 'A QUIEN PUEDA INTERESAR';
+        const salarioBaseUSD = Number(emp.sueldo || 0);
+        const salarioBaseBs = salarioBaseUSD * tasa;
+
+        const parrafoSalario = tipo === 'constancia_con_sueldo'
+            ? `devengando un salario básico mensual de <strong>$${salarioBaseUSD.toFixed(2)}</strong> (equivalente a <strong>Bs. ${fNum(salarioBaseBs)}</strong> a la tasa oficial del Banco Central de Venezuela).`
+            : `demostrando durante su desempeño honestidad, puntualidad y responsabilidad en las funciones asignadas.`;
+
+        html = `
+        <div class="bg-white text-black p-8 font-serif max-w-2xl mx-auto border border-black shadow-lg text-xs leading-relaxed" id="documento-impresion-papel">
+            <div class="text-center border-b-2 border-black pb-3 mb-5 font-sans">
+                <h2 class="text-base font-black uppercase tracking-wider text-black">${appState.parametros.nombre_empresa}</h2>
+                <p class="text-[11px] text-slate-800 font-semibold">${appState.parametros.rif_empresa}</p>
+                <p class="text-[9px] text-slate-600">DEPARTAMENTO DE GESTIÓN HUMANA Y RELACIONES LABORALES</p>
+            </div>
+
+            <div class="text-center my-6">
+                <h3 class="text-sm font-bold uppercase tracking-widest underline underline-offset-4 text-black">CONSTANCIA DE TRABAJO</h3>
+            </div>
+
+            <p class="mb-4 text-xs font-bold font-sans uppercase">${dirigido}:</p>
+
+            <p class="text-justify mb-5 indent-6">
+                Por medio de la presente se hace constar que el (la) ciudadano(a) <strong>${emp.nombre}</strong>, titular de la Cédula de Identidad N° <strong>${emp.cedula}</strong>, presta sus servicios en esta empresa desde el <strong>${fechaIngresoFmt}</strong>, desempeñando actualmente el cargo de <strong>${cargo}</strong>, ${parrafoSalario}
+            </p>
+
+            <p class="text-justify mb-10 indent-6">
+                Constancia que se expide en cumplimiento del Artículo 84 de la Ley Orgánica del Trabajo, los Trabajadores y las Trabajadoras (LOTTT), a petición de la parte interesada, en la ciudad de ${ciudad}, a los ${fechaLetras}.
+            </p>
+
+            <div class="pt-12 text-center border-t border-black mt-12 w-64 mx-auto font-sans">
+                <p class="font-bold text-xs uppercase">${appState.parametros.nombre_empresa.split('/')[0].trim()}</p>
+                <p class="text-[9px] text-slate-700">Recursos Humanos / Administración</p>
+            </div>
+        </div>`;
+    }
 
     gId('area-impresion-constancia').innerHTML = html;
 }
 
-function imprimirConstanciaLaboral() {
+function imprimirDocumentoLaboral() {
     gId('print-container').innerHTML = gId('area-impresion-constancia').innerHTML;
     window.print();
 }
