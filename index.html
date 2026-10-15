@@ -720,6 +720,23 @@
                             </table>
                         </div>
                     </div>
+                    <!-- PANEL CENTRAL DE CONFIGURACIÓN DE MÓDULOS / LICENCIAS (SOLO MASTER) -->
+                    <div id="panel-superadmin-features" class="border border-indigo-900/60 bg-slate-950 p-5 rounded-xl space-y-4 shadow-xl">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-indigo-950 pb-3">
+                            <div>
+                                <h4 class="text-xs font-bold text-indigo-400 uppercase tracking-wider flex items-center">
+                                    <i class="fa-solid fa-toggle-on mr-2 text-sm"></i> Matriz de Funcionalidades y Módulos Activos (Feature Flags)
+                                </h4>
+                                <p class="text-[10px] text-slate-400">Activa o desactiva opciones según el contrato y requerimientos de esta empresa</p>
+                            </div>
+                            <button onclick="guardarFeatureFlagsConfig()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-4 py-2 rounded-lg font-bold flex items-center space-x-1.5 transition shadow-lg shadow-indigo-600/30">
+                                <i class="fa-solid fa-floppy-disk"></i><span>Aplicar Cambios a la Empresa</span>
+                            </button>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="contenedor-features-checkboxes">
+                            <!-- Los checkboxes se renderizan dinámicamente -->
+                        </div>
+                    </div>
                 </section>
             </div>
         </main>
@@ -943,6 +960,107 @@
             calculoVacacionesActual: null, calculoUtilidadesActual: [], calculoAntiguedadActual: null, calculoPrestacionesActual: null 
         };
 
+        // ==========================================================================
+// MATRIZ DE CONFIGURACIÓN DECLARATIVA (FEATURE FLAGS)
+// ==========================================================================
+const DEFAULT_FEATURES = {
+    // 1. Empleados
+    'empleados.subsidio': { label: 'Subsidio Especial en Ficha', cat: 'Empleados', default: true },
+    'empleados.dahua': { label: 'Integración ID Reloj Dahua', cat: 'Empleados', default: true },
+    // 2. Procesar Nómina
+    'nomina.dahua_asistencia': { label: 'Botón Aplicar Asistencia Biométrica', cat: 'Nómina', default: true },
+    'nomina.prenomina': { label: 'Pre-Nómina y Borradores en Nube', cat: 'Nómina', default: true },
+    'nomina.subsidio': { label: 'Columna Subsidio Especial', cat: 'Nómina', default: true },
+    'nomina.prestamos': { label: 'Descuento de Préstamos y Saldos', cat: 'Nómina', default: true },
+    'nomina.adelantos': { label: 'Descuento de Adelantos', cat: 'Nómina', default: true },
+    'nomina.txt_banco': { label: 'Generación TXT Bancario (Alim/Sub)', cat: 'Nómina', default: true },
+    // 3. Vacaciones
+    'vacaciones.subsidio': { label: 'Subsidio Especial de Vacaciones', cat: 'Vacaciones', default: true },
+    'vacaciones.whatsapp': { label: 'Botón Envío Recibo por WhatsApp', cat: 'Vacaciones', default: true },
+    // 4. Utilidades
+    'utilidades.pagos_parciales': { label: 'Modalidad Pagos Parciales (%)', cat: 'Utilidades', default: true },
+    'utilidades.subsidio': { label: 'Subsidio Especial en Utilidades', cat: 'Utilidades', default: true },
+    'utilidades.inces': { label: 'Retención Legal 0.5% INCES (Art. 14)', cat: 'Utilidades', default: true },
+    'utilidades.imprimir_resumen': { label: 'Botón Imprimir Resumen General', cat: 'Utilidades', default: true },
+    // 5. Antigüedad y Prestaciones
+    'antiguedad.tope_75_anticipos': { label: 'Bloquear Anticipos > 75% Capital (Art. 144)', cat: 'Prestaciones', default: true },
+    'antiguedad.conciliacion': { label: 'Módulo Conciliación Mes a Mes', cat: 'Prestaciones', default: true },
+    'antiguedad.intereses_bcv': { label: 'Devengo de Intereses Mensuales BCV', cat: 'Prestaciones', default: true }
+};
+
+function getFeatureFlag(key) {
+    if (!appState.features) return DEFAULT_FEATURES[key]?.default ?? true;
+    return appState.features[key] !== undefined ? appState.features[key] : (DEFAULT_FEATURES[key]?.default ?? true);
+}
+
+function aplicarFeatureFlagsDOM() {
+    document.querySelectorAll('[data-feature]').forEach(el => {
+        const key = el.getAttribute('data-feature');
+        const isEnabled = getFeatureFlag(key);
+        if (isEnabled) {
+            el.classList.remove('hidden');
+            if (el.tagName === 'INPUT' || el.tagName === 'BUTTON' || el.tagName === 'SELECT') {
+                el.removeAttribute('disabled');
+            }
+        } else {
+            el.classList.add('hidden');
+            if (el.tagName === 'INPUT' || el.tagName === 'BUTTON' || el.tagName === 'SELECT') {
+                el.setAttribute('disabled', 'true');
+            }
+        }
+    });
+}
+
+function renderPanelFeatureFlags() {
+    const contenedor = gId('contenedor-features-checkboxes');
+    if (!contenedor) return;
+    
+    // Agrupar por categoría
+    const grupos = {};
+    Object.keys(DEFAULT_FEATURES).forEach(key => {
+        const item = DEFAULT_FEATURES[key];
+        if (!grupos[item.cat]) grupos[item.cat] = [];
+        grupos[item.cat].push({ key, label: item.label });
+    });
+
+    let html = '';
+    Object.keys(grupos).forEach(cat => {
+        html += `<div class="bg-slate-900 border border-slate-800 p-3.5 rounded-lg space-y-2">
+            <h5 class="text-[11px] font-bold text-sky-400 uppercase tracking-wider border-b border-slate-800 pb-1">${cat}</h5>
+            <div class="space-y-1.5">`;
+        grupos[cat].forEach(opt => {
+            const activo = getFeatureFlag(opt.key);
+            html += `<label class="flex items-center space-x-2 text-xs text-slate-300 hover:text-white cursor-pointer select-none">
+                <input type="checkbox" id="flag-${opt.key}" ${activo ? 'checked' : ''} class="w-3.5 h-3.5 rounded bg-slate-950 border-slate-700 text-indigo-600 focus:ring-0 cursor-pointer">
+                <span class="text-[11px]">${opt.label}</span>
+            </label>`;
+        });
+        html += `</div></div>`;
+    });
+    contenedor.innerHTML = html;
+}
+
+async function guardarFeatureFlagsConfig() {
+    if (appState.usuarioActual?.rol !== 'master') return showToast('Solo el Administrador Master puede modificar licencias', 'error');
+    
+    const nuevasFlags = {};
+    Object.keys(DEFAULT_FEATURES).forEach(key => {
+        const chk = gId(`flag-${key}`);
+        nuevasFlags[key] = chk ? chk.checked : true;
+    });
+
+    appState.features = nuevasFlags;
+    localStorage.setItem('nomina_features_config', JSON.stringify(nuevasFlags));
+    
+    await safeQuery(
+        supabaseClient.from('parametros_config').upsert([{ id: 1, features_config: nuevasFlags }]),
+        'save_features_config'
+    );
+
+    aplicarFeatureFlagsDOM();
+    showToast('Configuración de módulos actualizada y aplicada');
+}
+
         document.addEventListener('DOMContentLoaded', () => {
             if(gId('nom-fecha-proceso')) gId('nom-fecha-proceso').valueAsDate = new Date();
             if(gId('vac-fecha-inicio')) gId('vac-fecha-inicio').valueAsDate = new Date();
@@ -1044,6 +1162,11 @@
                 if(gId('sep-usuarios')) gId('sep-usuarios').classList.add('hidden');
                 switchTab('historico');
             }
+            const panelFlags = gId('panel-superadmin-features');
+    if (panelFlags) {
+        if (isMaster) panelFlags.classList.remove('hidden');
+        else panelFlags.classList.add('hidden');
+    }
         }
 
         function cargarCacheLocal() {
@@ -1074,6 +1197,8 @@
             const anticCache = localStorage.getItem('nomina_anticipos_cache');
             if(anticCache) { try { appState.anticipos = JSON.parse(anticCache); } catch(e){} }
             aplicarParametrosEnVista();
+            const fc = localStorage.getItem('nomina_features_config');
+    if (fc) { try { appState.features = JSON.parse(fc); } catch(e){} }
         }
 
         function aplicarParametrosEnVista() {
@@ -1287,6 +1412,12 @@ if (antProcesadas && antProcesadas.length > 0) {
             if (usrs && usrs.length > 0) { appState.usuarios = usrs; localStorage.setItem('nomina_usuarios', JSON.stringify(usrs)); }
             const paramConf = await safeQuery(supabaseClient.from('parametros_config').select('*').eq('id', 1).maybeSingle(), 'parametros');
             if (paramConf) { appState.parametros = { nombre_empresa: paramConf.nombre_empresa || appState.parametros.nombre_empresa, rif_empresa: paramConf.rif_empresa || appState.parametros.rif_empresa, dias_utilidades: paramConf.dias_utilidades || 30 }; }
+            if (paramConf && paramConf.features_config) {
+        appState.features = paramConf.features_config;
+        localStorage.setItem('nomina_features_config', JSON.stringify(paramConf.features_config));
+    }
+    renderPanelFeatureFlags();
+    aplicarFeatureFlagsDOM();
             const tasas = await safeQuery(supabaseClient.from('tasas_mensuales').select('*').order('mes', {ascending: false}), 'tasas_mensuales');
             if (tasas && tasas.length > 0) {
                 appState.tasasMensuales = tasas.map(t => {
@@ -1512,25 +1643,46 @@ function abrirCrearDepartamento() { gId('depto-id').value=''; gId('depto-nombre'
             gId('total-anticipos-bs').innerText = `Bs. ${fNum(totalBs)}`;
         }
 
-        async function agregarAnticipo() {
-            const empId = gId('anticipo-emp-id').value;
-            const fecha = gId('anticipo-fecha').value;
-            const monto = parseFloat(gId('anticipo-monto').value) || 0;
-            const concepto = gId('anticipo-concepto').value.trim();
-            if(!empId) return showToast('Empleado no seleccionado', 'error');
-            if(!fecha) return showToast('Indique la fecha del anticipo', 'error');
-            if(monto <= 0) return showToast('El monto debe ser mayor a 0', 'error');
-            const nuevo = { empleado_id: parseInt(empId), monto_bs: monto, fecha: fecha, concepto: concepto || null };
-            const insertado = await safeQuery(supabaseClient.from('anticipos_prestaciones').insert([nuevo]).select(), 'insert_anticipo');
-            if(insertado && insertado[0]) { appState.anticipos.push(insertado[0]); }
-            else { nuevo.id = Date.now(); appState.anticipos.push(nuevo); }
-            localStorage.setItem('nomina_anticipos_cache', JSON.stringify(appState.anticipos));
-            gId('anticipo-monto').value = '';
-            gId('anticipo-concepto').value = '';
-            renderTablaAnticipos();
-            renderTablaPrestamos();
-            showToast('Anticipo registrado con éxito');
+async function agregarAnticipo() {
+    const empId = gId('anticipo-emp-id').value;
+    const fecha = gId('anticipo-fecha').value;
+    const monto = parseFloat(gId('anticipo-monto').value) || 0;
+    const concepto = gId('anticipo-concepto').value.trim();
+
+    if (!empId) return showToast('Empleado no seleccionado', 'error');
+    if (!fecha) return showToast('Indique la fecha del anticipo', 'error');
+    if (monto <= 0) return showToast('El monto debe ser mayor a 0', 'error');
+
+    // Validación Legal Art. 144 LOTTT: Tope 75% del capital de garantía
+    if (getFeatureFlag('antiguedad.tope_75_anticipos')) {
+        const emp = appState.empleados.find(e => String(e.id) === String(empId));
+        if (emp && emp.fecha_ingreso) {
+            const calculo = computarPrestacionesMensuales(emp, fecha);
+            const capitalDisponible = calculo.capitalFinalBs + calculo.totalDepositosBs;
+            const limite75 = capitalDisponible * 0.75;
+            const totalPrevio = totalAnticiposBs(empId);
+            
+            if ((totalPrevio + monto) > limite75 && limite75 > 0) {
+                const excedente = (totalPrevio + monto) - limite75;
+                if (!confirm(`ADVERTENCIA LEGAL (Art. 144 LOTTT):\nEste anticipo supera el límite legal del 75% del capital acumulado.\n\nTope legal permitido: Bs. ${fNum(limite75)}\nExcedente: Bs. ${fNum(excedente)}\n\n¿Desea autorizar la operación bajo responsabilidad de la empresa?`)) {
+                    return;
+                }
+            }
         }
+    }
+
+    const nuevo = { empleado_id: parseInt(empId), monto_bs: monto, fecha: fecha, concepto: concepto || null };
+    const insertado = await safeQuery(supabaseClient.from('anticipos_prestaciones').insert([nuevo]).select(), 'insert_anticipo');
+    if (insertado && insertado[0]) { appState.anticipos.push(insertado[0]); }
+    else { nuevo.id = Date.now(); appState.anticipos.push(nuevo); }
+    
+    localStorage.setItem('nomina_anticipos_cache', JSON.stringify(appState.anticipos));
+    gId('anticipo-monto').value = '';
+    gId('anticipo-concepto').value = '';
+    renderTablaAnticipos();
+    renderTablaPrestamos();
+    showToast('Anticipo registrado con éxito');
+}
 
         async function eliminarAnticipo(id) {
             if(!confirm('¿Eliminar este anticipo?')) return;
@@ -2387,7 +2539,20 @@ function generarUtilidades() {
 
         // Montos a pagar en este pago parcial
         const tuPago = tu * fraccion;
-        const tbPago = tb * fraccion;
+        const tbPago = tuPago * t;
+        
+        // Retención 0.5% INCES sobre la utilidad líquida (si está activo el feature flag)
+        const retencionIncesUSD = getFeatureFlag('utilidades.inces') ? (tuPago * 0.005) : 0;
+        const retencionIncesBs = retencionIncesUSD * t;
+        
+        const tuPagoNeto = tuPago - retencionIncesUSD;
+        const tbPagoNeto = tbPago - retencionIncesBs;
+
+        const subUSDPago = getFeatureFlag('utilidades.subsidio') ? (subUSDTotal * fraccion) : 0;
+        const subBsPago = subUSDPago * t;
+        
+        const granUSDPago = tuPagoNeto + subUSDPago;
+        const granBsPago = tbPagoNeto + subBsPago;
         const subUSDPago = subUSDTotal * fraccion;
         const subBsPago = subBsTotal * fraccion;
         const granUSDPago = granUSDTotal * fraccion;
