@@ -953,6 +953,51 @@
                 <div id="area-impresion-constancia" class="p-6 overflow-y-auto bg-slate-900 h-full custom-scrollbar"></div>
             </div>
         </div>
+<!-- MODAL GESTIÓN DE ENLACES E IMPRESIÓN AR-I -->
+        <div id="modal-gestion-ari" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+            <div class="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-xl shadow-2xl overflow-hidden flex flex-col">
+                <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-950">
+                    <h3 class="font-bold text-sm text-white flex items-center">
+                        <i class="fa-solid fa-receipt text-amber-400 mr-2"></i> Formulario AR-I (I.S.L.R.) - <span id="ari-modal-emp-nombre" class="ml-1 text-amber-300"></span>
+                    </h3>
+                    <button onclick="closeModal('modal-gestion-ari')" class="text-slate-400 px-2"><i class="fa-solid fa-xmark text-lg"></i></button>
+                </div>
+                <div class="p-5 space-y-4 text-xs">
+                    <input type="hidden" id="ari-modal-emp-id">
+                    <div class="bg-slate-950 p-3.5 rounded-lg border border-slate-800 flex justify-between items-center">
+                        <div>
+                            <span class="text-slate-400 text-[10px] uppercase font-bold block">Porcentaje de Retención Actual:</span>
+                            <span id="ari-modal-pct-actual" class="text-lg font-black font-mono text-emerald-400">0.00%</span>
+                        </div>
+                        <button onclick="imprimirPlanillaARISENIAT()" class="bg-sky-600/20 hover:bg-sky-600/40 text-sky-400 border border-sky-500/30 px-3 py-1.5 rounded-lg font-bold transition">
+                            <i class="fa-solid fa-print mr-1"></i> Imprimir Planilla SENIAT
+                        </button>
+                    </div>
+
+                    <div class="space-y-2 border-t border-slate-800 pt-3">
+                        <span class="font-bold text-white block">Generar Enlace Seguro de Un Solo Uso:</span>
+                        <p class="text-[11px] text-slate-400 leading-tight">
+                            Genera un link temporal (72 horas) para que el trabajador llene sus datos desde su teléfono. Una vez enviado, el link se autodestruye.
+                        </p>
+                        <div class="flex gap-2">
+                            <button onclick="generarTokenYEnlaceARI()" class="bg-amber-600 hover:bg-amber-500 text-white font-bold px-3 py-2 rounded-lg flex items-center space-x-1 transition shadow">
+                                <i class="fa-solid fa-wand-magic-sparkles mr-1"></i><span>Generar Enlace</span>
+                            </button>
+                            <input type="text" id="ari-enlace-generado" readonly placeholder="Presione Generar Enlace..." class="flex-1 bg-slate-950 border border-slate-700 rounded-lg p-2 font-mono text-slate-300 outline-none">
+                        </div>
+                    </div>
+
+                    <div id="contenedor-acciones-enlace" class="hidden flex gap-2 pt-1">
+                        <button onclick="copiarEnlaceARI()" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-200 py-2 rounded-lg font-semibold flex items-center justify-center space-x-1">
+                            <i class="fa-solid fa-copy mr-1"></i><span>Copiar Enlace</span>
+                        </button>
+                        <button onclick="enviarWhatsAppEnlaceARI()" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-lg font-bold flex items-center justify-center space-x-1 shadow">
+                            <i class="fa-brands fa-whatsapp mr-1"></i><span>Enviar por WhatsApp</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
         
     </div> <!-- FIN APP WRAPPER -->
 
@@ -1549,10 +1594,12 @@ function renderEmpleados() {
             <td class="p-3.5 text-sky-400" data-feature="empleados.subsidio">$${Number(e.otros_ingresos).toFixed(2)}</td>
             <td class="p-3.5 text-center font-mono text-xs ${e.device_user_id ? 'text-amber-400 font-bold' : 'text-slate-600'}" data-feature="empleados.dahua">${e.device_user_id || '—'}</td>
             <td class="p-3.5 text-right space-x-1 whitespace-nowrap">
+            <td class="p-3.5 text-right space-x-1 whitespace-nowrap">
+                <button onclick="abrirModalGestionARI(${e.id})" class="text-amber-400 hover:text-amber-300 p-1.5 transition" title="Gestionar Formulario AR-I (I.S.L.R.)"><i class="fa-solid fa-receipt"></i></button>
                 <button data-feature="documentos.constancias" onclick="abrirModalDocumentoLaboral(${e.id})" class="text-teal-400 hover:text-teal-300 p-1.5 transition" title="Emitir Constancia o Amonestación"><i class="fa-solid fa-file-contract"></i></button>
                 <button onclick="editarEmpleado(${e.id})" class="text-sky-400 hover:text-sky-300 p-1.5 transition" title="Editar"><i class="fa-solid fa-pen"></i></button>
                 <button onclick="eliminarEmpleado(${e.id})" class="text-slate-500 hover:text-red-400 p-1.5 transition" title="Eliminar"><i class="fa-solid fa-trash"></i></button>
-            </td>
+</td>
         </tr>
     `).join('');
     aplicarFeatureFlagsDOM();
@@ -4273,6 +4320,146 @@ function actualizarVistaPreviaDocumento() {
 
 function imprimirDocumentoLaboral() {
     gId('print-container').innerHTML = gId('area-impresion-constancia').innerHTML;
+    window.print();
+}
+
+        let empleadoARIGestion = null;
+
+function abrirModalGestionARI(empId) {
+    const emp = appState.empleados.find(e => String(e.id) === String(empId));
+    if (!emp) return showToast('Empleado no encontrado', 'error');
+    
+    empleadoARIGestion = emp;
+    gId('ari-modal-emp-id').value = emp.id;
+    gId('ari-modal-emp-nombre').innerText = emp.nombre;
+    gId('ari-modal-pct-actual').innerText = `${Number(emp.islr_porcentaje || 0).toFixed(2)}%`;
+    gId('ari-enlace-generado').value = '';
+    gId('contenedor-acciones-enlace').classList.add('hidden');
+    
+    openModal('modal-gestion-ari');
+}
+
+async function generarTokenYEnlaceARI() {
+    const emp = empleadoARIGestion;
+    if (!emp) return;
+
+    const token = crypto.randomUUID();
+    const expiraEn = new Date(Date.now() + (72 * 60 * 60 * 1000)).toISOString(); // 72 horas
+
+    const { error } = await supabaseClient
+        .from('solicitudes_ari')
+        .insert([{
+            token: token,
+            empleado_id: emp.id,
+            expira_en: expiraEn,
+            usado: false
+        }]);
+
+    if (error) {
+        showToast('Error al generar enlace seguro', 'error');
+        return;
+    }
+
+    // Construir URL absoluta apuntando a ari.html en el mismo host
+    const urlBase = window.location.href.substring(0, window.location.href.lastIndexOf('/'));
+    const urlCompleta = `${urlBase}/ari.html?t=${token}`;
+    
+    gId('ari-enlace-generado').value = urlCompleta;
+    gId('contenedor-acciones-enlace').classList.remove('hidden');
+    showToast('Enlace único generado exitosamente');
+}
+
+function copiarEnlaceARI() {
+    const input = gId('ari-enlace-generado');
+    if (!input || !input.value) return;
+    navigator.clipboard.writeText(input.value);
+    showToast('Enlace copiado al portapapeles');
+}
+
+function enviarWhatsAppEnlaceARI() {
+    const emp = empleadoARIGestion;
+    const url = gId('ari-enlace-generado').value;
+    if (!emp || !url) return;
+    
+    let t = emp.telefono ? emp.telefono.replace(/\D/g, '') : '';
+    if (!t) return showToast('El empleado no tiene teléfono registrado', 'error');
+    if (t.startsWith('0')) t = '58' + t.substring(1); else if (t.length === 10) t = '58' + t;
+
+    const msg = `Estimado(a) ${emp.nombre},\nLe hacemos entrega de su enlace único y seguro para completar el Formulario AR-I del SENIAT (Determinación de Retención de I.S.L.R.):\n\n${url}\n\nPor favor ingrese y complete sus datos. Este enlace es de un solo uso y expirará automáticamente una vez enviado.`;
+    window.open(`https://wa.me/${t}?text=${encodeURIComponent(msg)}`, '_blank');
+}
+
+async function imprimirPlanillaARISENIAT() {
+    const emp = empleadoARIGestion;
+    if (!emp) return;
+
+    // Buscar la última declaración completada del empleado
+    const { data } = await supabaseClient
+        .from('solicitudes_ari')
+        .select('*')
+        .eq('empleado_id', emp.id)
+        .eq('usado', true)
+        .order('fecha_completado', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+    const d = data?.datos_declaracion || {
+        ingreso_anual_bs: (Number(emp.sueldo || 0) * 12 * 36.5),
+        ingreso_anual_ut: ((Number(emp.sueldo || 0) * 12 * 36.5) / 9),
+        desgravamen_tipo: 'unico',
+        cargas_familiares: 0,
+        porcentaje_determinado: emp.islr_porcentaje || 0,
+        valor_ut_aplicado: 9.00
+    };
+
+    const fechaFmt = data?.fecha_completado ? new Date(data.fecha_completado).toLocaleDateString('es-VE') : new Date().toLocaleDateString('es-VE');
+
+    const html = `
+    <div class="bg-white text-black p-8 font-sans max-w-3xl mx-auto border-2 border-black text-[11px] leading-tight space-y-4">
+        <div class="flex justify-between items-start border-b-2 border-black pb-2">
+            <div>
+                <p class="font-extrabold uppercase text-[9px]">REPÚBLICA BOLIVARIANA DE VENEZUELA</p>
+                <p class="font-bold text-[9px]">MINISTERIO DEL PODER POPULAR DE ECONOMÍA Y FINANZAS - SENIAT</p>
+                <h2 class="text-sm font-black mt-1 uppercase">FORMULARIO AR-I (DECRETO N° 1808)</h2>
+            </div>
+            <div class="text-right">
+                <p class="text-[9px] font-bold">FECHA DE DECLARACIÓN</p>
+                <p class="font-mono text-xs font-black">${fechaFmt}</p>
+            </div>
+        </div>
+
+        <table class="w-full border border-black text-[10px]">
+            <tr class="bg-slate-100 font-bold border-b border-black"><td colspan="4" class="p-1 uppercase">A. DATOS DEL TRABAJADOR Y AGENTE DE RETENCIÓN</td></tr>
+            <tr class="border-b border-black"><td class="p-1.5 font-bold w-32">APELLIDOS Y NOMBRES:</td><td class="p-1.5 uppercase font-bold">${emp.nombre}</td><td class="p-1.5 font-bold w-24">CÉDULA / RIF:</td><td class="p-1.5 font-mono">${emp.cedula}</td></tr>
+            <tr class="border-b border-black"><td class="p-1.5 font-bold">EMPRESA (PATRONO):</td><td class="p-1.5 uppercase">${appState.parametros.nombre_empresa}</td><td class="p-1.5 font-bold">RIF EMPRESA:</td><td class="p-1.5 font-mono">${appState.parametros.rif_empresa}</td></tr>
+        </table>
+
+        <table class="w-full border border-black text-[10px]">
+            <tr class="bg-slate-100 font-bold border-b border-black"><td class="p-1" colspan="2">B. DETERMINACIÓN DEL PORCENTAJE DE RETENCIÓN</td><td class="p-1 text-right font-mono">VALORES EN U.T.</td></tr>
+            <tr class="border-b border-black"><td class="p-1.5">1. Total Remuneraciones Normales Proyectadas en el Año</td><td class="p-1.5 font-mono text-right">Bs. ${Number(d.ingreso_anual_bs).toLocaleString('es-VE',{minimumFractionDigits:2})}</td><td class="p-1.5 font-mono font-bold text-right">${Number(d.ingreso_anual_ut).toFixed(2)} U.T.</td></tr>
+            <tr class="border-b border-black"><td class="p-1.5">2. Desgravamen Aplicado (${d.desgravamen_tipo === 'unico' ? 'Único 774 U.T.' : 'Sin Desgravamen'})</td><td class="p-1.5 text-right">-</td><td class="p-1.5 font-mono text-right">-${d.desgravamen_tipo === 'unico' ? '774.00' : '0.00'} U.T.</td></tr>
+            <tr class="border-b border-black"><td class="p-1.5">3. Rebaja Personal (Art. 61 LISLR)</td><td class="p-1.5 text-right">-</td><td class="p-1.5 font-mono text-right">-10.00 U.T.</td></tr>
+            <tr class="border-b border-black"><td class="p-1.5">4. Cargas Familiares Declaradas (${d.cargas_familiares} personas x 10 U.T.)</td><td class="p-1.5 text-right">-</td><td class="p-1.5 font-mono text-right">-${(Number(d.cargas_familiares) * 10).toFixed(2)} U.T.</td></tr>
+            <tr class="bg-slate-200 font-bold border-t-2 border-black text-xs"><td class="p-2 uppercase" colspan="2">PORCENTAJE DE RETENCIÓN FINAL DETERMINADO:</td><td class="p-2 font-mono font-black text-right text-sm">${Number(d.porcentaje_determinado).toFixed(2)}%</td></tr>
+        </table>
+
+        <p class="text-[9px] text-justify leading-tight">
+            Declaro bajo fe de juramento que las informaciones contenidas en este formulario son copia fiel de mis asignaciones salariales proyectadas y cargas familiares reales para el presente ejercicio fiscal, en cumplimiento de lo establecido en el Reglamento Parcial de la Ley de Impuesto sobre la Renta en Materia de Retenciones (Decreto N° 1808).
+        </p>
+
+        <div class="grid grid-cols-2 gap-12 pt-12 border-t border-black text-center text-[10px] font-bold">
+            <div>
+                <div class="border-t border-black pt-1">FIRMA DEL TRABAJADOR DECLARANTE</div>
+                <p class="text-[9px] font-normal font-mono">C.I. ${emp.cedula}</p>
+            </div>
+            <div>
+                <div class="border-t border-black pt-1">AGENTE DE RETENCIÓN (FIRMA Y SELLO)</div>
+                <p class="text-[9px] font-normal">${appState.parametros.nombre_empresa.split('/')[0].trim()}</p>
+            </div>
+        </div>
+    </div>`;
+
+    gId('print-container').innerHTML = html;
     window.print();
 }
     </script>
