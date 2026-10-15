@@ -267,7 +267,23 @@
                     <div class="overflow-x-auto overflow-y-auto max-h-[65vh] custom-scrollbar">
                         <table class="w-full text-left text-xs whitespace-nowrap relative">
                            <thead class="bg-slate-950 text-slate-400 uppercase text-[10px] tracking-wider sticky top-0 z-20 shadow-[0_1px_0_0_#1e293b]">
-                                <tr><th class="p-3 min-w-[170px]">Empleado</th><th class="p-3 min-w-[95px]">S. Integral ($)</th><th class="p-3 text-center min-w-[70px]">Días Falt.</th><th class="p-3 min-w-[95px]">Otras Asig. ($)</th><th class="p-3 text-center min-w-[70px]">Hrs. Desc.</th><th class="p-3 min-w-[95px]">Otros Desc. ($)</th><th class="p-3 min-w-[95px]">Adelantos ($)</th><th class="p-3 min-w-[95px]">Préstamos ($)</th><th class="p-3 min-w-[95px]">Desc. Ley (Bs)</th><th class="p-3 min-w-[85px]">Neto ($)</th><th class="p-3 min-w-[100px]">Neto (Bs)</th></tr>
+                               <tr>
+                                    <th class="p-3 min-w-[170px]">Empleado</th>
+                                    <th class="p-3 min-w-[95px]">S. Integral ($)</th>
+                                    <th class="p-3 text-center min-w-[70px]">Días Falt.</th>
+                                    <th class="p-3 text-center min-w-[65px]" data-feature="nomina.recargos_lottt" title="Horas Extras Diurnas (Recargo 50% Art. 118)">H. Ext (50%)</th>
+                                    <th class="p-3 text-center min-w-[65px]" data-feature="nomina.recargos_lottt" title="Horas Nocturnas (Recargo 30% Art. 117)">H. Noct (30%)</th>
+                                    <th class="p-3 text-center min-w-[65px]" data-feature="nomina.recargos_lottt" title="Días Feriados/Descanso trabajados (Recargo 1.5x Art. 119/120)">Feriados</th>
+                                    <th class="p-3 min-w-[95px]">Otras Asig. ($)</th>
+                                    <th class="p-3 text-center min-w-[70px]">Hrs. Desc.</th>
+                                    <th class="p-3 min-w-[95px]">Otros Desc. ($)</th>
+                                    <th class="p-3 min-w-[95px]" data-feature="nomina.adelantos">Adelantos ($)</th>
+                                    <th class="p-3 min-w-[95px]" data-feature="nomina.prestamos">Préstamos ($)</th>
+                                    <th class="p-3 text-center min-w-[70px]" data-feature="nomina.islr" title="Retención I.S.L.R. según porcentaje AR-I">% ISLR</th>
+                                    <th class="p-3 min-w-[95px]">Desc. Ley (Bs)</th>
+                                    <th class="p-3 min-w-[85px]">Neto ($)</th>
+                                    <th class="p-3 min-w-[100px]">Neto (Bs)</th>
+                                </tr>
                             </thead>
                             <tbody id="tabla-nomina-editable-body" class="divide-y divide-slate-800/50"></tbody>
                         </table>
@@ -880,7 +896,41 @@
         <div id="modal-cargo" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
             <div class="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-sm overflow-hidden shadow-2xl"><div class="p-4 border-b border-slate-800 flex justify-between"><h3 id="modal-cargo-titulo" class="font-bold text-white">Cargo</h3><button onclick="closeModal('modal-cargo')" class="text-slate-400"><i class="fa-solid fa-xmark"></i></button></div><div class="p-4"><input type="hidden" id="cargo-id"><input type="text" id="cargo-nombre" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white"></div><div class="p-4 border-t border-slate-800 flex justify-end space-x-2"><button onclick="closeModal('modal-cargo')" class="px-3 py-1.5 bg-slate-800 text-xs rounded-lg text-slate-300">Cancelar</button><button onclick="guardarCargo()" class="px-3 py-1.5 bg-purple-600 text-white text-xs font-bold rounded-lg">Guardar</button></div></div>
         </div>
-
+<!-- MODAL GENERADOR DE CONSTANCIAS DE TRABAJO (ART. 84 LOTTT) -->
+        <div id="modal-constancia" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+            <div class="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh]">
+                <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-950">
+                    <h3 class="font-bold text-sm text-white flex items-center">
+                        <i class="fa-solid fa-file-signature text-teal-400 mr-2"></i> Emitir Constancia de Trabajo (Art. 84 LOTTT)
+                    </h3>
+                    <div class="flex space-x-2">
+                        <button onclick="imprimirConstanciaLaboral()" class="bg-teal-600 hover:bg-teal-500 text-white text-xs px-3.5 py-1.5 rounded-lg font-semibold flex items-center space-x-1.5 transition shadow">
+                            <i class="fa-solid fa-print"></i><span>Imprimir Constancia</span>
+                        </button>
+                        <button onclick="closeModal('modal-constancia')" class="text-slate-400 px-2"><i class="fa-solid fa-xmark text-lg"></i></button>
+                    </div>
+                </div>
+                <div class="p-4 bg-slate-950 border-b border-slate-800 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                        <label class="text-[11px] font-semibold text-slate-400 block mb-1">Tipo de Constancia</label>
+                        <select id="const-tipo" onchange="actualizarVistaPreviaConstancia()" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-teal-500">
+                            <option value="con_sueldo">Con Mención de Salario</option>
+                            <option value="sin_sueldo">Sin Mención de Salario</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-[11px] font-semibold text-slate-400 block mb-1">Destinatario</label>
+                        <input type="text" id="const-dirigido" value="A QUIEN PUEDA INTERESAR" oninput="actualizarVistaPreviaConstancia()" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-teal-500">
+                    </div>
+                    <div>
+                        <label class="text-[11px] font-semibold text-slate-400 block mb-1">Ciudad de Emisión</label>
+                        <input type="text" id="const-ciudad" value="Caracas" oninput="actualizarVistaPreviaConstancia()" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-teal-500">
+                    </div>
+                </div>
+                <div id="area-impresion-constancia" class="p-6 overflow-y-auto bg-slate-900 h-full custom-scrollbar"></div>
+            </div>
+        </div>
+        
     </div> <!-- FIN APP WRAPPER -->
 
     <script>
@@ -967,13 +1017,16 @@ const DEFAULT_FEATURES = {
     // 1. Empleados
     'empleados.subsidio': { label: 'Subsidio Especial en Ficha', cat: 'Empleados', default: true },
     'empleados.dahua': { label: 'Integración ID Reloj Dahua', cat: 'Empleados', default: true },
-    // 2. Procesar Nómina
+// 2. Procesar Nómina
     'nomina.dahua_asistencia': { label: 'Botón Aplicar Asistencia Biométrica', cat: 'Nómina', default: true },
     'nomina.prenomina': { label: 'Pre-Nómina y Borradores en Nube', cat: 'Nómina', default: true },
+    'nomina.recargos_lottt': { label: 'Recargos LOTTT (Extras, Nocturnidad, Feriados)', cat: 'Nómina', default: true },
+    'nomina.islr': { label: 'Retención I.S.L.R. (%) [AR-I]', cat: 'Nómina', default: true },
     'nomina.subsidio': { label: 'Columna Subsidio Especial', cat: 'Nómina', default: true },
     'nomina.prestamos': { label: 'Descuento de Préstamos y Saldos', cat: 'Nómina', default: true },
     'nomina.adelantos': { label: 'Descuento de Adelantos', cat: 'Nómina', default: true },
     'nomina.txt_banco': { label: 'Generación TXT Bancario (Alim/Sub)', cat: 'Nómina', default: true },
+    'documentos.constancias': { label: 'Generador de Constancias de Trabajo', cat: 'Personal', default: true },
     // 3. Vacaciones
     'vacaciones.subsidio': { label: 'Subsidio Especial de Vacaciones', cat: 'Vacaciones', default: true },
     'vacaciones.whatsapp': { label: 'Botón Envío Recibo por WhatsApp', cat: 'Vacaciones', default: true },
@@ -1457,7 +1510,11 @@ if (antProcesadas && antProcesadas.length > 0) {
         function renderDepartamentos() { gId('tabla-deptos-body').innerHTML = appState.departamentos.map(d => `<tr class="hover:bg-slate-900/50"><td class="p-3.5 font-mono text-slate-400 text-xs">#${d.id}</td><td class="p-3.5 font-semibold text-white">${d.nombre}</td><td class="p-3.5 text-right space-x-1"><button onclick="editarDepartamento(${d.id})" class="text-amber-400 p-1 hover:text-amber-300"><i class="fa-solid fa-pen"></i></button><button onclick="eliminarDepartamento(${d.id})" class="text-slate-500 hover:text-red-400 p-1"><i class="fa-solid fa-trash"></i></button></td></tr>`).join(''); }
         function renderCargos() { gId('tabla-cargos-body').innerHTML = appState.cargos.map(c => `<tr class="hover:bg-slate-900/50"><td class="p-3.5 font-mono text-slate-400 text-xs">#${c.id}</td><td class="p-3.5 font-semibold text-white">${c.nombre}</td><td class="p-3.5 text-right space-x-1"><button onclick="editarCargo(${c.id})" class="text-purple-400 p-1 hover:text-purple-300"><i class="fa-solid fa-pen"></i></button><button onclick="eliminarCargo(${c.id})" class="text-slate-500 hover:text-red-400 p-1"><i class="fa-solid fa-trash"></i></button></td></tr>`).join(''); }
 function renderEmpleados() {
-    gId('tabla-empleados-body').innerHTML = appState.empleados.map(e => `<tr class="hover:bg-slate-900/50 ${!e.activo?'opacity-50':''}"><td class="p-3.5 text-center"><input type="checkbox" ${e.activo?'checked':''} onchange="toggleEstadoEmpleado(${e.id}, ${e.activo})" class="w-4 h-4 text-sky-500 rounded bg-slate-950 border-slate-800 cursor-pointer"></td><td class="p-3.5 font-mono text-slate-400 text-[11px]">${e.fecha_ingreso||''}</td><td class="p-3.5 font-semibold text-slate-200">${e.cedula}</td><td class="p-3.5 font-bold text-white">${e.nombre}</td><td class="p-3.5 text-slate-400">${e.telefono||'-'}</td><td class="p-3.5 text-amber-400">${e.departamentos?.nombre||'-'}</td><td class="p-3.5 text-purple-400">${e.cargos?.nombre||'-'}</td><td class="p-3.5 text-slate-300 font-medium">$${Number(e.sueldo).toFixed(2)}</td><td class="p-3.5 text-emerald-400">$${Number(e.bono_alimentacion).toFixed(2)}</td><td class="p-3.5 text-sky-400">$${Number(e.otros_ingresos).toFixed(2)}</td><td class="p-3.5 text-center font-mono text-xs ${e.device_user_id ? 'text-amber-400 font-bold' : 'text-slate-600'}">${e.device_user_id || '—'}</td><td class="p-3.5 text-right space-x-1"><button onclick="editarEmpleado(${e.id})" class="text-sky-400 hover:text-sky-300 p-1"><i class="fa-solid fa-pen"></i></button><button onclick="eliminarEmpleado(${e.id})" class="text-slate-500 hover:text-red-400 p-1"><i class="fa-solid fa-trash"></i></button></td></tr>`).join('');
+    gId('tabla-empleados-body').innerHTML = appState.empleados.map(e => `<tr class="hover:bg-slate-900/50 ${!e.activo?'opacity-50':''}"><td class="p-3.5 text-center"><input type="checkbox" ${e.activo?'checked':''} onchange="toggleEstadoEmpleado(${e.id}, ${e.activo})" class="w-4 h-4 text-sky-500 rounded bg-slate-950 border-slate-800 cursor-pointer"></td><td class="p-3.5 font-mono text-slate-400 text-[11px]">${e.fecha_ingreso||''}</td><td class="p-3.5 font-semibold text-slate-200">${e.cedula}</td><td class="p-3.5 font-bold text-white">${e.nombre}</td><td class="p-3.5 text-slate-400">${e.telefono||'-'}</td><td class="p-3.5 text-amber-400">${e.departamentos?.nombre||'-'}</td><td class="p-3.5 text-purple-400">${e.cargos?.nombre||'-'}</td><td class="p-3.5 text-slate-300 font-medium">$${Number(e.sueldo).toFixed(2)}</td><td class="p-3.5 text-emerald-400">$${Number(e.bono_alimentacion).toFixed(2)}</td><td class="p-3.5 text-sky-400">$${Number(e.otros_ingresos).toFixed(2)}</td><td class="p-3.5 text-center font-mono text-xs ${e.device_user_id ? 'text-amber-400 font-bold' : 'text-slate-600'}">${e.device_user_id || '—'}</td><td class="p-3.5 text-right space-x-1"><button onclick="editarEmpleado(${e.id})" class="text-sky-400 hover:text-sky-300 p-1"><i class="fa-solid fa-pen"></i></button><button onclick="eliminarEmpleado(${e.id})" class="text-slate-500 hover:text-red-400 p-1"><i class="fa-solid fa-trash"></i></button></td><td class="p-3.5 text-right space-x-1">
+                        <button data-feature="documentos.constancias" onclick="abrirModalConstancia(${e.id})" class="text-teal-400 hover:text-teal-300 p-1" title="Emitir Constancia de Trabajo (Art. 84)"><i class="fa-solid fa-file-contract"></i></button>
+                        <button onclick="editarEmpleado(${e.id})" class="text-sky-400 hover:text-sky-300 p-1"><i class="fa-solid fa-pen"></i></button>
+                        <button onclick="eliminarEmpleado(${e.id})" class="text-slate-500 hover:text-red-400 p-1"><i class="fa-solid fa-trash"></i></button>
+                    </td></tr>`).join('');
 }
 
         async function toggleEstadoEmpleado(id, v) { try { await supabaseClient.from('empleados').update({ activo:!v }).eq('id',id); } catch(e){} const emp = appState.empleados.find(x => x.id === id); if (emp) emp.activo = !v; fetchAllData(); }
@@ -1705,14 +1762,18 @@ async function agregarAnticipo() {
             const sM = parseFloat(gId('nom-salario-minimo')?.value) || 130;
             const lun = parseInt(gId('nom-lunes')?.value) || 2;
             const filas = {};
-            emps.forEach(e => {
+emps.forEach(e => {
                 filas[e.id] = {
                     df: parseFloat(gId(`df-${e.id}`)?.value) || 0,
+                    hed: parseFloat(gId(`hed-${e.id}`)?.value) || 0,
+                    hnoct: parseFloat(gId(`hnoct-${e.id}`)?.value) || 0,
+                    fer: parseFloat(gId(`fer-${e.id}`)?.value) || 0,
                     oa: parseFloat(gId(`oa-${e.id}`)?.value) || 0,
                     hd: parseFloat(gId(`hd-${e.id}`)?.value) || 0,
                     od: parseFloat(gId(`od-${e.id}`)?.value) || 0,
                     ad: parseFloat(gId(`ad-${e.id}`)?.value) || 0,
-                    pr: parseFloat(gId(`pr-${e.id}`)?.value) || 0
+                    pr: parseFloat(gId(`pr-${e.id}`)?.value) || 0,
+                    islr: parseFloat(gId(`islr-${e.id}`)?.value) || 0
                 };
             });
             const prenominaData = { id: 1, fecha_pago: f, tasa_bcv: t, salario_minimo: sM, lunes: lun, filas: filas, updated_at: new Date().toISOString() };
@@ -1743,35 +1804,68 @@ async function agregarAnticipo() {
 
         let nominaTotalesCache = {};
 
-        function calcularNominaFila(id) {
-            const e = appState.empleados.find(x => String(x.id) === String(id)); 
-            if(!e) return {u:0, b:0};
-            const t = parseFloat(gId('nom-tasa-bcv').value) || 36.5; 
-            const sM = parseFloat(gId('nom-salario-minimo').value) || 130; 
-            const lun = parseInt(gId('nom-lunes').value) || 2;
-            const sb = Number(e.sueldo) || 0; 
-            const si = sb + (Number(e.bono_alimentacion) || 0) + (Number(e.otros_ingresos) || 0); 
-            const dia = si / 30; const base = dia * 15;
-            const df = parseFloat(gId(`df-${id}`)?.value || 0); 
-            const oa = parseFloat(gId(`oa-${id}`)?.value || 0); 
-            const hd = parseFloat(gId(`hd-${id}`)?.value || 0); 
-            const od = parseFloat(gId(`od-${id}`)?.value || 0); 
-            const ad = parseFloat(gId(`ad-${id}`)?.value || 0); 
-            const pr = parseFloat(gId(`pr-${id}`)?.value || 0);
-            const sbBs = sb * t; 
-            const ivss = (Math.min(sbBs, 5 * sM) * 12 / 52) * 0.04 * lun; 
-            const rpe = (Math.min(sbBs, 10 * sM) * 12 / 52) * 0.005 * lun; 
-            const faov = (sbBs * 0.01) / 2;
-            const leyU = (ivss + rpe + faov) / t; 
-            const netoU = base - (dia * df) + oa - ((dia / 8) * hd) - od - ad - pr - leyU; 
-            const netoB = netoU * t;
-            const elLey = gId(`ley-${id}`); if(elLey) elLey.innerText = `Bs. ${(ivss + rpe + faov).toFixed(2)}`;
-            const elNetoU = gId(`neto-usd-${id}`); if(elNetoU) elNetoU.innerText = `$${netoU.toFixed(2)}`;
-            const elNetoB = gId(`neto-bs-${id}`); if(elNetoB) elNetoB.innerText = `Bs. ${netoB.toFixed(2)}`;
-            nominaTotalesCache[id] = { u: netoU, b: netoB };
-            return nominaTotalesCache[id];
-        }
+function calcularNominaFila(id) {
+    const e = appState.empleados.find(x => String(x.id) === String(id)); 
+    if(!e) return {u:0, b:0};
+    
+    const t = parseFloat(gId('nom-tasa-bcv').value) || 36.5; 
+    const sM = parseFloat(gId('nom-salario-minimo').value) || 130; 
+    const lun = parseInt(gId('nom-lunes').value) || 2;
+    
+    const sb = Number(e.sueldo) || 0; 
+    const si = sb + (Number(e.bono_alimentacion) || 0) + (Number(e.otros_ingresos) || 0); 
+    const dia = si / 30; 
+    const base = dia * 15;
+    
+    // Inputs básicos
+    const df = parseFloat(gId(`df-${id}`)?.value || 0); 
+    const oa = parseFloat(gId(`oa-${id}`)?.value || 0); 
+    const hd = parseFloat(gId(`hd-${id}`)?.value || 0); 
+    const od = parseFloat(gId(`od-${id}`)?.value || 0); 
+    const ad = parseFloat(gId(`ad-${id}`)?.value || 0); 
+    const pr = parseFloat(gId(`pr-${id}`)?.value || 0);
 
+    // Recargos LOTTT (sobre salario base diario / por hora)
+    const horaBase = (sb / 30) / 8;
+    const diaBase = sb / 30;
+    
+    const hed = getFeatureFlag('nomina.recargos_lottt') ? parseFloat(gId(`hed-${id}`)?.value || 0) : 0;
+    const hnoct = getFeatureFlag('nomina.recargos_lottt') ? parseFloat(gId(`hnoct-${id}`)?.value || 0) : 0;
+    const fer = getFeatureFlag('nomina.recargos_lottt') ? parseFloat(gId(`fer-${id}`)?.value || 0) : 0;
+    const islrPct = getFeatureFlag('nomina.islr') ? parseFloat(gId(`islr-${id}`)?.value || 0) : 0;
+
+    const montoHED = horaBase * 1.5 * hed;          // Recargo 50% Horas Extras (Art. 118 LOTTT)
+    const montoNoct = horaBase * 0.30 * hnoct;       // Recargo 30% Bono Nocturno (Art. 117 LOTTT)
+    const montoFer = diaBase * 1.5 * fer;            // Día Feriado / Descanso laborado (Art. 119/120 LOTTT)
+    const totalRecargosUSD = montoHED + montoNoct + montoFer;
+
+    // Deducciones de Ley
+    const sbBs = sb * t; 
+    const ivss = (Math.min(sbBs, 5 * sM) * 12 / 52) * 0.04 * lun; 
+    const rpe = (Math.min(sbBs, 10 * sM) * 12 / 52) * 0.005 * lun; 
+    const faov = (sbBs * 0.01) / 2;
+    const leyU = (ivss + rpe + faov) / t; 
+
+    // Retención I.S.L.R. en base a asignaciones devengadas
+    const totalAsignacionesUSD = base - (dia * df) + totalRecargosUSD + oa;
+    const islrUSD = totalAsignacionesUSD * (islrPct / 100);
+
+    // Salario Neto
+    const netoU = totalAsignacionesUSD - ((dia / 8) * hd) - od - ad - pr - leyU - islrUSD; 
+    const netoB = netoU * t;
+
+    const elLey = gId(`ley-${id}`); 
+    if(elLey) elLey.innerText = `Bs. ${(ivss + rpe + faov + (islrUSD * t)).toFixed(2)}`;
+    
+    const elNetoU = gId(`neto-usd-${id}`); 
+    if(elNetoU) elNetoU.innerText = `$${netoU.toFixed(2)}`;
+    
+    const elNetoB = gId(`neto-bs-${id}`); 
+    if(elNetoB) elNetoB.innerText = `Bs. ${netoB.toFixed(2)}`;
+    
+    nominaTotalesCache[id] = { u: netoU, b: netoB };
+    return nominaTotalesCache[id];
+}
         function actualizarFilaYTotales(id) { calcularNominaFila(id); sumarTotalesNomina(); }
         function recalcularTodaLaNomina() { appState.empleados.filter(e => e.activo).forEach(e => { calcularNominaFila(e.id); }); sumarTotalesNomina(); }
         function sumarTotalesNomina() {
@@ -1781,49 +1875,66 @@ async function agregarAnticipo() {
             if(gId('nom-total-bs')) gId('nom-total-bs').value = `Bs. ${tb.toFixed(2)}`; 
         }
 
-        function renderTablaNominaEditable() {
-            const emps = appState.empleados.filter(e => e.activo);
-            let borrador = null;
-            const rawDraft = localStorage.getItem('nomina_borrador_global');
-            if (rawDraft) {
-                try { 
-                    borrador = JSON.parse(rawDraft);
-                    if(borrador.salario_minimo && gId('nom-salario-minimo')) gId('nom-salario-minimo').value = borrador.salario_minimo;
-                    if(borrador.lunes && gId('nom-lunes')) gId('nom-lunes').value = borrador.lunes;
-                    if(borrador.fecha_pago && gId('nom-fecha-proceso')) gId('nom-fecha-proceso').value = borrador.fecha_pago;
-                    if(borrador.tasa_bcv && gId('nom-tasa-bcv')) gId('nom-tasa-bcv').value = borrador.tasa_bcv;
-                    const badge = gId('txt-ultima-prenomina');
-                    if(badge && borrador.updated_at) { badge.innerText = `Pre-nómina: ${new Date(borrador.updated_at).toLocaleTimeString('es-VE')}`; }
-                } catch(e){}
-            }
-            gId('tabla-nomina-editable-body').innerHTML = emps.map(e => {
-                const si = Number(e.sueldo) + Number(e.bono_alimentacion) + Number(e.otros_ingresos);
-                const saldoPres = Number(e.saldo_prestamo) || 0;
-                const prestamoSugeridoDef = saldoPres > 0 ? saldoPres.toFixed(2) : "0.00";
-                const bEmp = borrador?.filas?.[e.id] || {};
-                const safeNum = (val) => { const parsed = parseFloat(val); return isNaN(parsed) ? "0.00" : parsed.toFixed(2); };
-                const safeInt = (val) => { const parsed = parseInt(val, 10); return isNaN(parsed) ? 0 : parsed; };
-                const dfVal = safeInt(bEmp.df); const oaVal = safeNum(bEmp.oa); const hdVal = safeInt(bEmp.hd);
-                const odVal = safeNum(bEmp.od); const adVal = safeNum(bEmp.ad);
-                let prVal = prestamoSugeridoDef;
-                if (bEmp.pr !== undefined) { const parsedPr = parseFloat(bEmp.pr); if (!isNaN(parsedPr)) prVal = parsedPr.toFixed(2); }
-                return `<tr id="fila-emp-${e.id}" class="hover:bg-slate-900/50 transition">
-                    <td class="p-3" style="min-width: 170px;"><div class="font-bold text-white">${e.nombre}</div><div class="text-[10px] text-slate-400">${e.cedula}</div></td>
-                    <td class="p-3 font-semibold text-sky-400" style="min-width: 95px;">$${si.toFixed(2)}</td>
-                    <td class="p-3 text-center" style="min-width: 70px;"><input type="number" id="df-${e.id}" value="${dfVal}" min="0" autocomplete="off" spellcheck="false" oninput="actualizarFilaYTotales(${e.id}); autoguardarBorradorNomina();" style="width: 56px; min-width: 56px; display: inline-block;" class="bg-slate-950 border border-slate-800 rounded text-center p-1 text-xs text-white focus:border-emerald-500 outline-none"></td>
-                    <td class="p-3" style="min-width: 95px;"><input type="number" step="0.01" id="oa-${e.id}" value="${oaVal}" autocomplete="off" spellcheck="false" oninput="actualizarFilaYTotales(${e.id}); autoguardarBorradorNomina();" style="width: 80px; min-width: 80px; display: inline-block;" class="bg-slate-950 border border-slate-800 rounded p-1 text-xs text-white focus:border-emerald-500 outline-none"></td>
-                    <td class="p-3 text-center" style="min-width: 70px;"><input type="number" id="hd-${e.id}" value="${hdVal}" min="0" autocomplete="off" spellcheck="false" oninput="actualizarFilaYTotales(${e.id}); autoguardarBorradorNomina();" style="width: 56px; min-width: 56px; display: inline-block;" class="bg-slate-950 border border-slate-800 rounded text-center p-1 text-xs text-white focus:border-emerald-500 outline-none"></td>
-                    <td class="p-3" style="min-width: 95px;"><input type="number" step="0.01" id="od-${e.id}" value="${odVal}" autocomplete="off" spellcheck="false" oninput="actualizarFilaYTotales(${e.id}); autoguardarBorradorNomina();" style="width: 80px; min-width: 80px; display: inline-block;" class="bg-slate-950 border border-slate-800 rounded p-1 text-xs text-white focus:border-emerald-500 outline-none"></td>
-                    <td class="p-3" style="min-width: 95px;"><input type="number" step="0.01" id="ad-${e.id}" value="${adVal}" autocomplete="off" spellcheck="false" oninput="actualizarFilaYTotales(${e.id}); autoguardarBorradorNomina();" style="width: 80px; min-width: 80px; display: inline-block;" class="bg-slate-950 border border-slate-800 rounded p-1 text-xs text-white focus:border-emerald-500 outline-none"></td>
-                    <td class="p-3" style="min-width: 95px;"><input type="number" step="0.01" id="pr-${e.id}" value="${prVal}" autocomplete="off" spellcheck="false" oninput="actualizarFilaYTotales(${e.id}); autoguardarBorradorNomina();" style="width: 80px; min-width: 80px; display: inline-block;" class="bg-slate-950 border border-slate-800 rounded p-1 text-xs text-white focus:border-emerald-500 outline-none"></td>
-                    <td class="p-3 text-amber-400 font-medium" style="min-width: 95px;" id="ley-${e.id}">Bs. 0.00</td>
-                    <td class="p-3 font-bold text-emerald-400" style="min-width: 85px;" id="neto-usd-${e.id}">$0.00</td>
-                    <td class="p-3 font-bold text-emerald-400" style="min-width: 100px;" id="neto-bs-${e.id}">Bs. 0.00</td>
-                </tr>`;
-            }).join('');
-            recalcularTodaLaNomina();
-        }
-
+function renderTablaNominaEditable() {
+    const emps = appState.empleados.filter(e => e.activo);
+    let borrador = null;
+    const rawDraft = localStorage.getItem('nomina_borrador_global');
+    if (rawDraft) {
+        try { 
+            borrador = JSON.parse(rawDraft);
+            if(borrador.salario_minimo && gId('nom-salario-minimo')) gId('nom-salario-minimo').value = borrador.salario_minimo;
+            if(borrador.lunes && gId('nom-lunes')) gId('nom-lunes').value = borrador.lunes;
+            if(borrador.fecha_pago && gId('nom-fecha-proceso')) gId('nom-fecha-proceso').value = borrador.fecha_pago;
+            if(borrador.tasa_bcv && gId('nom-tasa-bcv')) gId('nom-tasa-bcv').value = borrador.tasa_bcv;
+            const badge = gId('txt-ultima-prenomina');
+            if(badge && borrador.updated_at) { badge.innerText = `Pre-nómina: ${new Date(borrador.updated_at).toLocaleTimeString('es-VE')}`; }
+        } catch(e){}
+    }
+    
+    gId('tabla-nomina-editable-body').innerHTML = emps.map(e => {
+        const si = Number(e.sueldo) + Number(e.bono_alimentacion) + Number(e.otros_ingresos);
+        const saldoPres = Number(e.saldo_prestamo) || 0;
+        const prestamoSugeridoDef = saldoPres > 0 ? saldoPres.toFixed(2) : "0.00";
+        const bEmp = borrador?.filas?.[e.id] || {};
+        
+        const safeNum = (val) => { const parsed = parseFloat(val); return isNaN(parsed) ? "0.00" : parsed.toFixed(2); };
+        const safeInt = (val) => { const parsed = parseInt(val, 10); return isNaN(parsed) ? 0 : parsed; };
+        
+        const dfVal = safeInt(bEmp.df);
+        const hedVal = safeInt(bEmp.hed);
+        const hnoctVal = safeInt(bEmp.hnoct);
+        const ferVal = safeInt(bEmp.fer);
+        const oaVal = safeNum(bEmp.oa);
+        const hdVal = safeInt(bEmp.hd);
+        const odVal = safeNum(bEmp.od);
+        const adVal = safeNum(bEmp.ad);
+        const islrVal = safeNum(bEmp.islr);
+        
+        let prVal = prestamoSugeridoDef;
+        if (bEmp.pr !== undefined) { const parsedPr = parseFloat(bEmp.pr); if (!isNaN(parsedPr)) prVal = parsedPr.toFixed(2); }
+        
+        return `<tr id="fila-emp-${e.id}" class="hover:bg-slate-900/50 transition">
+            <td class="p-3" style="min-width: 170px;"><div class="font-bold text-white">${e.nombre}</div><div class="text-[10px] text-slate-400">${e.cedula}</div></td>
+            <td class="p-3 font-semibold text-sky-400" style="min-width: 95px;">$${si.toFixed(2)}</td>
+            <td class="p-3 text-center" style="min-width: 70px;"><input type="number" id="df-${e.id}" value="${dfVal}" min="0" autocomplete="off" oninput="actualizarFilaYTotales(${e.id}); autoguardarBorradorNomina();" style="width: 50px;" class="bg-slate-950 border border-slate-800 rounded text-center p-1 text-xs text-white focus:border-emerald-500 outline-none"></td>
+            <td class="p-3 text-center" data-feature="nomina.recargos_lottt" style="min-width: 65px;"><input type="number" id="hed-${e.id}" value="${hedVal}" min="0" autocomplete="off" oninput="actualizarFilaYTotales(${e.id}); autoguardarBorradorNomina();" style="width: 50px;" class="bg-slate-950 border border-indigo-900/50 rounded text-center p-1 text-xs text-indigo-300 focus:border-indigo-500 outline-none"></td>
+            <td class="p-3 text-center" data-feature="nomina.recargos_lottt" style="min-width: 65px;"><input type="number" id="hnoct-${e.id}" value="${hnoctVal}" min="0" autocomplete="off" oninput="actualizarFilaYTotales(${e.id}); autoguardarBorradorNomina();" style="width: 50px;" class="bg-slate-950 border border-indigo-900/50 rounded text-center p-1 text-xs text-indigo-300 focus:border-indigo-500 outline-none"></td>
+            <td class="p-3 text-center" data-feature="nomina.recargos_lottt" style="min-width: 65px;"><input type="number" id="fer-${e.id}" value="${ferVal}" min="0" autocomplete="off" oninput="actualizarFilaYTotales(${e.id}); autoguardarBorradorNomina();" style="width: 50px;" class="bg-slate-950 border border-indigo-900/50 rounded text-center p-1 text-xs text-indigo-300 focus:border-indigo-500 outline-none"></td>
+            <td class="p-3" style="min-width: 95px;"><input type="number" step="0.01" id="oa-${e.id}" value="${oaVal}" autocomplete="off" oninput="actualizarFilaYTotales(${e.id}); autoguardarBorradorNomina();" style="width: 75px;" class="bg-slate-950 border border-slate-800 rounded p-1 text-xs text-white focus:border-emerald-500 outline-none"></td>
+            <td class="p-3 text-center" style="min-width: 70px;"><input type="number" id="hd-${e.id}" value="${hdVal}" min="0" autocomplete="off" oninput="actualizarFilaYTotales(${e.id}); autoguardarBorradorNomina();" style="width: 50px;" class="bg-slate-950 border border-slate-800 rounded text-center p-1 text-xs text-white focus:border-emerald-500 outline-none"></td>
+            <td class="p-3" style="min-width: 95px;"><input type="number" step="0.01" id="od-${e.id}" value="${odVal}" autocomplete="off" oninput="actualizarFilaYTotales(${e.id}); autoguardarBorradorNomina();" style="width: 75px;" class="bg-slate-950 border border-slate-800 rounded p-1 text-xs text-white focus:border-emerald-500 outline-none"></td>
+            <td class="p-3" data-feature="nomina.adelantos" style="min-width: 95px;"><input type="number" step="0.01" id="ad-${e.id}" value="${adVal}" autocomplete="off" oninput="actualizarFilaYTotales(${e.id}); autoguardarBorradorNomina();" style="width: 75px;" class="bg-slate-950 border border-slate-800 rounded p-1 text-xs text-white focus:border-emerald-500 outline-none"></td>
+            <td class="p-3" data-feature="nomina.prestamos" style="min-width: 95px;"><input type="number" step="0.01" id="pr-${e.id}" value="${prVal}" autocomplete="off" oninput="actualizarFilaYTotales(${e.id}); autoguardarBorradorNomina();" style="width: 75px;" class="bg-slate-950 border border-slate-800 rounded p-1 text-xs text-white focus:border-emerald-500 outline-none"></td>
+            <td class="p-3 text-center" data-feature="nomina.islr" style="min-width: 70px;"><input type="number" step="0.01" id="islr-${e.id}" value="${islrVal}" min="0" max="100" autocomplete="off" oninput="actualizarFilaYTotales(${e.id}); autoguardarBorradorNomina();" style="width: 55px;" class="bg-slate-950 border border-amber-900/50 rounded text-center p-1 text-xs text-amber-300 focus:border-amber-500 outline-none"></td>
+            <td class="p-3 text-amber-400 font-medium" style="min-width: 95px;" id="ley-${e.id}">Bs. 0.00</td>
+            <td class="p-3 font-bold text-emerald-400" style="min-width: 85px;" id="neto-usd-${e.id}">$0.00</td>
+            <td class="p-3 font-bold text-emerald-400" style="min-width: 100px;" id="neto-bs-${e.id}">Bs. 0.00</td>
+        </tr>`;
+    }).join('');
+    
+    recalcularTodaLaNomina();
+    aplicarFeatureFlagsDOM();
+}
         async function procesarNominaGlobal() {
             const f = gId('nom-fecha-proceso').value; 
             const t = parseFloat(gId('nom-tasa-bcv').value) || 36.5; 
@@ -2818,8 +2929,12 @@ async function eliminarUtilidadesProcesadas(p, f) {
             const [y, m, d] = r.fecha_pago.split('-');
             const subUSD = Number(r.subsidio_usd) || 0;
             const subBs = Number(r.subsidio_bs) || 0;
-            const granUSD = Number(r.gran_total_usd || (Number(r.total_usd) + subUSD));
-            const granBs = Number(r.gran_total_bs || (Number(r.total_bs) + subBs));
+const tuBrutoUSD = Number(r.total_usd_anual ? (r.total_usd_anual * (Number(r.porcentaje_pagado || 100) / 100)) : r.total_usd) || 0;
+    const incesUSD = getFeatureFlag('utilidades.inces') ? (tuBrutoUSD * 0.005) : 0;
+    const incesBs = incesUSD * Number(r.tasa_bcv || 1);
+    
+    const granUSD = Number(r.gran_total_usd || (tuBrutoUSD - incesUSD + subUSD));
+    const granBs = Number(r.gran_total_bs || ((tuBrutoUSD - incesUSD + subUSD) * Number(r.tasa_bcv || 1)));
             return `<div class="recibo-utilidades-print bg-white text-black p-4 font-sans max-w-4xl mx-auto border-2 border-black my-2 text-[10px]">
                 <div class="flex justify-between items-start mb-2 pb-1 border-b-2 border-black"><div><h2 class="text-xl font-black tracking-widest text-black uppercase">${appState.parametros.nombre_empresa.split('/')[0].trim()}</h2></div><div class="text-right"><h3 class="text-xs font-extrabold text-black uppercase">${appState.parametros.nombre_empresa}</h3><p class="text-[9px] text-slate-800 font-semibold">${appState.parametros.rif_empresa}</p></div></div>
               <div class="bg-[#fde0e0] text-center font-bold text-[10px] py-1 border border-black mb-2 uppercase tracking-wider text-black">RECIBO DE PAGO DE UTILIDADES (PERÍODO ${r.periodo})${r.porcentaje_pagado !== undefined && Number(r.porcentaje_pagado) < 100 ? ` — PAGO PARCIAL: ${Number(r.porcentaje_pagado).toFixed(2)}%` : ''}</div>
@@ -2828,10 +2943,30 @@ async function eliminarUtilidadesProcesadas(p, f) {
                     <tr><td class="bg-slate-100 px-1.5 py-0.5 border-r border-b border-black font-bold text-black">CARGO</td><td class="px-1.5 py-0.5 border-r border-b border-black uppercase text-black">${emp.cargos?.nombre||'-'}</td><td class="bg-slate-100 px-1.5 py-0.5 border-r border-b border-black font-bold text-black">FECHA PAGO</td><td class="px-1.5 py-0.5 border-b border-black uppercase text-black">${d}/${m}/${y}</td></tr>
                     <tr><td class="bg-slate-100 px-1.5 py-0.5 border-r border-black font-bold text-black">FECHA INGRESO</td><td class="px-1.5 py-0.5 border-r border-black text-black">${emp.fecha_ingreso||'-'}</td><td class="bg-slate-100 px-1.5 py-0.5 border-r border-black font-bold text-black">TASA BCV APLICADA</td><td class="px-1.5 py-0.5 font-bold text-black">${Number(r.tasa_bcv).toFixed(2)} Bs/$</td></tr>
                 </table>
-                <div class="font-bold text-[9px] uppercase text-black mb-0.5">1. Detalle de Cálculo Legal de Utilidades (Art. 131 LOTTT)</div>
+<div class="font-bold text-[9px] uppercase text-black mb-0.5">1. Detalle de Cálculo Legal de Utilidades (Art. 131 LOTTT)</div>
                 <table class="w-full text-[9px] border border-black mb-2">
-                   <thead><tr class="bg-[#fde0e0] font-bold border-b border-black text-black"><th class="px-1.5 py-0.5 text-center border-r border-black text-black">DÍAS TRABAJADOS</th><th class="px-1.5 py-0.5 text-center border-r border-black text-black">DÍAS A PAGAR (BASE ${appState.parametros.dias_utilidades||30})</th><th class="px-1.5 py-0.5 text-center border-r border-black text-black">% PAGADO</th><th class="px-1.5 py-0.5 text-right border-r border-black text-black">SALARIO MENSUAL BASE ($)</th><th class="px-1.5 py-0.5 text-right border-r border-black text-black">SUBTOTAL ($)</th><th class="px-1.5 py-0.5 text-right text-black">SUBTOTAL (BS)</th></tr></thead>
-                    <tbody class="divide-y divide-slate-300"><tr><td class="px-1.5 py-0.5 text-center font-mono text-black">${r.dias_trabajados} d</td><td class="px-1.5 py-0.5 text-center font-mono text-black">${Number(r.dias_pagados).toFixed(2)} d</td><td class="px-1.5 py-0.5 text-center font-mono font-bold text-black">${Number(r.porcentaje_pagado !== undefined ? r.porcentaje_pagado : 100).toFixed(2)}%</td><td class="px-1.5 py-0.5 text-right font-mono text-black">$${Number(r.salario_base).toFixed(2)}</td><td class="px-1.5 py-0.5 text-right font-mono font-bold text-black">$${Number(r.total_usd).toFixed(2)}</td><td class="px-1.5 py-0.5 text-right font-mono font-bold text-black">${fNum(Number(r.total_bs))}</td></tr></tbody>
+                   <thead>
+                       <tr class="bg-[#fde0e0] font-bold border-b border-black text-black">
+                           <th class="px-1.5 py-0.5 text-center border-r border-black">DÍAS TRAB.</th>
+                           <th class="px-1.5 py-0.5 text-center border-r border-black">DÍAS A PAGAR</th>
+                           <th class="px-1.5 py-0.5 text-center border-r border-black">% PAGADO</th>
+                           <th class="px-1.5 py-0.5 text-right border-r border-black">MONTO BRUTO ($)</th>
+                           ${incesUSD > 0 ? '<th class="px-1.5 py-0.5 text-right border-r border-black text-rose-700">(-) INCES 0.5% ($)</th>' : ''}
+                           <th class="px-1.5 py-0.5 text-right border-r border-black">NETO LEY ($)</th>
+                           <th class="px-1.5 py-0.5 text-right">NETO LEY (BS)</th>
+                       </tr>
+                   </thead>
+                    <tbody class="divide-y divide-slate-300">
+                        <tr>
+                            <td class="px-1.5 py-0.5 text-center font-mono">${r.dias_trabajados} d</td>
+                            <td class="px-1.5 py-0.5 text-center font-mono">${Number(r.dias_pagados).toFixed(2)} d</td>
+                            <td class="px-1.5 py-0.5 text-center font-mono font-bold">${Number(r.porcentaje_pagado !== undefined ? r.porcentaje_pagado : 100).toFixed(2)}%</td>
+                            <td class="px-1.5 py-0.5 text-right font-mono">$${tuBrutoUSD.toFixed(2)}</td>
+                            ${incesUSD > 0 ? `<td class="px-1.5 py-0.5 text-right font-mono text-rose-700 font-semibold">-$${incesUSD.toFixed(2)}</td>` : ''}
+                            <td class="px-1.5 py-0.5 text-right font-mono font-bold">$${(tuBrutoUSD - incesUSD).toFixed(2)}</td>
+                            <td class="px-1.5 py-0.5 text-right font-mono font-bold">${fNum((tuBrutoUSD - incesUSD) * Number(r.tasa_bcv))}</td>
+                        </tr>
+                    </tbody>
                 </table>
                 <div class="bg-slate-50 border border-black p-2 mb-2 flex justify-between items-center text-[9px] text-black"><div><span class="font-bold uppercase text-black">2. Subsidio Especial No Obligatorio</span><span class="text-[8px] text-slate-700 block">Asignación voluntaria complementaria otorgada por la empresa</span></div><div class="text-right"><span class="text-[8px] uppercase font-bold text-slate-700 block">Total Subsidio Especial:</span><span class="font-mono font-bold text-black text-[9.5px]">$${subUSD.toFixed(2)} / ${fNum(subBs)} Bs</span></div></div>
                 <div class="flex justify-between items-center bg-[#fde0e0] border-2 border-black p-1.5 font-bold text-[10px] mb-2 text-black"><span class="uppercase font-black">GRAN TOTAL UTILIDADES A COBRAR:</span><span class="font-mono text-xs font-black text-black">$${granUSD.toFixed(2)} / ${fNum(granBs)} Bs</span></div>
@@ -3919,6 +4054,75 @@ async function aplicarAsistenciaANomina() {
             gId('print-container').innerHTML = `<div class="p-4">${gId('area-impresion-utilidades').innerHTML}</div>`; 
             window.print(); 
         }
+
+        let empleadoConstanciaActual = null;
+
+function abrirModalConstancia(empId) {
+    const emp = appState.empleados.find(e => String(e.id) === String(empId));
+    if (!emp) return showToast('Empleado no encontrado', 'error');
+    empleadoConstanciaActual = emp;
+    actualizarVistaPreviaConstancia();
+    openModal('modal-constancia');
+}
+
+function actualizarVistaPreviaConstancia() {
+    const emp = empleadoConstanciaActual;
+    if (!emp) return;
+
+    const tipo = gId('const-tipo').value;
+    const dirigido = gId('const-dirigido').value.trim() || 'A QUIEN PUEDA INTERESAR';
+    const ciudad = gId('const-ciudad').value.trim() || 'Caracas';
+
+    const hoy = new Date();
+    const meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+    const fechaLetras = `${hoy.getDate()} días del mes de ${meses[hoy.getMonth()]} de ${hoy.getFullYear()}`;
+
+    const [iy, im, id] = (emp.fecha_ingreso || '').split('-');
+    const fechaIngresoFmt = (iy && im && id) ? `${id}/${im}/${iy}` : 'la fecha de su contrato';
+
+    const cargo = emp.cargos?.nombre || emp.departamentos?.nombre || 'Trabajador(a)';
+    const salarioBase = Number(emp.sueldo || 0);
+    const salarioIntegral = salarioBase + Number(emp.bono_alimentacion || 0) + Number(emp.otros_ingresos || 0);
+
+    const parrafoSalarial = tipo === 'con_sueldo' 
+        ? `percibiendo un ingreso mensual de <strong>$${salarioIntegral.toFixed(2)}</strong> (equivalente en bolívares calculados a la tasa oficial fijada por el Banco Central de Venezuela).`
+        : `demostrando durante su permanencia honestidad, compromiso y alto sentido de responsabilidad.`;
+
+    const html = `
+    <div class="bg-white text-black p-8 font-serif max-w-2xl mx-auto border border-black shadow-lg text-sm leading-relaxed" id="documento-constancia-papel">
+        <div class="text-center border-b-2 border-black pb-4 mb-6">
+            <h2 class="text-lg font-black uppercase tracking-wider text-black">${appState.parametros.nombre_empresa}</h2>
+            <p class="text-xs text-slate-800 font-sans font-semibold">${appState.parametros.rif_empresa}</p>
+            <p class="text-[10px] text-slate-600 font-sans">DEPARTAMENTO DE GESTIÓN HUMANA Y RELACIONES LABORALES</p>
+        </div>
+
+        <div class="text-center my-6">
+            <h3 class="text-base font-bold uppercase tracking-widest underline underline-offset-4 text-black">CONSTANCIA DE TRABAJO</h3>
+        </div>
+
+        <p class="mb-4 text-xs font-bold font-sans uppercase">${dirigido}:</p>
+
+        <p class="text-justify mb-6 indent-8">
+            Por medio de la presente se hace constar que el (la) ciudadano(a) <strong>${emp.nombre}</strong>, titular de la Cédula de Identidad N° <strong>${emp.cedula}</strong>, presta sus servicios en esta empresa desde el <strong>${fechaIngresoFmt}</strong>, desempeñando actualmente el cargo de <strong>${cargo}</strong>, ${parrafoSalarial}
+        </p>
+
+        <p class="text-justify mb-10 indent-8">
+            Constancia que se expide en cumplimiento del Artículo 84 de la Ley Orgánica del Trabajo, los Trabajadores y las Trabajadoras (LOTTT), a petición de la parte interesada, en la ciudad de ${ciudad}, a los ${fechaLetras}.
+        </p>
+
+        <div class="pt-16 text-center border-t border-black mt-12 w-64 mx-auto font-sans">
+            <p class="font-bold text-xs uppercase">${appState.parametros.nombre_empresa.split('/')[0].trim()}</p>
+            <p class="text-[10px] text-slate-700">Recursos Humanos / Administración</p>
+        </div>
+    </div>`;
+
+    gId('area-impresion-constancia').innerHTML = html;
+}
+
+function imprimirConstanciaLaboral() {
+    gId('print-container').innerHTML = gId('area-impresion-constancia').innerHTML;
+    window.print();
+}
     </script>
 </body>
 </html>
