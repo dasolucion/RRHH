@@ -3,17 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Formulario AR-I - Determinación de I.S.L.R.</title>
+    <title>Formulario AR-I Oficial - Determinación de I.S.L.R.</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
-<body class="bg-slate-950 text-slate-100 font-sans antialiased min-h-screen p-4 sm:p-6 flex items-center justify-center">
+<body class="bg-slate-950 text-slate-100 font-sans antialiased min-h-screen p-3 sm:p-6 flex items-center justify-center">
 
     <!-- ESTADO: CARGANDO -->
     <div id="pantalla-cargando" class="text-center space-y-3">
         <i class="fa-solid fa-spinner fa-spin text-3xl text-emerald-400"></i>
-        <p class="text-xs text-slate-400">Validando enlace de seguridad...</p>
+        <p class="text-xs text-slate-400">Validando enlace de seguridad con la base de datos...</p>
     </div>
 
     <!-- ESTADO: ENLACE INVÁLIDO O USADO -->
@@ -23,93 +23,129 @@
         </div>
         <h2 class="text-base font-bold text-white">Enlace No Válido o Expirado</h2>
         <p class="text-xs text-slate-400 leading-relaxed" id="mensaje-error-token">
-            Este enlace ya fue utilizado o ha caducado por motivos de seguridad.
+            Este enlace ya fue utilizado o ha caducado por motivos de seguridad legal.
         </p>
     </div>
 
     <!-- ESTADO: FORMULARIO AR-I ACTIVO -->
-    <div id="pantalla-formulario" class="hidden bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-5 sm:p-8 space-y-6 shadow-2xl">
-        <div class="border-b border-slate-800 pb-4 text-center sm:text-left flex flex-col sm:flex-row justify-between items-center gap-3">
+    <div id="pantalla-formulario" class="hidden bg-slate-900 border border-slate-800 rounded-2xl max-w-3xl w-full p-5 sm:p-8 space-y-6 shadow-2xl my-4">
+        <div class="border-b border-slate-800 pb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
             <div>
-                <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-950/60 border border-emerald-800/80 px-2 py-0.5 rounded">Formulario AR-I (Decreto 1808)</span>
-                <h1 class="text-lg font-black text-white mt-1">Estimación de Retención de I.S.L.R.</h1>
-                <p class="text-xs text-slate-400" id="empresa-nombre-label">Gestión de Talento Humano</p>
+                <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-950/60 border border-emerald-800/80 px-2 py-0.5 rounded">SENIAT - Formulario AR-I (Decreto 1808)</span>
+                <h1 class="text-lg font-black text-white mt-1">Determinación de Retención de I.S.L.R.</h1>
+                <p class="text-xs text-slate-400" id="empresa-nombre-label">Cargando empresa...</p>
             </div>
-            <div class="text-right font-mono text-xs bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800">
-                <span class="text-slate-500 block text-[9px] uppercase font-bold">U.T. Vigente</span>
-                <span class="text-emerald-400 font-bold" id="lbl-ut-vigente">Bs. 9.00</span>
+            <div class="text-right font-mono text-xs bg-slate-950 px-3.5 py-2 rounded-xl border border-slate-800">
+                <span class="text-slate-500 block text-[9px] uppercase font-bold">Unidad Tributaria (U.T.)</span>
+                <span class="text-amber-400 font-bold text-sm" id="lbl-ut-vigente">Bs. 9.00</span>
             </div>
         </div>
 
-        <div class="bg-slate-950/60 border border-slate-800 p-3.5 rounded-xl grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
-            <div><span class="text-slate-500 text-[10px] uppercase font-bold block">Trabajador:</span><span id="lbl-emp-nombre" class="font-bold text-white">-</span></div>
-            <div><span class="text-slate-500 text-[10px] uppercase font-bold block">Cédula:</span><span id="lbl-emp-cedula" class="font-mono text-slate-200">-</span></div>
+        <div class="bg-slate-950/70 border border-slate-800 p-4 rounded-xl grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+            <div><span class="text-slate-500 text-[10px] uppercase font-bold block">Trabajador(a):</span><span id="lbl-emp-nombre" class="font-bold text-white">-</span></div>
+            <div><span class="text-slate-500 text-[10px] uppercase font-bold block">Cédula de Identidad:</span><span id="lbl-emp-cedula" class="font-mono text-slate-200">-</span></div>
             <div><span class="text-slate-500 text-[10px] uppercase font-bold block">Cargo:</span><span id="lbl-emp-cargo" class="text-purple-300">-</span></div>
         </div>
 
-        <form id="form-ari" onsubmit="enviarDeclaracionARI(event)" class="space-y-4 text-xs">
+        <form id="form-ari" onsubmit="enviarDeclaracionARI(event)" class="space-y-5 text-xs">
+            <!-- 1. Remuneraciones Anuales Estimadas -->
             <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
-                <label class="block font-bold text-white text-[11px] uppercase tracking-wide">
-                    1. Remuneraciones Anuales Estimadas (En Bolívares)
-                </label>
-                <p class="text-[10px] text-amber-400 leading-tight">
-                    <i class="fa-solid fa-triangle-exclamation mr-1"></i> Art. 31 Ley de ISLR: Solo salario normal gravable proyectado. <strong>No incluya CestaTicket ni subsidios no salariales</strong>.
+                <div class="flex justify-between items-center">
+                    <label class="font-bold text-white text-[11px] uppercase tracking-wide">
+                        1. Remuneraciones Anuales Gravables Estimadas (Bs.)
+                    </label>
+                    <span id="ari-ingreso-ut" class="font-bold font-mono text-sky-400 text-xs">0.00 U.T.</span>
+                </div>
+                <p class="text-[10px] text-amber-400/90 leading-tight">
+                    <i class="fa-solid fa-triangle-exclamation mr-1"></i> Art. 31 LISLR: Solo declare salario normal proyectado y horas extras. <strong>Excluya expresamente Cestaticket y subsidios no remunerativos</strong>.
                 </p>
                 <div class="relative">
                     <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500 font-bold">Bs.</span>
-                    <input type="number" step="0.01" id="ari-ingreso-bs" required oninput="calcularPorcentajeARI()" class="w-full bg-slate-900 border border-slate-700 rounded-lg pl-10 pr-3 py-2 text-white font-mono font-bold focus:border-emerald-500 outline-none">
-                </div>
-                <div class="text-[10px] text-slate-400 flex justify-between pt-1">
-                    <span>Equivalente en U.T.:</span>
-                    <span id="ari-ingreso-ut" class="font-bold font-mono text-sky-400">0.00 U.T.</span>
+                    <input type="number" step="0.01" id="ari-ingreso-bs" required oninput="calcularPorcentajeARI()" class="w-full bg-slate-900 border border-slate-700 rounded-lg pl-10 pr-3 py-2 text-white font-mono font-bold focus:border-emerald-500 outline-none text-sm">
                 </div>
             </div>
 
-            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
-                <label class="block font-bold text-white text-[11px] uppercase tracking-wide">
-                    2. Modalidad de Desgravamen (Art. 59 LISLR)
-                </label>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <label class="flex items-center space-x-2 bg-slate-900 border border-slate-700 p-2.5 rounded-lg cursor-pointer hover:border-emerald-500">
-                        <input type="radio" name="ari-desgravamen" value="unico" checked onchange="calcularPorcentajeARI()" class="text-emerald-500">
+            <!-- 2. Modalidad de Desgravámenes -->
+            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-4">
+                <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                    <label class="font-bold text-white text-[11px] uppercase tracking-wide">
+                        2. Modalidad de Desgravamen (Art. 59 LISLR)
+                    </label>
+                    <span id="lbl-total-desgravamen-ut" class="font-bold font-mono text-teal-400 text-xs">Desgravamen: 774.00 U.T.</span>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <label class="flex items-center space-x-2 bg-slate-900 border border-slate-700 p-3 rounded-lg cursor-pointer hover:border-emerald-500 transition">
+                        <input type="radio" name="ari-desgravamen" value="unico" checked onchange="toggleModalidadDesgravamen()" class="text-emerald-500">
                         <div>
-                            <span class="font-bold text-white block">Desgravamen Único</span>
-                            <span class="text-[10px] text-slate-400">774 U.T. sin soportes</span>
+                            <span class="font-bold text-white block">A. Desgravamen Único</span>
+                            <span class="text-[10px] text-slate-400">774 U.T. automático sin necesidad de comprobantes</span>
                         </div>
                     </label>
-                    <label class="flex items-center space-x-2 bg-slate-900 border border-slate-700 p-2.5 rounded-lg cursor-pointer hover:border-emerald-500">
-                        <input type="radio" name="ari-desgravamen" value="cero" onchange="calcularPorcentajeARI()" class="text-emerald-500">
+                    <label class="flex items-center space-x-2 bg-slate-900 border border-slate-700 p-3 rounded-lg cursor-pointer hover:border-emerald-500 transition">
+                        <input type="radio" name="ari-desgravamen" value="detallado" onchange="toggleModalidadDesgravamen()" class="text-emerald-500">
                         <div>
-                            <span class="font-bold text-white block">Sin Desgravamen</span>
-                            <span class="text-[10px] text-slate-400">0 U.T.</span>
+                            <span class="font-bold text-white block">B. Desgravámenes Detallados</span>
+                            <span class="text-[10px] text-slate-400">Deducción de gastos reales con comprobantes fiscales</span>
                         </div>
                     </label>
                 </div>
+
+                <!-- Campos de Desgravámenes Detallados (Ocultos por defecto) -->
+                <div id="seccion-desgravamen-detallado" class="hidden space-y-3 pt-3 border-t border-slate-800/80">
+                    <p class="text-[10px] text-slate-400 italic">Ingrese los montos en Bolívares proyectados para el año que cuenten con factura o recibo oficial:</p>
+                    
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="text-[10px] text-slate-300 block mb-1">Educación propia e hijos (hasta 25 años):</label>
+                            <input type="number" step="0.01" id="desg-educacion" value="0.00" oninput="calcularPorcentajeARI()" class="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-xs text-white font-mono">
+                        </div>
+                        <div>
+                            <label class="text-[10px] text-slate-300 block mb-1">Primas seguro HCM (hospitalización/cirugía):</label>
+                            <input type="number" step="0.01" id="desg-seguro" value="0.00" oninput="calcularPorcentajeARI()" class="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-xs text-white font-mono">
+                        </div>
+                        <div>
+                            <label class="text-[10px] text-slate-300 block mb-1">Servicios médicos, odontológicos y prótesis:</label>
+                            <input type="number" step="0.01" id="desg-medico" value="0.00" oninput="calcularPorcentajeARI()" class="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-xs text-white font-mono">
+                        </div>
+                        <div>
+                            <label class="text-[10px] text-slate-300 block mb-1" title="Tope vivienda principal: 1.000 UT intereses o 800 UT alquiler">Intereses Vivienda (Tope 1000 UT) / Alquiler (Tope 800 UT):</label>
+                            <input type="number" step="0.01" id="desg-vivienda" value="0.00" oninput="calcularPorcentajeARI()" class="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-xs text-white font-mono">
+                        </div>
+                    </div>
+                </div>
             </div>
 
+            <!-- 3. Cargas Familiares -->
             <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
-                <label class="block font-bold text-white text-[11px] uppercase tracking-wide">
-                    3. Cargas Familiares (10 U.T. c/u - Art. 61 LISLR)
-                </label>
-                <p class="text-[10px] text-slate-400">Cónyuge, ascendientes e hijos menores o estudiantes hasta 25 años.</p>
-                <div class="flex items-center space-x-3">
-                    <input type="number" id="ari-cargas" min="0" max="20" value="0" oninput="calcularPorcentajeARI()" class="w-24 bg-slate-900 border border-slate-700 rounded-lg p-2 text-center text-white font-mono font-bold focus:border-emerald-500 outline-none">
-                    <span class="text-slate-400">Total rebaja = <strong id="lbl-cargas-ut" class="text-sky-400 font-mono">0 U.T.</strong></span>
+                <div class="flex justify-between items-center">
+                    <label class="font-bold text-white text-[11px] uppercase tracking-wide">
+                        3. Cargas Familiares (Art. 61 LISLR)
+                    </label>
+                    <span id="lbl-cargas-ut" class="font-bold font-mono text-sky-400 text-xs">0.00 U.T. (0 Cargas)</span>
+                </div>
+                <p class="text-[10px] text-slate-400">
+                    Deducción de <strong>10 U.T. por cada carga</strong>: Cónyuge no separado de bienes, ascendientes (padres/abuelos) y descendientes directos (hijos menores o discapacitados, o estudiantes hasta 25 años).
+                </p>
+                <div class="flex items-center space-x-3 pt-1">
+                    <input type="number" id="ari-cargas" min="0" max="20" value="0" oninput="calcularPorcentajeARI()" class="w-24 bg-slate-900 border border-slate-700 rounded-lg p-2 text-center text-white font-mono font-bold focus:border-emerald-500 outline-none text-sm">
+                    <span class="text-slate-400 text-[11px]">Número total de cargas familiares certificadas</span>
                 </div>
             </div>
 
-            <div class="bg-gradient-to-r from-emerald-950/60 to-slate-900 border-2 border-emerald-500/40 p-4 rounded-xl flex justify-between items-center">
-                <div>
+            <!-- 4. Cuadro Resumen y Porcentaje Determinado -->
+            <div class="bg-gradient-to-r from-emerald-950/60 to-slate-900 border-2 border-emerald-500/40 p-4 rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                <div class="space-y-0.5">
                     <span class="text-[10px] uppercase font-bold text-slate-400 block">Porcentaje de Retención Determinado</span>
-                    <span class="text-[9px] text-emerald-400">Se aplicará automáticamente a cada quincena</span>
+                    <span class="text-[9px] text-emerald-400 block font-mono" id="lbl-renta-neta-detalle">Renta Neta Gravable: 0.00 U.T.</span>
                 </div>
                 <div class="text-right">
-                    <span id="lbl-porcentaje-final" class="text-3xl font-black text-emerald-400 font-mono">0.00%</span>
+                    <span id="lbl-porcentaje-final" class="text-3xl sm:text-4xl font-black text-emerald-400 font-mono">0.00%</span>
                 </div>
             </div>
 
             <button type="submit" id="btn-enviar-ari" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl transition shadow-lg shadow-emerald-600/30 flex items-center justify-center space-x-2 text-xs uppercase tracking-wider">
-                <i class="fa-solid fa-file-export"></i><span>Firmar y Enviar Declaración</span>
+                <i class="fa-solid fa-file-export"></i><span>Firmar y Enviar Declaración al Agente de Retención</span>
             </button>
         </form>
     </div>
@@ -121,26 +157,25 @@
         </div>
         <h2 class="text-lg font-bold text-white">Declaración Recibida con Éxito</h2>
         <p class="text-xs text-slate-300 leading-relaxed">
-            Se ha fijado un porcentaje de retención de <strong id="lbl-porcentaje-confirmado" class="text-emerald-400 font-mono text-sm">0.00%</strong> para su nómina.
+            Se ha fijado un porcentaje de retención de <strong id="lbl-porcentaje-confirmado" class="text-emerald-400 font-mono text-sm">0.00%</strong> para su ficha de nómina.
         </p>
         <p class="text-[11px] text-slate-500 bg-slate-950 p-3 rounded-lg border border-slate-800">
-            <i class="fa-solid fa-lock mr-1"></i> Este enlace de seguridad ha quedado invalidado.
+            <i class="fa-solid fa-lock mr-1"></i> Por motivos de seguridad y validez jurídica, este enlace ha quedado invalidado para futuras modificaciones.
         </p>
     </div>
 
     <script>
         const SUPABASE_URL = 'https://nrfplwpmwplpbskidtqs.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yZnBsd3Btd3BscGJza2lkdHFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc1OTA4MjIsImV4cCI6MjEwMzE2NjgyMn0.PZXrE9KtAVF2e4RbyM3-m1ClS8R8QaTCctLzZKAAYdQ';
-        
-        // Evita colisión de nombres con la variable global 'supabase'
         const clienteSupabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         const gId = (id) => document.getElementById(id);
-        const VALOR_UT = 9.00;
+        let valorUT = 9.00; // Valor base por defecto
 
         let solicitudActiva = null;
         let empleadoActivo = null;
         let porcentajeCalculadoFinal = 0;
+        let desgravamenFinalUT = 774;
 
         async function validarYIniciar() {
             const urlParams = new URLSearchParams(window.location.search);
@@ -152,7 +187,20 @@
             }
 
             try {
-                // 1. Consultar token de forma aislada
+                // 1. Obtener la U.T. configurada en la empresa
+                const { data: paramConf } = await clienteSupabase
+                    .from('parametros_config')
+                    .select('*')
+                    .eq('id', 1)
+                    .maybeSingle();
+
+                if (paramConf && paramConf.valor_ut) {
+                    valorUT = Number(paramConf.valor_ut);
+                }
+                gId('lbl-ut-vigente').innerText = `Bs. ${valorUT.toFixed(2)}`;
+                if (paramConf?.nombre_empresa) gId('empresa-nombre-label').innerText = paramConf.nombre_empresa;
+
+                // 2. Consultar token de solicitud
                 const { data: sol, error: errSol } = await clienteSupabase
                     .from('solicitudes_ari')
                     .select('*')
@@ -170,11 +218,11 @@
                 }
 
                 if (new Date(sol.expira_en) < new Date()) {
-                    mostrarError('Este enlace de seguridad ha caducado (plazo vencido).');
+                    mostrarError('Este enlace de seguridad ha caducado (plazo de 72 horas vencido).');
                     return;
                 }
 
-                // 2. Consultar empleado asociado
+                // 3. Consultar empleado
                 const { data: emp, error: errEmp } = await clienteSupabase
                     .from('empleados')
                     .select('*')
@@ -209,11 +257,22 @@
             gId('lbl-emp-cedula').innerText = emp.cedula || '-';
             gId('lbl-emp-cargo').innerText = emp.cargo || 'Trabajador';
             
-            // Sugerir salario base anual proyectado
+            // Sugerir salario base anual proyectado (Base mensual * 12 * tasa referencial 36.5)
             const sueldoAnualUSD = (Number(emp.sueldo) || 0) * 12;
             const sueldoAnualBsEstimado = sueldoAnualUSD * 36.50;
             gId('ari-ingreso-bs').value = sueldoAnualBsEstimado.toFixed(2);
             
+            calcularPorcentajeARI();
+        }
+
+        function toggleModalidadDesgravamen() {
+            const modalidad = document.querySelector('input[name="ari-desgravamen"]:checked')?.value || 'unico';
+            const contenedorDetallado = gId('seccion-desgravamen-detallado');
+            if (modalidad === 'detallado') {
+                contenedorDetallado.classList.remove('hidden');
+            } else {
+                contenedorDetallado.classList.add('hidden');
+            }
             calcularPorcentajeARI();
         }
 
@@ -222,18 +281,42 @@
             const modalidadDesgravamen = document.querySelector('input[name="ari-desgravamen"]:checked')?.value || 'unico';
             const cantCargas = parseInt(gId('ari-cargas').value) || 0;
 
-            const ingresoUT = ingresoBs / VALOR_UT;
+            const ingresoUT = ingresoBs / valorUT;
             gId('ari-ingreso-ut').innerText = `${ingresoUT.toFixed(2)} U.T.`;
 
+            // Si el ingreso no supera 1.000 UT, no hay retención legal
             if (ingresoUT <= 1000) {
+                desgravamenFinalUT = 0;
+                gId('lbl-total-desgravamen-ut').innerText = 'Ingreso menor a 1.000 U.T. (No sujeto)';
+                gId('lbl-renta-neta-detalle').innerText = 'Renta Neta Gravable: 0.00 U.T.';
                 actualizarResultado(0);
                 return;
             }
 
-            const desgravamenUT = modalidadDesgravamen === 'unico' ? 774 : 0;
-            const rentaNetaGravableUT = Math.max(0, ingresoUT - desgravamenUT);
+            // Calcular Desgravamen según modalidad
+            if (modalidadDesgravamen === 'unico') {
+                desgravamenFinalUT = 774;
+            } else {
+                const educacionBs = parseFloat(gId('desg-educacion')?.value) || 0;
+                const seguroBs = parseFloat(gId('desg-seguro')?.value) || 0;
+                const medicoBs = parseFloat(gId('desg-medico')?.value) || 0;
+                const viviendaBs = parseFloat(gId('desg-vivienda')?.value) || 0;
 
-            // Tarifa 1 - Art. 50 LISLR
+                const educacionUT = educacionBs / valorUT;
+                const seguroUT = seguroBs / valorUT;
+                const medicoUT = medicoBs / valorUT;
+                // Tope de vivienda: máximo 1.000 UT
+                const viviendaUT = Math.min(1000, viviendaBs / valorUT);
+
+                desgravamenFinalUT = educacionUT + seguroUT + medicoUT + viviendaUT;
+            }
+
+            gId('lbl-total-desgravamen-ut').innerText = `Desgravamen: ${desgravamenFinalUT.toFixed(2)} U.T.`;
+
+            const rentaNetaGravableUT = Math.max(0, ingresoUT - desgravamenFinalUT);
+            gId('lbl-renta-neta-detalle').innerText = `Renta Neta Gravable: ${rentaNetaGravableUT.toFixed(2)} U.T.`;
+
+            // Tarifa 1 (Art. 50 LISLR)
             let pctTarifa = 0.06;
             let sustraendoUT = 0;
 
@@ -247,10 +330,15 @@
             else { pctTarifa = 0.34; sustraendoUT = 875; }
 
             const impuestoTarifa1UT = (rentaNetaGravableUT * pctTarifa) - sustraendoUT;
-            const totalRebajasUT = 10 + (cantCargas * 10);
-            gId('lbl-cargas-ut').innerText = `${cantCargas * 10} U.T.`;
 
+            // Rebajas de Ley: 10 UT personal + 10 UT por cada carga familiar (Art. 61)
+            const rebajaPersonalUT = 10;
+            const rebajaCargasUT = cantCargas * 10;
+            gId('lbl-cargas-ut').innerText = `${rebajaCargasUT.toFixed(2)} U.T. (${cantCargas} Carga/s)`;
+
+            const totalRebajasUT = rebajaPersonalUT + rebajaCargasUT;
             const impuestoDeterminadoUT = Math.max(0, impuestoTarifa1UT - totalRebajasUT);
+
             let porcentajeFinal = (impuestoDeterminadoUT / ingresoUT) * 100;
             porcentajeFinal = Math.max(0, Math.min(34, Math.round(porcentajeFinal * 100) / 100));
 
@@ -268,19 +356,28 @@
 
             const btn = gId('btn-enviar-ari');
             btn.disabled = true;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Guardando...';
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Guardando declaración...';
+
+            const modalidad = document.querySelector('input[name="ari-desgravamen"]:checked')?.value || 'unico';
 
             const payloadDatos = {
                 ingreso_anual_bs: parseFloat(gId('ari-ingreso-bs').value) || 0,
-                ingreso_anual_ut: (parseFloat(gId('ari-ingreso-bs').value) || 0) / VALOR_UT,
-                desgravamen_tipo: document.querySelector('input[name="ari-desgravamen"]:checked')?.value,
+                ingreso_anual_ut: (parseFloat(gId('ari-ingreso-bs').value) || 0) / valorUT,
+                desgravamen_tipo: modalidad,
+                desgravamen_ut: desgravamenFinalUT,
+                detalles_desgravamen: modalidad === 'detallado' ? {
+                    educacion_bs: parseFloat(gId('desg-educacion')?.value) || 0,
+                    seguro_bs: parseFloat(gId('desg-seguro')?.value) || 0,
+                    medico_bs: parseFloat(gId('desg-medico')?.value) || 0,
+                    vivienda_bs: parseFloat(gId('desg-vivienda')?.value) || 0
+                } : null,
                 cargas_familiares: parseInt(gId('ari-cargas').value) || 0,
                 porcentaje_determinado: porcentajeCalculadoFinal,
-                valor_ut_aplicado: VALOR_UT
+                valor_ut_aplicado: valorUT
             };
 
             try {
-                // 1. Invalidar token
+                // 1. Invalidar token y guardar declaración
                 await clienteSupabase
                     .from('solicitudes_ari')
                     .update({
@@ -291,7 +388,7 @@
                     })
                     .eq('id', solicitudActiva.id);
 
-                // 2. Actualizar porcentaje en empleados
+                // 2. Actualizar el % de retención en la ficha del empleado
                 await clienteSupabase
                     .from('empleados')
                     .update({ islr_porcentaje: porcentajeCalculadoFinal })
@@ -301,13 +398,12 @@
                 gId('pantalla-exito').classList.remove('hidden');
                 gId('lbl-porcentaje-confirmado').innerText = `${porcentajeCalculadoFinal.toFixed(2)}%`;
             } catch (err) {
-                alert('Error al registrar la declaración.');
+                alert('Ocurrió un error al registrar la declaración.');
                 btn.disabled = false;
                 btn.innerHTML = 'Reintentar Enviar';
             }
         }
 
-        // Ejecutar inmediatamente
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', validarYIniciar);
         } else {
