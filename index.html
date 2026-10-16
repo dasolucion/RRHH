@@ -977,7 +977,7 @@
                     <div class="grid grid-cols-2 gap-3"><div><label class="text-[11px] text-slate-400 block mb-1">F. Ingreso</label><input type="date" id="emp-fecha" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white"></div><div><label class="text-[11px] text-slate-400 block mb-1">Cédula</label><input type="text" id="emp-cedula" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white"></div></div>
                     <div class="grid grid-cols-2 gap-3"><div><label class="text-[11px] text-slate-400 block mb-1">Nombre</label><input type="text" id="emp-nombre" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white"></div><div><label class="text-[11px] text-slate-400 block mb-1">Teléfono</label><input type="text" id="emp-telefono" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white"></div></div>
                     <div class="grid grid-cols-2 gap-3"><div><label class="text-[11px] text-slate-400 block mb-1">Departamento</label><select id="emp-depto-select" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white"></select></div><div><label class="text-[11px] text-slate-400 block mb-1">Cargo</label><select id="emp-cargo-select" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white"></select></div></div>
-                    <div class="grid grid-cols-3 gap-3 border-t border-slate-800 pt-2"><div><label class="text-[11px] text-slate-400 block mb-1">Salario ($)</label><input type="number" step="0.01" id="emp-sueldo" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white"></div><div><label class="text-[11px] text-slate-400 block mb-1">B. Alim ($)</label><input type="number" step="0.01" id="emp-bono-alim" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white"></div><div><label class="text-[11px] text-slate-400 block mb-1">Subsidio ($)</label><input type="number" step="0.01" id="emp-otros-ing" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white"></div><div><label class="text-[11px] text-slate-400 block mb-1">% Retención ISLR (AR-I)</label><input type="number" step="0.01" id="emp-islr" placeholder="0.00" min="0" max="100" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-amber-300 font-bold font-mono outline-none focus:border-amber-500"></div></div>
+                    <div class="grid grid-cols-3 gap-3 border-t border-slate-800 pt-2"><div><label class="text-[11px] text-slate-400 block mb-1">Salario ($)</label><input type="number" step="0.01" id="emp-sueldo" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white"></div><div><label class="text-[11px] text-slate-400 block mb-1">B. Alim ($)</label><input type="number" step="0.01" id="emp-bono-alim" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white"></div><div data-feature="empleados.subsidio"><label class="text-[11px] text-slate-400 block mb-1">Subsidio ($)</label><input type="number" step="0.01" id="emp-otros-ing" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white"></div><div><label class="text-[11px] text-slate-400 block mb-1">% Retención ISLR (AR-I)</label><input type="number" step="0.01" id="emp-islr" placeholder="0.00" min="0" max="100" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-amber-300 font-bold font-mono outline-none focus:border-amber-500"></div></div>
                     <div class="border-t border-slate-800 pt-2">
 <label class="text-[11px] text-amber-400 block mb-1"><i class="fa-solid fa-fingerprint mr-1"></i>ID Dispositivo Dahua (asistencia)</label>
 <input type="text" id="emp-device-user-id" placeholder="Ej: 7 (UserID que aparece en el reloj)" class="w-full bg-slate-950 border border-amber-500/30 rounded-lg p-2 text-xs text-white">
@@ -1222,8 +1222,11 @@ const DEFAULT_FEATURES = {
 };
 
 function getFeatureFlag(key) {
-    if (!appState.features) return DEFAULT_FEATURES[key]?.default ?? true;
-    return appState.features[key] !== undefined ? appState.features[key] : (DEFAULT_FEATURES[key]?.default ?? true);
+    const def = DEFAULT_FEATURES[key]?.default ?? true;
+    if (!appState.features) return def;
+    const v = appState.features[key];
+    if (v === undefined || v === null) return def;
+    return v === true || v === 'true' || v === 1 || v === '1';
 }
 
 function aplicarFeatureFlagsDOM() {
@@ -1346,7 +1349,8 @@ async function guardarFeatureFlagsConfig() {
             if(!coincidencia.activo) { errDiv.innerText = 'El usuario se encuentra inactivo. Contacte al Administrador.'; errDiv.classList.remove('hidden'); return; }
             errDiv.classList.add('hidden');
             appState.usuarioActual = coincidencia;
-            sessionStorage.setItem('nomina_usuario_activo', JSON.stringify(coincidencia));
+const sesionSegura = { id: coincidencia.id, nombre: coincidencia.nombre, usuario: coincidencia.usuario, rol: coincidencia.rol, activo: coincidencia.activo };
+sessionStorage.setItem('nomina_usuario_activo', JSON.stringify(sesionSegura));
             showToast(`Bienvenido(a), ${coincidencia.nombre}`);
             iniciarSistemaAutenticado();
         }
@@ -1898,7 +1902,7 @@ async function guardarEmpleado() {
         async function guardarHistoricoMeses() {
             const empId = gId('hist-sal-emp-select').value;
             if(!empId || appState.mesesEditablesActuales.length === 0) return showToast('No hay datos generados para guardar', 'error');
-            const registros = appState.mesesEditablesActuales.map(m => ({ empleado_id: empId, mes: m.mes, sueldo_base: m.sueldo_base, bono_alimentacion: m.bono_alimentacion, subsidio: m.subsidio }));
+            const registros = appState.mesesEditablesActuales.map(m => ({ empleado_id: parseInt(empId, 10), mes: m.mes, sueldo_base: m.sueldo_base, bono_alimentacion: m.bono_alimentacion, subsidio: m.subsidio }));
             try { await supabaseClient.from('historico_salarios').upsert(registros, { onConflict: 'empleado_id,mes' }); } catch(e) {}
             registros.forEach(r => {
                 const idx = appState.historicoSalarios.findIndex(x => String(x.empleado_id) === String(r.empleado_id) && x.mes === r.mes);
@@ -1931,12 +1935,17 @@ async function guardarEmpleado() {
                 </tr>`;
             }).join('');
         }
-
+let _debouncePrestamoTimer = null;
         async function guardarPrestamoFila(empId) {
-            const saldo = parseFloat(gId(`pres-saldo-${empId}`).value) || 0;
-            const emp = appState.empleados.find(x => String(x.id) === String(empId));
-            if (emp) { emp.saldo_prestamo = saldo; }
-            try { await supabaseClient.from('empleados').update({ saldo_prestamo: saldo }).eq('id', empId); } catch(e) {}
+    const saldo = parseFloat(gId(`pres-saldo-${empId}`).value) || 0;
+    const emp = appState.empleados.find(x => String(x.id) === String(empId));
+    if (emp) { emp.saldo_prestamo = saldo; }
+    
+    clearTimeout(_debouncePrestamoTimer);
+    _debouncePrestamoTimer = setTimeout(async () => {
+        try { await supabaseClient.from('empleados').update({ saldo_prestamo: saldo }).eq('id', empId); } catch(e) {}
+    }, 600);
+            
             const rawDraft = localStorage.getItem('nomina_borrador_global');
             if (rawDraft) {
                 try {
@@ -2091,108 +2100,81 @@ emps.forEach(e => {
         }
 
         let nominaTotalesCache = {};
+        
 async function procesarNominaGlobal() {
     const f = gId('nom-fecha-proceso').value; 
     const t = parseFloat(gId('nom-tasa-bcv').value) || 36.5; 
     const sM = parseFloat(gId('nom-salario-minimo').value) || 130; 
     const lun = parseInt(gId('nom-lunes').value) || 2;
     if(!f) return showToast('Falta fecha de pago', 'error'); 
-    
     const act = appState.empleados.filter(e => e.activo); 
     if(!act.length) return;
-    
-    const regs = []; 
-    const empUpdates = [];
-
+    const regs = []; const empUpdates = [];
     for (const e of act) {
         const sb = Number(e.sueldo) || 0; 
         const si = sb + (Number(e.bono_alimentacion) || 0) + (Number(e.otros_ingresos) || 0); 
-        const dia = si / 30; 
-        const base = dia * 15;
-        
-        const df = parseFloat(gId(`df-${e.id}`)?.value) || 0; 
-        const oa = parseFloat(gId(`oa-${e.id}`)?.value) || 0; 
-        const hd = parseFloat(gId(`hd-${e.id}`)?.value) || 0; 
-        const od = parseFloat(gId(`od-${e.id}`)?.value) || 0; 
-        const ad = parseFloat(gId(`ad-${e.id}`)?.value) || 0; 
-        const pr = parseFloat(gId(`pr-${e.id}`)?.value) || 0;
+        const dia = si / 30; const base = dia * 15;
+        const df = parseFloat(gId(`df-${e.id}`).value) || 0; 
+        const oa = parseFloat(gId(`oa-${e.id}`).value) || 0; 
+        const hd = parseFloat(gId(`hd-${e.id}`).value) || 0; 
+        const od = parseFloat(gId(`od-${e.id}`).value) || 0; 
+        const ad = parseFloat(gId(`ad-${e.id}`).value) || 0; 
+        const pr = parseFloat(gId(`pr-${e.id}`).value) || 0;
 
-        // Recargos LOTTT leídos desde la interfaz en vivo
+        // ⚡ Recargos LOTTT (respeta feature flags)
+        const hed   = getFeatureFlag('nomina.recargos_lottt') ? (parseFloat(gId(`hed-${e.id}`)?.value)   || 0) : 0;
+        const hnoct = getFeatureFlag('nomina.recargos_lottt') ? (parseFloat(gId(`hnoct-${e.id}`)?.value) || 0) : 0;
+        const fer   = getFeatureFlag('nomina.recargos_lottt') ? (parseFloat(gId(`fer-${e.id}`)?.value)   || 0) : 0;
+        const islrPct = getFeatureFlag('nomina.islr') ? (parseFloat(gId(`islr-${e.id}`)?.value) || 0) : 0;
+
         const horaBase = (sb / 30) / 8;
-        const diaBase = sb / 30;
-        const hed = getFeatureFlag('nomina.recargos_lottt') ? parseFloat(gId(`hed-${e.id}`)?.value || 0) : 0;
-        const hnoct = getFeatureFlag('nomina.recargos_lottt') ? parseFloat(gId(`hnoct-${e.id}`)?.value || 0) : 0;
-        const fer = getFeatureFlag('nomina.recargos_lottt') ? parseFloat(gId(`fer-${e.id}`)?.value || 0) : 0;
-        const islrPct = getFeatureFlag('nomina.islr') ? parseFloat(gId(`islr-${e.id}`)?.value || 0) : 0;
-
-        const montoHED = horaBase * 1.5 * hed;
-        const montoNoct = horaBase * 0.30 * hnoct;
-        const montoFer = diaBase * 1.5 * fer;
+        const diaBase  = sb / 30;
+        const montoHED   = horaBase * 1.5  * hed;
+        const montoNoct  = horaBase * 0.30 * hnoct;
+        const montoFer   = diaBase  * 1.5  * fer;
         const totalRecargosUSD = montoHED + montoNoct + montoFer;
 
-        // Deducciones de Ley
+        // Deducciones de ley (sobre salario base)
         const sbBs = sb * t; 
         const ivss = (Math.min(sbBs, 5 * sM) * 12 / 52) * 0.04 * lun; 
         const rpe = (Math.min(sbBs, 10 * sM) * 12 / 52) * 0.005 * lun; 
         const faov = (sbBs * 0.01) / 2; 
         const leyU = (ivss + rpe + faov) / t; 
 
-        // Retención ISLR sobre Salario Normal (Excluyendo Cestaticket y Subsidio)
-        const baseImponibleISLR = Math.max(0, (diaBase * (15 - df)) + totalRecargosUSD);
-        const islrUSD = baseImponibleISLR * (islrPct / 100);
+        // ISLR sobre salario normal (excluye bono alimentación y subsidio)
+        const baseSalarialImponibleUSD = Math.max(0, ((sb/30) * (15 - df)) + totalRecargosUSD);
+        const islrUSD = baseSalarialImponibleUSD * (islrPct / 100);
 
-        const totalAsigUSD = base - (dia * df) + totalRecargosUSD + oa;
-        const netoU = totalAsigUSD - ((dia / 8) * hd) - od - ad - pr - leyU - islrUSD;
+        const netoU = base - (dia * df) + oa + totalRecargosUSD - ((dia / 8) * hd) - od - ad - pr - leyU - islrUSD;
 
         if (pr > 0) {
             const nuevoSaldo = Math.max(0, (Number(e.saldo_prestamo) || 0) - pr);
             e.saldo_prestamo = nuevoSaldo;
             empUpdates.push(supabaseClient.from('empleados').update({ saldo_prestamo: nuevoSaldo }).eq('id', e.id));
         }
-
         regs.push({ 
-            fecha_pago: f, 
-            empleado_id: e.id, 
-            empleado: e.nombre, 
-            cargo: e.cargos?.nombre || '-', 
-            tasa_bcv: t, 
-            salario_minimo_bs: sM, 
-            salario_base: sb, 
-            bono_alimentacion: Number(e.bono_alimentacion) || 0, 
-            otros_ingresos: Number(e.otros_ingresos) || 0, 
-            dias_faltantes: df, 
-            otras_asignaciones: oa, 
-            horas_descuento: hd, 
-            otros_descuentos: od, 
-            adelantos: ad, 
-            prestamos: pr, 
-            ivss_usd: ivss / t, 
-            rpe_usd: rpe / t, 
-            faov_usd: faov / t, 
-            descuentos_ley_usd: leyU + islrUSD, 
-            neto_usd: netoU, 
-            neto_bs: netoU * t, 
-            estado: 'Procesado',
-            detalle_calculo: {
-                hed, hnoct, fer, islrPct,
-                montoHED, montoNoct, montoFer, totalRecargosUSD,
-                islrUSD, islrBs: islrUSD * t
-            }
+            fecha_pago: f, empleado_id: e.id, empleado: e.nombre, cargo: e.cargos?.nombre || '-', 
+            tasa_bcv: t, salario_minimo_bs: sM, salario_base: sb, 
+            bono_alimentacion: Number(e.bono_alimentacion) || 0, otros_ingresos: Number(e.otros_ingresos) || 0, 
+            dias_faltantes: df, otras_asignaciones: oa, horas_descuento: hd, 
+            otros_descuentos: od, adelantos: ad, prestamos: pr, 
+            hed: hed, hnoct: hnoct, fer: fer, 
+            recargos_lottt_usd: totalRecargosUSD,
+            islr_porcentaje: islrPct, islr_usd: islrUSD, islr_bs: islrUSD * t,
+            ivss_usd: ivss / t, rpe_usd: rpe / t, faov_usd: faov / t, descuentos_ley_usd: leyU, 
+            neto_usd: netoU, neto_bs: netoU * t, estado: 'Procesado' 
         });
     }
-
     if (empUpdates.length > 0) await Promise.all(empUpdates);
     await supabaseClient.from('nominas').insert(regs); 
     await safeQuery(supabaseClient.from('prenomina_borrador').delete().eq('id', 1), 'clear_prenomina');
     localStorage.removeItem('nomina_borrador_global');
-    
     const [yStr, mStr, dStr] = f.split('-');
     if (parseInt(dStr) >= 20) {
         const mesClave = `${yStr}-${mStr}`;
         const salariosFinMes = act.map(e => ({ empleado_id: e.id, mes: mesClave, sueldo_base: Number(e.sueldo) || 0, bono_alimentacion: Number(e.bono_alimentacion) || 0, subsidio: Number(e.otros_ingresos) || 0 }));
         try { await supabaseClient.from('historico_salarios').upsert(salariosFinMes, { onConflict: 'empleado_id,mes' }); } catch(e) {}
     }
-    
     showToast('Nómina procesada definitivamente con éxito'); 
     fetchAllData();
 }
@@ -2334,8 +2316,6 @@ function renderTablaNominaEditable() {
     aplicarFeatureFlagsDOM();
 }
 
-2233
-
         function renderHistoricoNominas() {
             const gr = {}; 
             const isMaster = appState.usuarioActual?.rol === 'master';
@@ -2409,35 +2389,36 @@ function renderTablaNominaEditable() {
             showToast(`Archivo TXT Alimentación generado (${regs.length} registros)`);
         }
 
-        function generarTXTSubsidio(fecha) {
-            const regs = appState.nominas.filter(n => n.fecha_pago === fecha);
-            if (regs.length === 0) return showToast('No hay registros para esta fecha', 'error');
-            let contenido = '';
-            regs.forEach(r => {
-                const e = appState.empleados.find(x => String(x.id) === String(r.empleado_id)) || {};
-                const cedulaFmt = formatearCedulaBanco(e.cedula || r.cedula || '');
-                const t = Number(r.tasa_bcv) || 1;
-                const sb  = Number(r.salario_base) || 0;
-                const bam = Number(r.bono_alimentacion) || 0;
-                const oim = Number(r.otros_ingresos) || 0;
-                const oa  = Number(r.otras_asignaciones) || 0;
-                const df  = Number(r.dias_faltantes) || 0;
-                const hd  = Number(r.horas_descuento) || 0;
-                const od  = Number(r.otros_descuentos) || 0;
-                const ad  = Number(r.adelantos) || 0;
-                const pr  = Number(r.prestamos) || 0;
-                const dia = (sb + bam + oim) / 30;
-                const subColUSD = ((oim / 30) * (15 - df)) + oa - ((dia / 8) * hd) - od - ad - pr;
-                const montoBs = subColUSD * t;
-                const cadena29 = formatearMontoFechaBanco(montoBs, fecha);
-                contenido += `${cedulaFmt}  ${cadena29}\n`;
-            });
-            if (!contenido.trim()) return showToast('Sin datos para exportar', 'error');
-            const nombre = `SUBSIDIO_${fecha.replace(/-/g,'')}.txt`;
-            descargarTXT(contenido, nombre);
-            showToast(`Archivo TXT Subsidio generado (${regs.length} registros)`);
-        }
-
+function generarTXTSubsidio(fecha) {
+    const regs = appState.nominas.filter(n => n.fecha_pago === fecha);
+    if (regs.length === 0) return showToast('No hay registros para esta fecha', 'error');
+    let contenido = '';
+    regs.forEach(r => {
+        const e = appState.empleados.find(x => String(x.id) === String(r.empleado_id)) || {};
+        const cedulaFmt = formatearCedulaBanco(e.cedula || r.cedula || '');
+        const t = Number(r.tasa_bcv) || 1;
+        const sb  = Number(r.salario_base) || 0;
+        const bam = Number(r.bono_alimentacion) || 0;
+        const oim = Number(r.otros_ingresos) || 0;
+        const oa  = Number(r.otras_asignaciones) || 0;
+        const df  = Number(r.dias_faltantes) || 0;
+        const hd  = Number(r.horas_descuento) || 0;
+        const od  = Number(r.otros_descuentos) || 0;
+        const ad  = Number(r.adelantos) || 0;
+        const pr  = Number(r.prestamos) || 0;
+        const recargos = Number(r.recargos_lottt_usd || 0);
+        const islr = Number(r.islr_usd || 0);
+        const dia = (sb + bam + oim) / 30;
+        const subColUSD = ((oim / 30) * (15 - df)) + oa + recargos - ((dia / 8) * hd) - od - ad - pr - islr;
+        const montoBs = subColUSD * t;
+        const cadena29 = formatearMontoFechaBanco(montoBs, fecha);
+        contenido += `${cedulaFmt}  ${cadena29}\n`;
+    });
+    if (!contenido.trim()) return showToast('Sin datos para exportar', 'error');
+    const nombre = `SUBSIDIO_${fecha.replace(/-/g,'')}.txt`;
+    descargarTXT(contenido, nombre);
+    showToast(`Archivo TXT Subsidio generado (${regs.length} registros)`);
+}
         async function eliminarNominaProcesada(f) { 
             if (appState.usuarioActual?.rol !== 'master') return showToast('No tiene permisos para eliminar registros', 'error');
             if(!confirm('¿Eliminar nómina? Se reintegrarán los montos amortizados a los préstamos.')) return; 
@@ -2460,79 +2441,87 @@ function renderTablaNominaEditable() {
             fetchAllData(); 
         }
 
-        function verDetalleNomina(f) {
-            const regs = appState.nominas.filter(n => n.fecha_pago === f); 
-            gId('detalle-fecha-pago').innerText = f; 
-            gId('print-fecha-pago').innerText = f;
-            let tb = 0, ta = 0, ti = 0, tr = 0, tf = 0, to = 0, tu = 0, tbs = 0;
-            let tSal = 0, tAlim = 0, tSub = 0;
+function verDetalleNomina(f) {
+    const regs = appState.nominas.filter(n => n.fecha_pago === f); 
+    gId('detalle-fecha-pago').innerText = f; 
+    gId('print-fecha-pago').innerText = f;
+    let tb = 0, ta = 0, ti = 0, tr = 0, tf = 0, to = 0, tu = 0, tbs = 0;
+    let tSal = 0, tAlim = 0, tSub = 0, tRec = 0, tIslr = 0;
 
-            gId('tabla-detalle-body').innerHTML = regs.map(r => {
-                const sq = Number(r.salario_base) / 2; 
-                const as = (Number(r.bono_alimentacion) / 2) + (Number(r.otros_ingresos) / 2) + Number(r.otras_asignaciones);
-                let ivss = Number(r.ivss_usd); 
-                if(ivss === 0 && Number(r.salario_base) > 0) ivss = ((Math.min(Number(r.salario_base) * r.tasa_bcv, 5 * r.salario_minimo_bs) * 12 / 52) * 0.04 * 2) / r.tasa_bcv;
-                let rpe = Number(r.rpe_usd); 
-                if(rpe === 0 && Number(r.salario_base) > 0) rpe = ((Math.min(Number(r.salario_base) * r.tasa_bcv, 10 * r.salario_minimo_bs) * 12 / 52) * 0.005 * 2) / r.tasa_bcv;
-                let faov = Number(r.faov_usd); 
-                if(faov === 0 && Number(r.salario_base) > 0) faov = (((Number(r.salario_base) * r.tasa_bcv) * 0.01) / 2) / r.tasa_bcv;
-                const od = Number(r.otros_descuentos) + Number(r.adelantos) + Number(r.prestamos); 
-                const nu = Number(r.neto_usd || r.neto || 0); 
-                const nb = Number(r.neto_bs);
-                const t = Number(r.tasa_bcv) || 1;
-                const sb = Number(r.salario_base) || 0;
-                const bam = Number(r.bono_alimentacion) || 0;
-                const oim = Number(r.otros_ingresos) || 0;
-                const oav = Number(r.otras_asignaciones) || 0;
-                const dfv = Number(r.dias_faltantes) || 0;
-                const hdv = Number(r.horas_descuento) || 0;
-                const odv = Number(r.otros_descuentos) || 0;
-                const adv = Number(r.adelantos) || 0;
-                const prv = Number(r.prestamos) || 0;
-                const dia = (sb + bam + oim) / 30;
-                const leyUsd = ivss + rpe + faov;
-                const salarioColUsd = ((sb / 30) * (15 - dfv)) - leyUsd;
-                const alimColUsd    = (bam / 30) * (15 - dfv);
-                const subColUsd     = ((oim / 30) * (15 - dfv)) + oav - ((dia / 8) * hdv) - odv - adv - prv;
-                const salarioColBs = salarioColUsd * t;
-                const alimColBs    = alimColUsd * t;
-                const subColBs     = subColUsd * t;
-                tb += sq; ta += as; ti += ivss; tr += rpe; tf += faov; to += od; tu += nu; tbs += nb;
-                tSal += salarioColBs; tAlim += alimColBs; tSub += subColBs;
-                return `<tr class="hover:bg-slate-800/40">
-                    <td class="p-2.5 font-semibold text-white">${r.empleado}</td>
-                    <td class="p-2.5 text-slate-400">${r.cargo||'-'}</td>
-                    <td class="p-2.5 text-slate-300">$${sq.toFixed(2)}</td>
-                    <td class="p-2.5 text-emerald-400">$${as.toFixed(2)}</td>
-                    <td class="p-2.5 text-amber-400">$${ivss.toFixed(2)}</td>
-                    <td class="p-2.5 text-amber-400">$${rpe.toFixed(2)}</td>
-                    <td class="p-2.5 text-amber-400">$${faov.toFixed(2)}</td>
-                    <td class="p-2.5 text-rose-400">$${od.toFixed(2)}</td>
-                    <td class="p-2.5 text-sky-400 font-semibold">Bs. ${fNum(salarioColBs)}</td>
-                    <td class="p-2.5 text-teal-400 font-semibold">Bs. ${fNum(alimColBs)}</td>
-                    <td class="p-2.5 text-purple-400 font-semibold">Bs. ${fNum(subColBs)}</td>
-                    <td class="p-2.5 font-bold text-emerald-400">$${nu.toFixed(2)}</td>
-                    <td class="p-2.5 font-bold text-emerald-400">Bs. ${nb.toFixed(2)}</td>
-                </tr>`;
-            }).join('');
+    gId('tabla-detalle-body').innerHTML = regs.map(r => {
+        const sq = Number(r.salario_base) / 2; 
+        const as = (Number(r.bono_alimentacion) / 2) + (Number(r.otros_ingresos) / 2) + Number(r.otras_asignaciones);
+        let ivss = Number(r.ivss_usd); 
+        if(ivss === 0 && Number(r.salario_base) > 0) ivss = ((Math.min(Number(r.salario_base) * r.tasa_bcv, 5 * r.salario_minimo_bs) * 12 / 52) * 0.04 * 2) / r.tasa_bcv;
+        let rpe = Number(r.rpe_usd); 
+        if(rpe === 0 && Number(r.salario_base) > 0) rpe = ((Math.min(Number(r.salario_base) * r.tasa_bcv, 10 * r.salario_minimo_bs) * 12 / 52) * 0.005 * 2) / r.tasa_bcv;
+        let faov = Number(r.faov_usd); 
+        if(faov === 0 && Number(r.salario_base) > 0) faov = (((Number(r.salario_base) * r.tasa_bcv) * 0.01) / 2) / r.tasa_bcv;
 
-            gId('tabla-detalle-foot').innerHTML = `<tr>
-                <td colspan="2" class="p-2.5 text-slate-300 text-right uppercase">Totales:</td>
-                <td class="p-2.5 text-white">$${tb.toFixed(2)}</td>
-                <td class="p-2.5 text-emerald-400">$${ta.toFixed(2)}</td>
-                <td class="p-2.5 text-amber-400">$${ti.toFixed(2)}</td>
-                <td class="p-2.5 text-amber-400">$${tr.toFixed(2)}</td>
-                <td class="p-2.5 text-amber-400">$${tf.toFixed(2)}</td>
-                <td class="p-2.5 text-rose-400">$${to.toFixed(2)}</td>
-                <td class="p-2.5 text-sky-400 font-bold">Bs. ${fNum(tSal)}</td>
-                <td class="p-2.5 text-teal-400 font-bold">Bs. ${fNum(tAlim)}</td>
-                <td class="p-2.5 text-purple-400 font-bold">Bs. ${fNum(tSub)}</td>
-                <td class="p-2.5 text-emerald-400">$${tu.toFixed(2)}</td>
-                <td class="p-2.5 text-emerald-400">Bs. ${tbs.toFixed(2)}</td>
-            </tr>`;
-            openModal('modal-detalle-nomina');
-        }
+        // ⚡ Recargos e ISLR
+        const recargosUsd = Number(r.recargos_lottt_usd || 0);
+        const islrUsd = Number(r.islr_usd || 0);
 
+        const od = Number(r.otros_descuentos) + Number(r.adelantos) + Number(r.prestamos); 
+        const nu = Number(r.neto_usd || r.neto || 0); 
+        const nb = Number(r.neto_bs);
+        const t = Number(r.tasa_bcv) || 1;
+        const sb = Number(r.salario_base) || 0;
+        const bam = Number(r.bono_alimentacion) || 0;
+        const oim = Number(r.otros_ingresos) || 0;
+        const oav = Number(r.otras_asignaciones) || 0;
+        const dfv = Number(r.dias_faltantes) || 0;
+        const hdv = Number(r.horas_descuento) || 0;
+        const odv = Number(r.otros_descuentos) || 0;
+        const adv = Number(r.adelantos) || 0;
+        const prv = Number(r.prestamos) || 0;
+        const dia = (sb + bam + oim) / 30;
+        const leyUsd = ivss + rpe + faov;
+        const salarioColUsd = ((sb / 30) * (15 - dfv)) - leyUsd - islrUsd;
+        const alimColUsd    = (bam / 30) * (15 - dfv);
+        const subColUsd     = ((oim / 30) * (15 - dfv)) + oav + recargosUsd - ((dia / 8) * hdv) - odv - adv - prv;
+        const salarioColBs = salarioColUsd * t;
+        const alimColBs    = alimColUsd * t;
+        const subColBs     = subColUsd * t;
+
+        tb += sq; ta += as + recargosUsd; ti += ivss; tr += rpe; tf += faov; to += od + islrUsd; tu += nu; tbs += nb;
+        tSal += salarioColBs; tAlim += alimColBs; tSub += subColBs;
+        tRec += recargosUsd * t;
+        tIslr += islrUsd * t;
+
+        return `<tr class="hover:bg-slate-800/40">
+            <td class="p-2.5 font-semibold text-white">${r.empleado}</td>
+            <td class="p-2.5 text-slate-400">${r.cargo||'-'}</td>
+            <td class="p-2.5 text-slate-300">$${sq.toFixed(2)}</td>
+            <td class="p-2.5 text-emerald-400">$${as.toFixed(2)}</td>
+            <td class="p-2.5 text-amber-400">$${ivss.toFixed(2)}</td>
+            <td class="p-2.5 text-amber-400">$${rpe.toFixed(2)}</td>
+            <td class="p-2.5 text-amber-400">$${faov.toFixed(2)}</td>
+            <td class="p-2.5 text-rose-400">$${od.toFixed(2)}</td>
+            <td class="p-2.5 text-sky-400 font-semibold">Bs. ${fNum(salarioColBs)}</td>
+            <td class="p-2.5 text-teal-400 font-semibold">Bs. ${fNum(alimColBs)}</td>
+            <td class="p-2.5 text-purple-400 font-semibold">Bs. ${fNum(subColBs)}</td>
+            <td class="p-2.5 font-bold text-emerald-400">$${nu.toFixed(2)}</td>
+            <td class="p-2.5 font-bold text-emerald-400">Bs. ${nb.toFixed(2)}</td>
+        </tr>`;
+    }).join('');
+
+    gId('tabla-detalle-foot').innerHTML = `<tr>
+        <td colspan="2" class="p-2.5 text-slate-300 text-right uppercase">Totales:</td>
+        <td class="p-2.5 text-white">$${tb.toFixed(2)}</td>
+        <td class="p-2.5 text-emerald-400">$${ta.toFixed(2)}</td>
+        <td class="p-2.5 text-amber-400">$${ti.toFixed(2)}</td>
+        <td class="p-2.5 text-amber-400">$${tr.toFixed(2)}</td>
+        <td class="p-2.5 text-amber-400">$${tf.toFixed(2)}</td>
+        <td class="p-2.5 text-rose-400">$${to.toFixed(2)}</td>
+        <td class="p-2.5 text-sky-400 font-bold">Bs. ${fNum(tSal)}</td>
+        <td class="p-2.5 text-teal-400 font-bold">Bs. ${fNum(tAlim)}</td>
+        <td class="p-2.5 text-purple-400 font-bold">Bs. ${fNum(tSub)}</td>
+        <td class="p-2.5 text-emerald-400">$${tu.toFixed(2)}</td>
+        <td class="p-2.5 text-emerald-400">Bs. ${tbs.toFixed(2)}</td>
+    </tr>`;
+    openModal('modal-detalle-nomina');
+}
         function verRecibosNomina(fecha) {
             const regs = appState.nominas.filter(n => n.fecha_pago === fecha); 
             gId('recibos-fecha-pago').innerText = fecha;
@@ -2544,103 +2533,135 @@ function renderTablaNominaEditable() {
             openModal('modal-recibos-nomina');
         }
 
-        function generarHTMLReciboSolo(r, fecha) {
-            const e = appState.empleados.find(x => String(x.id) === String(r.empleado_id)) || {}; 
-            const t = Number(r.tasa_bcv || 1); 
-            const sM = Number(r.salario_minimo_bs || 130);
-            const sm = Number(r.salario_base || 0); 
-            const bam = Number(r.bono_alimentacion || 0); 
-            const oim = Number(r.otros_ingresos || 0); 
-            const sim = sm + bam + oim;
-            const sqb = (sm / 2) * t; 
-            const bab = (bam / 2) * t; 
-            const oib = (oim / 2) * t; 
-            const oab = Number(r.otras_asignaciones || 0) * t; 
-            const tab = sqb + bab + oib + oab;
-            let sso = Number(r.ivss_usd || 0) * t; 
-            if(sso === 0 && sm > 0) sso = (Math.min(sm * t, 5 * sM) * 12 / 52) * 0.04 * 2;
-            let lph = Number(r.faov_usd || 0) * t; 
-            if(lph === 0 && sm > 0) lph = ((sm * t) * 0.01) / 2;
-            let rpe = Number(r.rpe_usd || 0) * t; 
-            if(rpe === 0 && sm > 0) rpe = (Math.min(sm * t, 10 * sM) * 12 / 52) * 0.005 * 2;
-            const dfb = ((sim / 30) * Number(r.dias_faltantes || 0)) * t; 
-            const hdb = (((sim / 30) / 8) * Number(r.horas_descuento || 0)) * t;
-            const prb = (Number(r.prestamos || 0) + Number(r.adelantos || 0)) * t; 
-            const odb = Number(r.otros_descuentos || 0) * t;
-            const tdb = dfb + sso + lph + rpe + prb + odb + hdb; 
-            const tnb = r.neto_bs ? Number(r.neto_bs) : (tab - tdb);
-            const dfv = Number(r.dias_faltantes || 0);
-            const hdv = Number(r.horas_descuento || 0);
-            const odv = Number(r.otros_descuentos || 0);
-            const adv = Number(r.adelantos || 0);
-            const prv = Number(r.prestamos || 0);
-            const oav = Number(r.otras_asignaciones || 0);
-            const diav = sim / 30;
-            const salarioBs = ((sm / 30) * (15 - dfv)) * t - (sso + lph + rpe);
-            const alimBs    = ((bam / 30) * (15 - dfv)) * t;
-            const subsBs    = ((oim / 30) * (15 - dfv)) * t + (oav * t) - (((diav / 8) * hdv) * t) - (odv * t) - (adv * t) - (prv * t);
-            const [y, m, d] = fecha.split('-'); 
-            const fO = new Date(y, m - 1, d); 
-            const qT = fO.getDate() <= 15 ? '1ERA QUINCENA' : '2DA QUINCENA'; 
-            const mN = fO.toLocaleString('es-ES', { month: 'long' }).toUpperCase(); 
-            const tP = `RECIBO DE PAGO ${qT} DE ${mN} ${y}`;
-            return `
-            <div class="recibo-card bg-white text-black p-3 print:p-2 rounded-lg shadow-xl border border-slate-300 font-sans max-w-3xl mx-auto w-full relative group">
-                <button onclick="enviarWhatsAppRecibo(${r.empleado_id}, '${fecha}')" class="absolute top-3 right-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full w-8 h-8 flex items-center justify-center shadow-lg transition-all opacity-40 group-hover:opacity-100 print-hidden" title="Enviar WhatsApp"><i class="fa-brands fa-whatsapp text-lg"></i></button>
-                <div>
-                    <div class="flex justify-between items-start mb-1 pb-0.5 border-b border-black">
-                        <div><h2 class="text-xl print:text-base print:leading-tight font-black tracking-widest text-black uppercase">${appState.parametros.nombre_empresa.split('/')[0].trim()}</h2></div>
-                        <div class="text-right print:leading-tight pr-10 print:pr-0"><h3 class="text-xs print:text-[10px] font-extrabold text-black uppercase">${appState.parametros.nombre_empresa}</h3><p class="text-[10px] print:text-[8.5px] text-slate-800 font-semibold">${appState.parametros.rif_empresa}</p></div>
-                    </div>
-                    <div class="bg-[#dbece0] text-center font-bold text-[10.5px] print:text-[9px] py-0.5 border border-black mb-1 uppercase tracking-wider text-black">${tP}</div>
-                    <table class="w-full text-[10px] print:text-[8.5px] border border-black mb-1 font-semibold">
-                        <tr><td class="bg-slate-100 px-1 py-0.5 border-r border-b border-black w-28 font-bold text-black">TRABAJADOR</td><td class="px-1 py-0.5 border-r border-b border-black font-bold uppercase text-black">${r.empleado}</td><td class="bg-slate-100 px-1 py-0.5 border-r border-b border-black w-16 font-bold text-black">CARGO</td><td class="px-1 py-0.5 border-b border-black uppercase font-bold text-black">${r.cargo||e.cargos?.nombre||'-'}</td></tr>
-                        <tr><td class="bg-slate-100 px-1.5 py-0.5 border-r border-b border-black font-bold text-black">CÉDULA</td><td class="px-1.5 py-0.5 border-r border-b border-black text-black">${e.cedula||r.cedula||'-'}</td><td class="bg-slate-100 px-1.5 py-0.5 border-r border-b border-black font-bold text-black">F. INGRESO</td><td class="px-1.5 py-0.5 border-b border-black text-black">${e.fecha_ingreso||'-'}</td></tr>
-                        <tr><td class="bg-slate-100 px-1.5 py-0.5 border-r border-black font-bold text-black">SALARIO MENSUAL</td><td colspan="3" class="px-1.5 py-0.5 font-bold text-black">${fNum(sm*t)} Bs. ($${sm.toFixed(2)}) | Tasa: ${t.toFixed(2)} Bs/$</td></tr>
-                    </table>
-                    <table class="w-full text-[10px] print:text-[8.5px] border border-black mb-1">
-                        <thead><tr class="bg-[#dbece0] font-bold border-b border-black text-black"><th class="px-1.5 py-0.5 text-left border-r border-black text-black" colspan="2">ASIGNACIÓN</th><th class="px-1.5 py-0.5 text-right w-28 text-black">MONTO (BS)</th></tr></thead>
-                        <tbody class="divide-y divide-slate-300">
-                            <tr><td class="px-1.5 py-0.5 text-black">Salario quincenal (15 d)</td><td class="px-1.5 py-0.5 text-center w-12 text-slate-800">15 d</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(sqb)}</td></tr>
-                            <tr><td class="px-1.5 py-0.5 text-black" colspan="2">Bono de alimentación</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(bab)}</td></tr>
-                            <tr><td class="px-1.5 py-0.5 text-black" colspan="2">Subsidio especial no obligatorio</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(oib+oab)}</td></tr>
-                        </tbody>
-                        <tfoot><tr class="font-bold border-t border-black bg-slate-50 text-black"><td class="px-1.5 py-0.5" colspan="2">TOTAL ASIGNACIONES</td><td class="px-1.5 py-0.5 text-right font-mono font-bold text-black">${fNum(tab)}</td></tr></tfoot>
-                    </table>
-                    <table class="w-full text-[9.5px] print:text-[8px] border border-black mb-1">
-                        <tbody class="divide-y divide-slate-200">
-                            <tr><td class="px-1.5 py-0.5 text-black">Días no laborados (${r.dias_faltantes||0} d)</td><td class="px-1.5 py-0.5 text-right font-mono w-28 text-black">${fNum(dfb)}</td></tr>
-                            <tr><td class="px-1.5 py-0.5 text-black">S.S.O. / IVSS (4%)</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(sso)}</td></tr>
-                            <tr><td class="px-1.5 py-0.5 text-black">L.P.H. / FAOV (1%)</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(lph)}</td></tr>
-                            <tr><td class="px-1.5 py-0.5 text-black">Paro Forzoso / RPE (0,5%)</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(rpe)}</td></tr>
-                            <tr><td class="px-1.5 py-0.5 text-black">Préstamos / Adelantos amortizados</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(prb)}</td></tr>
-                            <tr><td class="px-1.5 py-0.5 text-black">Otras deducciones</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(odb)}</td></tr>
-                            <tr><td class="px-1.5 py-0.5 text-black">Horas descontadas (${r.horas_descuento||0} hrs)</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(hdb)}</td></tr>
-                        </tbody>
-                        <tfoot><tr class="font-bold border-t border-black bg-slate-50 text-black"><td class="px-1.5 py-0.5">TOTAL DEDUCCIONES</td><td class="px-1.5 py-0.5 text-right font-mono font-bold text-black">${fNum(tdb)}</td></tr></tfoot>
-                    </table>
+function generarHTMLReciboSolo(r, fecha) {
+    const e = appState.empleados.find(x => String(x.id) === String(r.empleado_id)) || {}; 
+    const t = Number(r.tasa_bcv || 1); 
+    const sM = Number(r.salario_minimo_bs || 130);
+    const sm = Number(r.salario_base || 0); 
+    const bam = Number(r.bono_alimentacion || 0); 
+    const oim = Number(r.otros_ingresos || 0); 
+    const sim = sm + bam + oim;
+    const sqb = (sm / 2) * t; 
+    const bab = (bam / 2) * t; 
+    const oib = (oim / 2) * t; 
+    const oab = Number(r.otras_asignaciones || 0) * t; 
+
+    // ⚡ Recargos LOTTT
+    const horaBaseUSD = (sm / 30) / 8;
+    const diaBaseUSD  = sm / 30;
+    const hedV   = Number(r.hed || 0);
+    const hnoctV = Number(r.hnoct || 0);
+    const ferV   = Number(r.fer || 0);
+    const montoHEDBs   = horaBaseUSD * 1.5  * hedV   * t;
+    const montoNoctBs  = horaBaseUSD * 0.30 * hnoctV * t;
+    const montoFerBs   = diaBaseUSD  * 1.5  * ferV   * t;
+    const totalRecargosBs = montoHEDBs + montoNoctBs + montoFerBs;
+
+    const tab = sqb + bab + oib + oab + totalRecargosBs;
+
+    let sso = Number(r.ivss_usd || 0) * t; 
+    if(sso === 0 && sm > 0) sso = (Math.min(sm * t, 5 * sM) * 12 / 52) * 0.04 * 2;
+    let lph = Number(r.faov_usd || 0) * t; 
+    if(lph === 0 && sm > 0) lph = ((sm * t) * 0.01) / 2;
+    let rpe = Number(r.rpe_usd || 0) * t; 
+    if(rpe === 0 && sm > 0) rpe = (Math.min(sm * t, 10 * sM) * 12 / 52) * 0.005 * 2;
+
+    // ⚡ ISLR
+    const islrPctVal = Number(r.islr_porcentaje || 0);
+    let islrBs = Number(r.islr_usd || 0) * t;
+    if (islrBs === 0 && islrPctVal > 0) {
+        const salBaseDiaUSD = sm / 30;
+        const baseImp = Math.max(0, (salBaseDiaUSD * (15 - Number(r.dias_faltantes || 0))) + 
+            ((horaBaseUSD * 1.5 * hedV) + (horaBaseUSD * 0.30 * hnoctV) + (diaBaseUSD * 1.5 * ferV)));
+        islrBs = baseImp * (islrPctVal / 100) * t;
+    }
+
+    const dfb = ((sim / 30) * Number(r.dias_faltantes || 0)) * t; 
+    const hdb = (((sim / 30) / 8) * Number(r.horas_descuento || 0)) * t;
+    const prb = (Number(r.prestamos || 0) + Number(r.adelantos || 0)) * t; 
+    const odb = Number(r.otros_descuentos || 0) * t;
+    const tdb = dfb + sso + lph + rpe + islrBs + prb + odb + hdb; 
+    const tnb = r.neto_bs ? Number(r.neto_bs) : (tab - tdb);
+
+    const dfv = Number(r.dias_faltantes || 0);
+    const hdv = Number(r.horas_descuento || 0);
+    const odv = Number(r.otros_descuentos || 0);
+    const adv = Number(r.adelantos || 0);
+    const prv = Number(r.prestamos || 0);
+    const oav = Number(r.otras_asignaciones || 0);
+    const diav = sim / 30;
+
+    const salarioBs = ((sm / 30) * (15 - dfv)) * t - (sso + lph + rpe + islrBs);
+    const alimBs    = ((bam / 30) * (15 - dfv)) * t;
+    const subsBs    = ((oim / 30) * (15 - dfv)) * t + (oav * t) - (((diav / 8) * hdv) * t) - (odv * t) - (adv * t) - (prv * t) + totalRecargosBs;
+
+    const [y, m, d] = fecha.split('-'); 
+    const fO = new Date(y, m - 1, d); 
+    const qT = fO.getDate() <= 15 ? '1ERA QUINCENA' : '2DA QUINCENA'; 
+    const mN = fO.toLocaleString('es-ES', { month: 'long' }).toUpperCase(); 
+    const tP = `RECIBO DE PAGO ${qT} DE ${mN} ${y}`;
+
+    return `
+    <div class="recibo-card bg-white text-black p-3 print:p-2 rounded-lg shadow-xl border border-slate-300 font-sans max-w-3xl mx-auto w-full relative group">
+        <button onclick="enviarWhatsAppRecibo(${r.empleado_id}, '${fecha}')" class="absolute top-3 right-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full w-8 h-8 flex items-center justify-center shadow-lg transition-all opacity-40 group-hover:opacity-100 print-hidden" title="Enviar WhatsApp"><i class="fa-brands fa-whatsapp text-lg"></i></button>
+        <div>
+            <div class="flex justify-between items-start mb-1 pb-0.5 border-b border-black">
+                <div><h2 class="text-xl print:text-base print:leading-tight font-black tracking-widest text-black uppercase">${appState.parametros.nombre_empresa.split('/')[0].trim()}</h2></div>
+                <div class="text-right print:leading-tight pr-10 print:pr-0"><h3 class="text-xs print:text-[10px] font-extrabold text-black uppercase">${appState.parametros.nombre_empresa}</h3><p class="text-[10px] print:text-[8.5px] text-slate-800 font-semibold">${appState.parametros.rif_empresa}</p></div>
+            </div>
+            <div class="bg-[#dbece0] text-center font-bold text-[10.5px] print:text-[9px] py-0.5 border border-black mb-1 uppercase tracking-wider text-black">${tP}</div>
+            <table class="w-full text-[10px] print:text-[8.5px] border border-black mb-1 font-semibold">
+                <tr><td class="bg-slate-100 px-1 py-0.5 border-r border-b border-black w-28 font-bold text-black">TRABAJADOR</td><td class="px-1 py-0.5 border-r border-b border-black font-bold uppercase text-black">${r.empleado}</td><td class="bg-slate-100 px-1 py-0.5 border-r border-b border-black w-16 font-bold text-black">CARGO</td><td class="px-1 py-0.5 border-b border-black uppercase font-bold text-black">${r.cargo||e.cargos?.nombre||'-'}</td></tr>
+                <tr><td class="bg-slate-100 px-1.5 py-0.5 border-r border-b border-black font-bold text-black">CÉDULA</td><td class="px-1.5 py-0.5 border-r border-b border-black text-black">${e.cedula||r.cedula||'-'}</td><td class="bg-slate-100 px-1.5 py-0.5 border-r border-b border-black font-bold text-black">F. INGRESO</td><td class="px-1.5 py-0.5 border-b border-black text-black">${e.fecha_ingreso||'-'}</td></tr>
+                <tr><td class="bg-slate-100 px-1.5 py-0.5 border-r border-black font-bold text-black">SALARIO MENSUAL</td><td colspan="3" class="px-1.5 py-0.5 font-bold text-black">${fNum(sm*t)} Bs. ($${sm.toFixed(2)}) | Tasa: ${t.toFixed(2)} Bs/$</td></tr>
+            </table>
+            <table class="w-full text-[10px] print:text-[8.5px] border border-black mb-1">
+                <thead><tr class="bg-[#dbece0] font-bold border-b border-black text-black"><th class="px-1.5 py-0.5 text-left border-r border-black text-black" colspan="2">ASIGNACIÓN</th><th class="px-1.5 py-0.5 text-right w-28 text-black">MONTO (BS)</th></tr></thead>
+                <tbody class="divide-y divide-slate-300">
+                    <tr><td class="px-1.5 py-0.5 text-black">Salario quincenal (15 d)</td><td class="px-1.5 py-0.5 text-center w-12 text-slate-800">15 d</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(sqb)}</td></tr>
+                    <tr><td class="px-1.5 py-0.5 text-black" colspan="2">Bono de alimentación</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(bab)}</td></tr>
+                    <tr><td class="px-1.5 py-0.5 text-black" colspan="2">Subsidio especial no obligatorio</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(oib+oab)}</td></tr>
+                    ${hedV > 0 ? `<tr><td class="px-1.5 py-0.5 text-black">Horas Extras Diurnas (Recargo 50%)</td><td class="px-1.5 py-0.5 text-center text-slate-800">${hedV} h</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(montoHEDBs)}</td></tr>` : ''}
+                    ${hnoctV > 0 ? `<tr><td class="px-1.5 py-0.5 text-black">Bono Nocturno (Recargo 30%)</td><td class="px-1.5 py-0.5 text-center text-slate-800">${hnoctV} h</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(montoNoctBs)}</td></tr>` : ''}
+                    ${ferV > 0 ? `<tr><td class="px-1.5 py-0.5 text-black">Feriados/Descanso Trabajados (1.5x)</td><td class="px-1.5 py-0.5 text-center text-slate-800">${ferV} d</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(montoFerBs)}</td></tr>` : ''}
+                </tbody>
+                <tfoot><tr class="font-bold border-t border-black bg-slate-50 text-black"><td class="px-1.5 py-0.5" colspan="2">TOTAL ASIGNACIONES</td><td class="px-1.5 py-0.5 text-right font-mono font-bold text-black">${fNum(tab)}</td></tr></tfoot>
+            </table>
+            <table class="w-full text-[9.5px] print:text-[8px] border border-black mb-1">
+                <tbody class="divide-y divide-slate-200">
+                    <tr><td class="px-1.5 py-0.5 text-black">Días no laborados (${r.dias_faltantes||0} d)</td><td class="px-1.5 py-0.5 text-right font-mono w-28 text-black">${fNum(dfb)}</td></tr>
+                    <tr><td class="px-1.5 py-0.5 text-black">S.S.O. / IVSS (4%)</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(sso)}</td></tr>
+                    <tr><td class="px-1.5 py-0.5 text-black">L.P.H. / FAOV (1%)</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(lph)}</td></tr>
+                    <tr><td class="px-1.5 py-0.5 text-black">Paro Forzoso / RPE (0,5%)</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(rpe)}</td></tr>
+                    ${islrBs > 0 ? `<tr><td class="px-1.5 py-0.5 text-black">I.S.L.R. Retención (${islrPctVal.toFixed(2)}%)</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(islrBs)}</td></tr>` : ''}
+                    <tr><td class="px-1.5 py-0.5 text-black">Préstamos / Adelantos amortizados</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(prb)}</td></tr>
+                    <tr><td class="px-1.5 py-0.5 text-black">Otras deducciones</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(odb)}</td></tr>
+                    <tr><td class="px-1.5 py-0.5 text-black">Horas descontadas (${r.horas_descuento||0} hrs)</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(hdb)}</td></tr>
+                </tbody>
+                <tfoot><tr class="font-bold border-t border-black bg-slate-50 text-black"><td class="px-1.5 py-0.5">TOTAL DEDUCCIONES</td><td class="px-1.5 py-0.5 text-right font-mono font-bold text-black">${fNum(tdb)}</td></tr></tfoot>
+            </table>
+        </div>
+        <div>
+            <div class="grid grid-cols-3 gap-1 mb-1 text-[9px] print:text-[8px]">
+                <div class="bg-[#e0f2fe] border border-black p-1 text-center text-black"><div class="font-bold uppercase text-[7.5px] leading-tight">Salario</div><div class="font-mono font-bold leading-tight">Bs. ${fNum(salarioBs)}</div></div>
+                <div class="bg-[#dcfce7] border border-black p-1 text-center text-black"><div class="font-bold uppercase text-[7.5px] leading-tight">Alimentación</div><div class="font-mono font-bold leading-tight">Bs. ${fNum(alimBs)}</div></div>
+                <div class="bg-[#fef3c7] border border-black p-1 text-center text-black"><div class="font-bold uppercase text-[7.5px] leading-tight">Subsidio</div><div class="font-mono font-bold leading-tight">Bs. ${fNum(subsBs)}</div></div>
+            </div>
+            <div class="flex justify-between items-center bg-[#dbece0] border border-black p-1 font-bold text-[10.5px] print:text-[9.5px] mb-1 text-black">
+                <span>TOTAL NETO A COBRAR</span>
+                <span class="font-mono text-xs print:text-[10px] text-black">${fNum(tnb)} Bs.</span>
+            </div>
+            <div class="border border-black p-1 mb-1 text-[7.5px] text-black leading-tight bg-slate-50"><strong>OBSERVACIÓN:</strong> El subsidio no posee naturaleza salarial, ya que no desprende de la intención retributiva del trabajo prestado sino un beneficio eminentemente social para cubrir parte de sus gastos por bienes y/o servicios básicos en que incurre el trabajador. Por tal motivo se otorga como una ayuda al trabajador sin que sea de carácter obligatorio en futuras ocasiones.</div>
+            <div class="border-t border-black pt-1">
+                <h4 class="text-center font-extrabold text-[8.5px] tracking-wider mb-2 text-black">RECIBO CONFORME</h4>
+                <div class="grid grid-cols-2 gap-4 text-[9px] font-semibold text-black">
+                    <div class="flex items-end"><span class="mr-1">FIRMA:</span><span class="border-b border-black flex-1"></span></div>
+                    <div class="flex items-end"><span class="mr-1">CÉDULA:</span><span class="border-b border-black flex-1 font-bold"></span></div>
                 </div>
-                <div>
-                    <div class="grid grid-cols-3 gap-1 mb-1 text-[9px] print:text-[8px]">
-                        <div class="bg-[#e0f2fe] border border-black p-1 text-center text-black"><div class="font-bold uppercase text-[7.5px] print:text-[7px] leading-tight">Salario</div><div class="font-mono font-bold leading-tight">Bs. ${fNum(salarioBs)}</div></div>
-                        <div class="bg-[#dcfce7] border border-black p-1 text-center text-black"><div class="font-bold uppercase text-[7.5px] print:text-[7px] leading-tight">Alimentación</div><div class="font-mono font-bold leading-tight">Bs. ${fNum(alimBs)}</div></div>
-                        <div class="bg-[#fef3c7] border border-black p-1 text-center text-black"><div class="font-bold uppercase text-[7.5px] print:text-[7px] leading-tight">Subsidio</div><div class="font-mono font-bold leading-tight">Bs. ${fNum(subsBs)}</div></div>
-                    </div>
-                    <div class="flex justify-between items-center bg-[#dbece0] border border-black p-1 font-bold text-[10.5px] print:text-[9.5px] mb-1 text-black">
-                        <span>TOTAL NETO A COBRAR</span>
-                        <span class="font-mono text-xs print:text-[10px] text-black">${fNum(tnb)} Bs.</span>
-                    </div>
-                    <div class="border border-black p-1 mb-1 text-[7.5px] print:text-[7px] text-black leading-tight bg-slate-50"><strong>OBSERVACIÓN:</strong> El subsidio no posee naturaleza salarial, ya que no desprende de la intención retributiva del trabajo prestado sino un beneficio eminentemente social para cubrir parte de sus gastos por bienes y/o servicios básicos en que incurre el trabajador. Por tal motivo se otorga como una ayuda al trabajador sin que sea de carácter obligatorio en futuras ocasiones.</div>
-                    <div class="border-t border-black pt-1">
-                        <h4 class="text-center font-extrabold text-[8.5px] print:text-[7.5px] tracking-wider mb-2 print:mb-1 text-black">RECIBO CONFORME</h4>
-                        <div class="grid grid-cols-2 gap-4 text-[9px] print:text-[7.5px] font-semibold text-black">
-                            <div class="flex items-end"><span class="mr-1">FIRMA:</span><span class="border-b border-black flex-1"></span></div>
-                            <div class="flex items-end"><span class="mr-1">CÉDULA:</span><span class="border-b border-black flex-1 font-bold"></span></div>
-                        </div>
-                    </div>
-                </div>
-            </div>`;
-        }
+            </div>
+        </div>
+    </div>`;
+}
 
 function enviarWhatsAppRecibo(id, f) {
     const r = appState.nominas.find(x => String(x.empleado_id) === String(id) && x.fecha_pago === f); 
@@ -2674,19 +2695,6 @@ function enviarWhatsAppRecibo(id, f) {
 
         function imprimirDesglose() { gId('print-container').innerHTML = `<div class="p-4">${gId('area-impresion').innerHTML}</div>`; window.print(); }
         function imprimirRecibos() { gId('print-container').innerHTML = gId('area-impresion-recibos').innerHTML; window.print(); }
-
-        function esFeriadoNacional(fecha) {
-            const y = fecha.getFullYear(), m = fecha.getMonth(), d = fecha.getDate();
-            const fj = [{m:0,d:1},{m:3,d:19},{m:4,d:1},{m:5,d:24},{m:6,d:5},{m:6,d:24},{m:9,d:12},{m:11,d:24},{m:11,d:25},{m:11,d:31}];
-            if(fj.some(f => f.m === m && f.d === d)) return true;
-            const a=y%19, b=Math.floor(y/100), c=y%100, d1=Math.floor(b/4), e1=b%4, f1=Math.floor((b+8)/25), g1=Math.floor((b-f1+1)/3), h=(19*a+b-d1-g1+15)%30, i=Math.floor(c/4), k=c%4, l=(32+2*e1+2*i-h-k)%7, m1=Math.floor((a+11*h+22*l)/451), month=Math.floor((h+l-7*m1+114)/31)-1, day=((h+l-7*m1+114)%31)+1;
-            const pas = new Date(y, month, day); 
-            const cL = new Date(pas); cL.setDate(cL.getDate()-48); 
-            const cM = new Date(pas); cM.setDate(cM.getDate()-47); 
-            const jS = new Date(pas); jS.setDate(jS.getDate()-3); 
-            const vS = new Date(pas); vS.setDate(vS.getDate()-2);
-            return [cL,cM,jS,vS].some(mov => mov.getFullYear() === y && mov.getMonth() === m && mov.getDate() === d);
-        }
 
         function calcularAntiguedadAnios(fechaIngresoStr, fechaReferenciaStr) {
             if (!fechaIngresoStr) return 1;
@@ -4243,6 +4251,12 @@ function esFeriadoNacional(fecha) {
     return [cL,cM,jS,vS].some(mov => mov.getFullYear() === y && mov.getMonth() === m && mov.getDate() === d);
 }
 
+        // Helper: fecha ISO en zona LOCAL (evita bugs de UTC)
+function fechaLocalISO(d) {
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
+
 // Devuelve array de días hábiles (Lun-Vie, no feriados) entre 2 fechas inclusivas
 function diasHabilesEnRango(desde, hasta) {
     const dias = [];
@@ -4259,12 +4273,14 @@ function diasHabilesEnRango(desde, hasta) {
 }
 
 async function aplicarAsistenciaANomina() {
+    // Feature flag check
+    if (!getFeatureFlag('nomina.dahua_asistencia')) {
+        return showToast('Módulo de asistencia biométrica desactivado', 'error');
+    }
+
     const fechaPagoStr = gId('nom-fecha-proceso')?.value;
     if (!fechaPagoStr) return showToast('Falta la fecha de pago en la nómina', 'error');
 
-    // El período es la quincena que termina en fecha_pago:
-    // - Si pago el 15 → período del 1 al 15
-    // - Si pago el 30/31 → período del 16 al último día
     const fechaPago = new Date(fechaPagoStr + 'T00:00:00');
     const dia = fechaPago.getDate();
     let inicioQuincena, finQuincena;
@@ -4277,12 +4293,12 @@ async function aplicarAsistenciaANomina() {
         finQuincena = new Date(fechaPago.getFullYear(), fechaPago.getMonth() + 1, 0);
     }
 
-    const isoIni = inicioQuincena.toISOString().split('T')[0];
-    const isoFin = finQuincena.toISOString().split('T')[0];
+    // ⚡ Usar helper de fecha local (evita bugs UTC)
+    const isoIni = fechaLocalISO(inicioQuincena);
+    const isoFin = fechaLocalISO(finQuincena);
 
     showToast(`Leyendo asistencia del ${isoIni} al ${isoFin}...`);
 
-    // 1) Traer registros de asistencia del período
     const { data: asistencia, error } = await supabaseClient
         .from('asistencia_registros')
         .select('device_user_id, fecha_hora, tipo')
@@ -4294,7 +4310,6 @@ async function aplicarAsistenciaANomina() {
         return showToast('Error al leer asistencia de Supabase', 'error');
     }
 
-    // 2) Agrupar por device_user_id → Set de días con marcaje
     const diasAsistidos = {};
     (asistencia || []).forEach(r => {
         if (!r.device_user_id || !r.fecha_hora) return;
@@ -4303,11 +4318,9 @@ async function aplicarAsistenciaANomina() {
         diasAsistidos[r.device_user_id].add(fechaDia);
     });
 
-    // 3) Calcular días hábiles totales del período
     const habilesPeriodo = diasHabilesEnRango(inicioQuincena, finQuincena);
     const totalHabiles = habilesPeriodo.length;
 
-    // 4) Para cada empleado activo, contar faltantes
     const emps = appState.empleados.filter(e => e.activo);
     let procesados = 0, sinID = 0;
 
@@ -4315,42 +4328,26 @@ async function aplicarAsistenciaANomina() {
         const inputDf = gId(`df-${e.id}`);
         if (!inputDf) continue;
 
-        if (!e.device_user_id) {
-            sinID++;
-            continue; // No tocamos empleados sin ID Dahua
-        }
+        if (!e.device_user_id) { sinID++; continue; }
 
-        const asistidosSet = diasAsistidos[String(e.device_user_id)] || new Set();
+        const asistidosSet = diasAsistidos[String(e.device_user_id).trim()] || new Set();
+        const fIngreso = e.fecha_ingreso ? new Date(e.fecha_ingreso + 'T00:00:00') : null;
         let faltantes = 0;
 
         for (const diaHabil of habilesPeriodo) {
-            const clave = diaHabil.toISOString().split('T')[0];
+            if (fIngreso && diaHabil < fIngreso) continue;
+            const clave = fechaLocalISO(diaHabil);
             if (!asistidosSet.has(clave)) faltantes++;
-        }
-
-        // Ajuste: si el empleado ingresó después del inicio de la quincena,
-        // solo contar desde su fecha de ingreso
-        if (e.fecha_ingreso) {
-            const fIng = new Date(e.fecha_ingreso + 'T00:00:00');
-            if (fIng > inicioQuincena) {
-                faltantes = 0;
-                for (const diaHabil of habilesPeriodo) {
-                    if (diaHabil < fIng) continue;
-                    const clave = diaHabil.toISOString().split('T')[0];
-                    if (!asistidosSet.has(clave)) faltantes++;
-                }
-            }
         }
 
         inputDf.value = faltantes;
         procesados++;
     }
 
-    // 5) Recalcular totales de la nómina
     recalcularTodaLaNomina();
     autoguardarBorradorNomina();
 
-    showToast(`Asistencia aplicada: ${procesados} empleados procesados (${totalHabiles} días hábiles en el período)${sinID > 0 ? `, ${sinID} sin ID Dahua` : ''}`);
+    showToast(`Asistencia aplicada: ${procesados} empleados (${totalHabiles} días hábiles)${sinID > 0 ? `, ${sinID} sin ID Dahua` : ''}`);
 }
 
         function verDetalleUtilidades(p, f) {
@@ -4561,7 +4558,13 @@ async function generarTokenYEnlaceARI() {
     const emp = empleadoARIGestion;
     if (!emp) return;
 
-    const token = crypto.randomUUID();
+    const token = (typeof crypto !== 'undefined' && crypto.randomUUID)
+    ? crypto.randomUUID()
+    : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
     const expiraEn = new Date(Date.now() + (72 * 60 * 60 * 1000)).toISOString(); // 72 horas
 
     const { error } = await supabaseClient
