@@ -2091,7 +2091,112 @@ emps.forEach(e => {
         }
 
         let nominaTotalesCache = {};
+async function procesarNominaGlobal() {
+    const f = gId('nom-fecha-proceso').value; 
+    const t = parseFloat(gId('nom-tasa-bcv').value) || 36.5; 
+    const sM = parseFloat(gId('nom-salario-minimo').value) || 130; 
+    const lun = parseInt(gId('nom-lunes').value) || 2;
+    if(!f) return showToast('Falta fecha de pago', 'error'); 
+    
+    const act = appState.empleados.filter(e => e.activo); 
+    if(!act.length) return;
+    
+    const regs = []; 
+    const empUpdates = [];
 
+    for (const e of act) {
+        const sb = Number(e.sueldo) || 0; 
+        const si = sb + (Number(e.bono_alimentacion) || 0) + (Number(e.otros_ingresos) || 0); 
+        const dia = si / 30; 
+        const base = dia * 15;
+        
+        const df = parseFloat(gId(`df-${e.id}`)?.value) || 0; 
+        const oa = parseFloat(gId(`oa-${e.id}`)?.value) || 0; 
+        const hd = parseFloat(gId(`hd-${e.id}`)?.value) || 0; 
+        const od = parseFloat(gId(`od-${e.id}`)?.value) || 0; 
+        const ad = parseFloat(gId(`ad-${e.id}`)?.value) || 0; 
+        const pr = parseFloat(gId(`pr-${e.id}`)?.value) || 0;
+
+        // Recargos LOTTT leídos desde la interfaz en vivo
+        const horaBase = (sb / 30) / 8;
+        const diaBase = sb / 30;
+        const hed = getFeatureFlag('nomina.recargos_lottt') ? parseFloat(gId(`hed-${e.id}`)?.value || 0) : 0;
+        const hnoct = getFeatureFlag('nomina.recargos_lottt') ? parseFloat(gId(`hnoct-${e.id}`)?.value || 0) : 0;
+        const fer = getFeatureFlag('nomina.recargos_lottt') ? parseFloat(gId(`fer-${e.id}`)?.value || 0) : 0;
+        const islrPct = getFeatureFlag('nomina.islr') ? parseFloat(gId(`islr-${e.id}`)?.value || 0) : 0;
+
+        const montoHED = horaBase * 1.5 * hed;
+        const montoNoct = horaBase * 0.30 * hnoct;
+        const montoFer = diaBase * 1.5 * fer;
+        const totalRecargosUSD = montoHED + montoNoct + montoFer;
+
+        // Deducciones de Ley
+        const sbBs = sb * t; 
+        const ivss = (Math.min(sbBs, 5 * sM) * 12 / 52) * 0.04 * lun; 
+        const rpe = (Math.min(sbBs, 10 * sM) * 12 / 52) * 0.005 * lun; 
+        const faov = (sbBs * 0.01) / 2; 
+        const leyU = (ivss + rpe + faov) / t; 
+
+        // Retención ISLR sobre Salario Normal (Excluyendo Cestaticket y Subsidio)
+        const baseImponibleISLR = Math.max(0, (diaBase * (15 - df)) + totalRecargosUSD);
+        const islrUSD = baseImponibleISLR * (islrPct / 100);
+
+        const totalAsigUSD = base - (dia * df) + totalRecargosUSD + oa;
+        const netoU = totalAsigUSD - ((dia / 8) * hd) - od - ad - pr - leyU - islrUSD;
+
+        if (pr > 0) {
+            const nuevoSaldo = Math.max(0, (Number(e.saldo_prestamo) || 0) - pr);
+            e.saldo_prestamo = nuevoSaldo;
+            empUpdates.push(supabaseClient.from('empleados').update({ saldo_prestamo: nuevoSaldo }).eq('id', e.id));
+        }
+
+        regs.push({ 
+            fecha_pago: f, 
+            empleado_id: e.id, 
+            empleado: e.nombre, 
+            cargo: e.cargos?.nombre || '-', 
+            tasa_bcv: t, 
+            salario_minimo_bs: sM, 
+            salario_base: sb, 
+            bono_alimentacion: Number(e.bono_alimentacion) || 0, 
+            otros_ingresos: Number(e.otros_ingresos) || 0, 
+            dias_faltantes: df, 
+            otras_asignaciones: oa, 
+            horas_descuento: hd, 
+            otros_descuentos: od, 
+            adelantos: ad, 
+            prestamos: pr, 
+            ivss_usd: ivss / t, 
+            rpe_usd: rpe / t, 
+            faov_usd: faov / t, 
+            descuentos_ley_usd: leyU + islrUSD, 
+            neto_usd: netoU, 
+            neto_bs: netoU * t, 
+            estado: 'Procesado',
+            detalle_calculo: {
+                hed, hnoct, fer, islrPct,
+                montoHED, montoNoct, montoFer, totalRecargosUSD,
+                islrUSD, islrBs: islrUSD * t
+            }
+        });
+    }
+
+    if (empUpdates.length > 0) await Promise.all(empUpdates);
+    await supabaseClient.from('nominas').insert(regs); 
+    await safeQuery(supabaseClient.from('prenomina_borrador').delete().eq('id', 1), 'clear_prenomina');
+    localStorage.removeItem('nomina_borrador_global');
+    
+    const [yStr, mStr, dStr] = f.split('-');
+    if (parseInt(dStr) >= 20) {
+        const mesClave = `${yStr}-${mStr}`;
+        const salariosFinMes = act.map(e => ({ empleado_id: e.id, mes: mesClave, sueldo_base: Number(e.sueldo) || 0, bono_alimentacion: Number(e.bono_alimentacion) || 0, subsidio: Number(e.otros_ingresos) || 0 }));
+        try { await supabaseClient.from('historico_salarios').upsert(salariosFinMes, { onConflict: 'empleado_id,mes' }); } catch(e) {}
+    }
+    
+    showToast('Nómina procesada definitivamente con éxito'); 
+    fetchAllData();
+}
+        
 function calcularNominaFila(id) {
     const e = appState.empleados.find(x => String(x.id) === String(id)); 
     if(!e) return {u:0, b:0};
