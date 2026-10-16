@@ -1756,7 +1756,7 @@ function renderEmpleados() {
             <td class="p-3.5 text-emerald-400">$${Number(e.bono_alimentacion).toFixed(2)}</td>
             <td class="p-3.5 text-sky-400" data-feature="empleados.subsidio">$${Number(e.otros_ingresos).toFixed(2)}</td>
             <td class="p-3.5 text-center font-mono text-xs ${e.device_user_id ? 'text-amber-400 font-bold' : 'text-slate-600'}" data-feature="empleados.dahua">${e.device_user_id || '—'}</td>
-            <td class="p-3.5 text-center min-w-[140px] space-x-1.5 whitespace-nowrap">
+            <td class="p-3.5 text-center min-w-[150px] space-x-1.5 whitespace-nowrap">
                 <button data-feature="empleados.ari" onclick="abrirModalGestionARI(${e.id})" class="text-amber-400 hover:text-amber-300 p-1.5 transition" title="Gestionar Formulario AR-I (I.S.L.R.)"><i class="fa-solid fa-receipt"></i></button>
                 <button data-feature="documentos.constancias" onclick="abrirModalDocumentoLaboral(${e.id})" class="text-teal-400 hover:text-teal-300 p-1.5 transition" title="Emitir Constancia o Amonestación"><i class="fa-solid fa-file-contract"></i></button>
                 <button onclick="editarEmpleado(${e.id})" class="text-sky-400 hover:text-sky-300 p-1.5 transition" title="Editar"><i class="fa-solid fa-pen"></i></button>
@@ -2140,14 +2140,14 @@ function calcularNominaFila(id) {
     const baseSalarialImponibleUSD = Math.max(0, (salarioBaseDia * (15 - df)) + totalRecargosUSD);
     const islrUSD = baseSalarialImponibleUSD * (islrPct / 100);
 
-    // Total Asignaciones en USD (Salario base quincenal neto de faltas + recargos + subsidio + otras asignaciones)
+    // TOTAL ASIGNACIONES DECLARADO (Resuelve el ReferenceError previo)
     const totalAsignacionesUSD = base - (dia * df) + totalRecargosUSD + oa;
 
-    // Salario Neto Definitivo
+    // Salario Neto
     const netoU = totalAsignacionesUSD - ((dia / 8) * hd) - od - ad - pr - leyU - islrUSD; 
     const netoB = netoU * t;
 
-    const elLey = gId(`ley-${id}`); 
+    const elLey = gId(`ley-${id}`);
     if(elLey) elLey.innerText = `Bs. ${(ivss + rpe + faov + (islrUSD * t)).toFixed(2)}`;
     
     const elNetoU = gId(`neto-usd-${id}`); 
@@ -4619,18 +4619,17 @@ function renderCuadroImpuestosMes() {
     const riesgoIvssPct = Number(appState.parametros?.riesgo_ivss || 9) / 100;
     const aplicaLPP = appState.parametros?.aplica_lpp !== false;
 
-    // Actualizar badges informativos
+    // Badges informativos
     const nombresRiesgo = { 9: '9% (Mínimo)', 10: '10% (Medio)', 11: '11% (Máximo)' };
     if (gId('lbl-riesgo-ivss-tag')) gId('lbl-riesgo-ivss-tag').innerText = nombresRiesgo[appState.parametros?.riesgo_ivss] || '9% (Mínimo)';
-    if (gId('lbl-lpp-tag')) gId('lbl-lpp-tag').innerText = aplicaLPP ? 'Activo (9% SENIAT)' : 'No configurado';
+    if (gId('lbl-lpp-tag')) gId('lbl-lpp-tag').innerText = aplicaLPP ? 'Activo (9% S. Base)' : 'No configurado';
 
-    // 1. Filtrar las nóminas procesadas que correspondan a este mes
+    // 1. Filtrar las nóminas procesadas del mes
     const nominasDelMes = (appState.nominas || []).filter(n => n.fecha_pago && n.fecha_pago.startsWith(mesClave));
 
     let tasaBCVMes = 36.50;
     let salarioMinimoBs = 130.00;
     let totalBaseSalarialBs = 0;
-    let totalSubsidiosBs = 0;
     let totalIvssRetenidoBs = 0;
     let totalRpeRetenidoBs = 0;
     let totalFaovRetenidoBs = 0;
@@ -4644,45 +4643,27 @@ function renderCuadroImpuestosMes() {
         
         cantTrabajadores.add(n.empleado_id);
 
+        // SOLO Salario Base devengado (excluye estrictamente cualquier bono o subsidio)
         const sbBs = (Number(n.salario_base || 0) / 2) * t;
-        const subBs = (Number(n.otros_ingresos || 0) / 2) * t;
-        
         totalBaseSalarialBs += sbBs;
-        totalSubsidiosBs += subBs;
 
         totalIvssRetenidoBs += (Number(n.ivss_usd || 0) * t);
         totalRpeRetenidoBs += (Number(n.rpe_usd || 0) * t);
         totalFaovRetenidoBs += (Number(n.faov_usd || 0) * t);
         
-        // Retenciones ISLR si existen en el registro
-        if (n.detalle_calculo?.islrUSD) {
-            totalIslrRetenidoBs += (Number(n.detalle_calculo.islrUSD) * t);
-        }
+        // Retención ISLR si existe en el detalle
+        const islrEnReg = n.detalle_calculo?.islrBs || (Number(n.detalle_calculo?.islrUSD || 0) * t);
+        totalIslrRetenidoBs += islrEnReg;
     });
 
-    // Cálculos patronales legales
-    // IVSS Patronal: Proporcional a la retención del 4% (Aporte = Retención / 0.04 * %riesgo)
+    // Cálculos patronales legales (Todos basados en salario base)
     const totalIvssPatronalBs = totalIvssRetenidoBs > 0 ? (totalIvssRetenidoBs / 0.04) * riesgoIvssPct : 0;
-    
-    // RPE Patronal (2% vs 0.5% retención = factor 4)
-    const totalRpePatronalBs = totalRpeRetenidoBs * 4;
+    const totalRpePatronalBs = totalRpeRetenidoBs * 4;       // 2% empresa vs 0.5% retención
+    const totalFaovPatronalBs = totalFaovRetenidoBs * 2;     // 2% empresa vs 1% retención
+    const totalIncesPatronalBs = totalBaseSalarialBs * 0.02; // 2% aporte patronal sobre salario base
 
-    // FAOV Patronal (2% patronal vs 1% retención = factor 2)
-    const totalFaovPatronalBs = totalFaovRetenidoBs * 2;
-
-    // INCES Patronal (2% mensual estimado sobre el total de sueldos)
-    const baseIncesBs = totalBaseSalarialBs;
-    const totalIncesPatronalBs = baseIncesBs * 0.02;
-
-    // LPP (Ley de Protección de Pensiones - 9% sobre Salario + Bonos/Subsidios)
-    // Con piso mínimo legal de 3 Salarios Mínimos por trabajador
-    let totalLppPatronalBs = 0;
-    if (aplicaLPP && cantTrabajadores.size > 0) {
-        const baseRealLPP = totalBaseSalarialBs + totalSubsidiosBs;
-        const baseMinimaLPP = cantTrabajadores.size * (salarioMinimoBs * 3);
-        const baseImponibleLPP = Math.max(baseRealLPP, baseMinimaLPP);
-        totalLppPatronalBs = baseImponibleLPP * 0.09;
-    }
+    // Ley de Protección de Pensiones LPP: 9% exclusivamente sobre Salario Base
+    const totalLppPatronalBs = aplicaLPP ? (totalBaseSalarialBs * 0.09) : 0;
 
     const obligaciones = [
         {
@@ -4712,15 +4693,15 @@ function renderCuadroImpuestosMes() {
         {
             concepto: 'I.N.C.E.S. Aporte Trimestral Patronal (2%)',
             ente: 'INCES Tributos',
-            baseBs: baseIncesBs,
+            baseBs: totalBaseSalarialBs,
             retencionBs: 0,
             aporteBs: totalIncesPatronalBs,
             totalBs: totalIncesPatronalBs
         },
         {
-            concepto: 'Ley de Protección de Pensiones LPP (9% Decreto 4.952)',
+            concepto: 'Ley de Protección de Pensiones LPP (9% s/Salario Base)',
             ente: 'SENIAT',
-            baseBs: totalBaseSalarialBs + totalSubsidiosBs,
+            baseBs: totalBaseSalarialBs,
             retencionBs: 0,
             aporteBs: totalLppPatronalBs,
             totalBs: totalLppPatronalBs
@@ -4765,7 +4746,7 @@ function renderCuadroImpuestosMes() {
     if (!tbody) return;
 
     if (nominasDelMes.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" class="p-6 text-center text-slate-500">No hay nóminas definitivas procesadas en el período ${mesClave}.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" class="p-6 text-center text-slate-500">No hay nóminas procesadas en ${mesClave}.</td></tr>`;
         gId('tabla-impuestos-foot').innerHTML = '';
         return;
     }
@@ -4784,7 +4765,7 @@ function renderCuadroImpuestosMes() {
 
     gId('tabla-impuestos-foot').innerHTML = `
         <tr>
-            <td colspan="3" class="p-3 text-right uppercase text-slate-300 font-bold">TOTALES CONSOLIDADOS DEL MES:</td>
+            <td colspan="3" class="p-3 text-right uppercase text-slate-300 font-bold">TOTALES CONSOLIDADOS (BASE SALARIAL PURA):</td>
             <td class="p-3 text-right font-mono text-amber-400 font-bold">Bs. ${fNum(sumRet)}</td>
             <td class="p-3 text-right font-mono text-rose-400 font-bold">Bs. ${fNum(sumApo)}</td>
             <td class="p-3 text-right font-mono text-emerald-400 text-sm font-black">Bs. ${fNum(sumTot)}</td>
@@ -4792,7 +4773,6 @@ function renderCuadroImpuestosMes() {
         </tr>
     `;
 }
-
 function imprimirReporteFiscalMensual() {
     const d = datosImpuestosMesActual;
     if (!d || !d.obligaciones || d.obligaciones.length === 0) {
