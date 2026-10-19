@@ -2728,88 +2728,126 @@ function enviarWhatsAppRecibo(id, f) {
             gId('vac-dias-pendientes').value = Math.max(0, dL - o);
         }
 
-        function calcularVacaciones() {
-            const id = gId('vac-emp-select').value; 
-            const per = gId('vac-periodo').value; 
-            const ini = gId('vac-fecha-inicio').value; 
-            const otor = parseFloat(gId('vac-dias-otorgados').value) || 0; 
-            const pend = parseFloat(gId('vac-dias-pendientes').value);
-            if(!id) return showToast('Seleccione un empleado', 'error');
-            if(!ini) return showToast('Indique la fecha de inicio', 'error');
-            if(!per) return showToast('Indique el período vacacional', 'error');
-            if(isNaN(pend) || pend < 0) return showToast('Días pendientes inválidos', 'error');
-            const e = appState.empleados.find(x => String(x.id) === String(id)); 
-            if(!e) return showToast('Empleado no encontrado', 'error');
-            const t = parseFloat(gId('nom-tasa-bcv').value) || 36.5; 
-            const sD = (Number(e.sueldo) || 0) / 30; 
-            const bD = (Number(e.bono_alimentacion) || 0) / 30; 
-            const subD = (Number(e.otros_ingresos) || 0) / 30;
-            const a = e.fecha_ingreso ? calcularAntiguedadAnios(e.fecha_ingreso, ini) : 1;
-            const dHabL = Math.min(30, 15 + Math.max(0, a - 1)); 
-            const dBonoL = Math.min(30, 16 + Math.max(0, a - 1));
-            let curr = new Date(ini + "T00:00:00"); 
-            let hab = 0, fs = 0;
-            while(hab < pend) { 
-                const dw = curr.getDay(); 
-                if(dw === 0 || dw === 6 || esFeriadoNacional(curr)) fs++; 
-                else hab++; 
-                if(hab < pend) curr.setDate(curr.getDate() + 1); 
-            }
-            let re = new Date(curr); 
-            re.setDate(re.getDate() + 1); 
-            while(re.getDay() === 0 || re.getDay() === 6 || esFeriadoNacional(re)) { re.setDate(re.getDate() + 1); }
-            const fReinc = `${String(re.getDate()).padStart(2,'0')}/${String(re.getMonth()+1).padStart(2,'0')}/${re.getFullYear()}`;
-            const tCont = pend + fs;
-            const mDLey = sD * dHabL; 
-            const mFsLey = sD * fs; 
-            const mBLey = sD * dBonoL; 
-            const mAlim = bD * tCont; 
-            const dedLey = sD * otor * 2; 
-            const tLey = Math.max(0, mDLey + mFsLey + mBLey + mAlim - dedLey);
-            const mDSub = subD * dHabL; 
-            const mFsSub = subD * fs; 
-            const mBSub = subD * dBonoL; 
-            const dedSub = subD * otor * 2; 
-            const tSub = Math.max(0, mDSub + mFsSub + mBSub - dedSub);
-            appState.calculoVacacionesActual = { 
-                empleado: e, periodo: per, fechaInicio: ini, fechaReincorporacion: fReinc, diasOtorgados: otor, 
-                diasHabilesLegales: dHabL, diasHabilesPendientes: pend, finesDeSemanaYFeriados: fs, totalDiasContinuos: tCont, 
-                diasBonoLegales: dBonoL, diasBonoAPagar: Math.max(0, dBonoL - otor), aniosAntiguedad: a, 
-                salarioDiarioBase: sD, bonoAlimDiario: bD, subsidioDiario: subD, 
-                montoDisfruteBrutoUSD: mDLey, montoDescansosUSD: mFsLey, montoBonoVacBrutoUSD: mBLey, montoBonoAlimUSD: mAlim, 
-                totalDeduccionesOtorgadosUSD: dedLey, totalNetoLeyUSD: tLey, totalNetoLeyBs: tLey * t, 
-                totalNetoSubsidioUSD: tSub, totalNetoSubsidioBs: tSub * t, 
-                granTotalUSD: tLey + tSub, granTotalBs: (tLey + tSub) * t, tasaBCV: t 
-            };
-            renderResultadoVacaciones(appState.calculoVacacionesActual);
-        }
+  function calcularVacaciones() {
+    const id = gId('vac-emp-select').value; 
+    const per = gId('vac-periodo').value; 
+    const ini = gId('vac-fecha-inicio').value; 
+    const otor = parseFloat(gId('vac-dias-otorgados').value) || 0; 
+    const pend = parseFloat(gId('vac-dias-pendientes').value);
 
-        function renderResultadoVacaciones(v) {
-            gId('res-vac-emp-nombre').innerText = v.empleado.nombre; 
-            gId('res-vac-cedula').innerText = v.empleado.cedula; 
-            gId('res-vac-cargo').innerText = v.empleado.cargos?.nombre || '-'; 
-            gId('res-vac-ingreso').innerText = v.empleado.fecha_ingreso || '-'; 
-            gId('res-vac-antiguedad').innerText = `${v.aniosAntiguedad} año(s)`; 
-            gId('res-vac-periodo').innerText = v.periodo; 
-            gId('res-vac-reincorporacion').innerText = v.fechaReincorporacion;
-            gId('lbl-salario-diario-base').innerText = `$${v.salarioDiarioBase.toFixed(2)}/día (Bs. ${fNum(v.salarioDiarioBase * v.tasaBCV)}/día)`; 
-            gId('lbl-tasa-bcv-vac').innerText = `${v.tasaBCV.toFixed(2)} Bs/$`;
-            gId('tabla-vacaciones-body').innerHTML = `
-                <tr class="hover:bg-slate-900/50"><td class="p-3 font-semibold text-white"><div>Días de Vacaciones / Disfrute Legal (Art. 190 LOTTT)</div><span class="text-[10px] text-slate-400">Derecho total según antigüedad sin deducción previa</span></td><td class="p-3 text-center font-bold text-teal-400">${v.diasHabilesLegales} d</td><td class="p-3 text-slate-300 font-mono">$${v.salarioDiarioBase.toFixed(2)}</td><td class="p-3 font-bold text-sky-400 font-mono">$${v.montoDisfruteBrutoUSD.toFixed(2)}</td><td class="p-3 font-bold text-slate-200 font-mono">Bs. ${fNum(v.montoDisfruteBrutoUSD * v.tasaBCV)}</td></tr>
-                <tr class="hover:bg-slate-900/50"><td class="p-3 font-semibold text-white"><div>Fines de Semana y Feriados comprendidos</div><span class="text-[10px] text-slate-400">Descansos remunerados durante el período de disfrute</span></td><td class="p-3 text-center font-bold text-teal-400">${v.finesDeSemanaYFeriados} d</td><td class="p-3 text-slate-300 font-mono">$${v.salarioDiarioBase.toFixed(2)}</td><td class="p-3 font-bold text-sky-400 font-mono">$${v.montoDescansosUSD.toFixed(2)}</td><td class="p-3 font-bold text-slate-200 font-mono">Bs. ${fNum(v.montoDescansosUSD * v.tasaBCV)}</td></tr>
-                <tr class="hover:bg-slate-900/50"><td class="p-3 font-semibold text-white"><div>Bono Vacacional Legal (Art. 192 LOTTT)</div><span class="text-[10px] text-slate-400">Bonificación legal completa (16 días base + 1 día adicional por año)</span></td><td class="p-3 text-center font-bold text-teal-400">${v.diasBonoLegales} d</td><td class="p-3 text-slate-300 font-mono">$${v.salarioDiarioBase.toFixed(2)}</td><td class="p-3 font-bold text-sky-400 font-mono">$${v.montoBonoVacBrutoUSD.toFixed(2)}</td><td class="p-3 font-bold text-slate-200 font-mono">Bs. ${fNum(v.montoBonoVacBrutoUSD * v.tasaBCV)}</td></tr>
-                <tr class="hover:bg-slate-900/50"><td class="p-3 font-semibold text-white"><div>Bono de Alimentación (Cestaticket período completo)</div><span class="text-[10px] text-slate-400">Días continuos de ausencia (${v.totalDiasContinuos} días)</span></td><td class="p-3 text-center font-bold text-teal-400">${v.totalDiasContinuos} d</td><td class="p-3 text-slate-300 font-mono">$${v.bonoAlimDiario.toFixed(2)}</td><td class="p-3 font-bold text-emerald-400 font-mono">$${v.montoBonoAlimUSD.toFixed(2)}</td><td class="p-3 font-bold text-slate-200 font-mono">Bs. ${fNum(v.montoBonoAlimUSD * v.tasaBCV)}</td></tr>
-                ${v.diasOtorgados > 0 ? `<tr class="bg-rose-950/20 text-rose-300 font-medium"><td class="p-3"><div class="font-bold flex items-center"><i class="fa-solid fa-minus-circle mr-1.5 text-rose-400"></i> (-) Días Previamente Otorgados / Anticipados</div><span class="text-[10px] text-rose-400/80">Descuento de disfrute y bono ya cobrados</span></td><td class="p-3 text-center font-bold text-rose-400">-${v.diasOtorgados * 2} d</td><td class="p-3 font-mono text-slate-300">$${v.salarioDiarioBase.toFixed(2)}</td><td class="p-3 font-bold text-rose-400 font-mono">-$${v.totalDeduccionesOtorgadosUSD.toFixed(2)}</td><td class="p-3 font-bold text-rose-400 font-mono">-Bs. ${fNum(v.totalDeduccionesOtorgadosUSD * v.tasaBCV)}</td></tr>` : ''}
-            `;
-            gId('tabla-vacaciones-foot').innerHTML = `<tr><td colspan="3" class="p-3 text-right uppercase tracking-wider font-extrabold text-xs">Total Neto Legal LOTTT:</td><td class="p-3 font-extrabold text-emerald-400 text-sm font-mono">$${v.totalNetoLeyUSD.toFixed(2)}</td><td class="p-3 font-extrabold text-emerald-400 text-sm font-mono">Bs. ${fNum(v.totalNetoLeyBs)}</td></tr>`;
-            gId('res-subsidio-total-usd').innerText = `$${v.totalNetoSubsidioUSD.toFixed(2)}`; 
-            gId('res-subsidio-total-bs').innerText = `Bs. ${fNum(v.totalNetoSubsidioBs)}`;
-            gId('res-gran-total-usd').innerText = `$${v.granTotalUSD.toFixed(2)}`; 
-            gId('res-gran-total-bs').innerText = `Bs. ${fNum(v.granTotalBs)}`;
-            gId('vac-resultado-container').classList.remove('hidden'); 
-            showToast('Vacaciones calculadas exitosamente');
-        }
+    if(!id) return showToast('Seleccione un empleado', 'error');
+    if(!ini) return showToast('Indique la fecha de inicio', 'error');
+    if(!per) return showToast('Indique el período vacacional', 'error');
+    if(isNaN(pend) || pend < 0) return showToast('Días pendientes inválidos', 'error');
 
+    const e = appState.empleados.find(x => String(x.id) === String(id)); 
+    if(!e) return showToast('Empleado no encontrado', 'error');
+
+    const t = parseFloat(gId('nom-tasa-bcv').value) || 36.5; 
+    const sD = (Number(e.sueldo) || 0) / 30; 
+    const bD = (Number(e.bono_alimentacion) || 0) / 30; 
+    const subD = (Number(e.otros_ingresos) || 0) / 30;
+
+    const a = e.fecha_ingreso ? calcularAntiguedadAnios(e.fecha_ingreso, ini) : 1;
+    const dHabL = Math.min(30, 15 + Math.max(0, a - 1)); 
+    const dBonoL = Math.min(30, 16 + Math.max(0, a - 1));
+
+    let curr = new Date(ini + "T00:00:00"); 
+    let hab = 0, fs = 0;
+    while(hab < pend) { 
+        const dw = curr.getDay(); 
+        if(dw === 0 || dw === 6 || esFeriadoNacional(curr)) fs++; 
+        else hab++; 
+        if(hab < pend) curr.setDate(curr.getDate() + 1); 
+    }
+
+    let re = new Date(curr); 
+    re.setDate(re.getDate() + 1); 
+    while(re.getDay() === 0 || re.getDay() === 6 || esFeriadoNacional(re)) { 
+        re.setDate(re.getDate() + 1); 
+    }
+
+    const fReinc = `${String(re.getDate()).padStart(2,'0')}/${String(re.getMonth()+1).padStart(2,'0')}/${re.getFullYear()}`;
+    const tCont = pend + fs;
+
+    // Cálculo puro basado estrictamente en los días que se van a disfrutar (pend)
+    const mDLey = sD * pend; 
+    const mFsLey = sD * fs; 
+    const mBLey = sD * dBonoL; 
+    const mAlim = bD * tCont; 
+    
+    const tLey = Math.max(0, mDLey + mFsLey + mBLey + mAlim);
+
+    const mDSub = subD * pend; 
+    const mFsSub = subD * fs; 
+    const mBSub = subD * dBonoL; 
+    const tSub = Math.max(0, mDSub + mFsSub + mBSub);
+
+    appState.calculoVacacionesActual = { 
+        empleado: e, 
+        periodo: per, 
+        fechaInicio: ini, 
+        fechaReincorporacion: fReinc, 
+        diasOtorgadosPrevios: otor, 
+        diasHabilesLegales: dHabL, 
+        diasHabilesDisfrute: pend, 
+        finesDeSemanaYFeriados: fs, 
+        totalDiasContinuos: tCont, 
+        diasBonoLegales: dBonoL, 
+        aniosAntiguedad: a, 
+        salarioDiarioBase: sD, 
+        bonoAlimDiario: bD, 
+        subsidioDiario: subD, 
+        montoDisfruteBrutoUSD: mDLey, 
+        montoDescansosUSD: mFsLey, 
+        montoBonoVacBrutoUSD: mBLey, 
+        montoBonoAlimUSD: mAlim, 
+        totalNetoLeyUSD: tLey, 
+        totalNetoLeyBs: tLey * t, 
+        totalNetoSubsidioUSD: tSub, 
+        totalNetoSubsidioBs: tSub * t, 
+        granTotalUSD: tLey + tSub, 
+        granTotalBs: (tLey + tSub) * t, 
+        tasaBCV: t 
+    };
+
+    renderResultadoVacaciones(appState.calculoVacacionesActual);
+}
+
+ function renderResultadoVacaciones(v) {
+    const [iy, im, id] = (v.empleado.fecha_ingreso || '').split('-');
+    const fechaIngresoFmt = (iy && im && id) ? `${id}/${im}/${iy}` : (v.empleado.fecha_ingreso || '-');
+
+    const [fiY, fiM, fiD] = (v.fechaInicio || '').split('-');
+    const fechaInicioFmt = (fiY && fiM && fiD) ? `${fiD}/${fiM}/${fiY}` : (v.fechaInicio || '-');
+
+    gId('res-vac-emp-nombre').innerText = v.empleado.nombre; 
+    gId('res-vac-cedula').innerText = v.empleado.cedula; 
+    gId('res-vac-cargo').innerText = v.empleado.cargos?.nombre || '-'; 
+    gId('res-vac-ingreso').innerText = fechaIngresoFmt; 
+    gId('res-vac-antiguedad').innerText = `${v.aniosAntiguedad} año(s)`; 
+    gId('res-vac-periodo').innerText = v.periodo; 
+    gId('res-vac-reincorporacion').innerText = v.fechaReincorporacion;
+
+    gId('lbl-salario-diario-base').innerText = `$${v.salarioDiarioBase.toFixed(2)}/día (Bs. ${fNum(v.salarioDiarioBase * v.tasaBCV)}/día)`; 
+    gId('lbl-tasa-bcv-vac').innerText = `${v.tasaBCV.toFixed(2)} Bs/$`;
+
+    gId('tabla-vacaciones-body').innerHTML = `
+        <tr class="hover:bg-slate-900/50"><td class="p-3 font-semibold text-white"><div>Días de Vacaciones / Disfrute Hábiles</div><span class="text-[10px] text-slate-400">Días a disfrutar en este período</span></td><td class="p-3 text-center font-bold text-teal-400">${v.diasHabilesDisfrute} d</td><td class="p-3 text-slate-300 font-mono">$${v.salarioDiarioBase.toFixed(2)}</td><td class="p-3 font-bold text-sky-400 font-mono">$${v.montoDisfruteBrutoUSD.toFixed(2)}</td><td class="p-3 font-bold text-slate-200 font-mono">Bs. ${fNum(v.montoDisfruteBrutoUSD * v.tasaBCV)}</td></tr>
+        <tr class="hover:bg-slate-900/50"><td class="p-3 font-semibold text-white"><div>Fines de Semana y Feriados comprendidos</div><span class="text-[10px] text-slate-400">Descansos remunerados durante el período de disfrute</span></td><td class="p-3 text-center font-bold text-teal-400">${v.finesDeSemanaYFeriados} d</td><td class="p-3 text-slate-300 font-mono">$${v.salarioDiarioBase.toFixed(2)}</td><td class="p-3 font-bold text-sky-400 font-mono">$${v.montoDescansosUSD.toFixed(2)}</td><td class="p-3 font-bold text-slate-200 font-mono">Bs. ${fNum(v.montoDescansosUSD * v.tasaBCV)}</td></tr>
+        <tr class="hover:bg-slate-900/50"><td class="p-3 font-semibold text-white"><div>Bono Vacacional Legal (Art. 192 LOTTT)</div><span class="text-[10px] text-slate-400">Bonificación legal completa (${v.diasBonoLegales} días)</span></td><td class="p-3 text-center font-bold text-teal-400">${v.diasBonoLegales} d</td><td class="p-3 text-slate-300 font-mono">$${v.salarioDiarioBase.toFixed(2)}</td><td class="p-3 font-bold text-sky-400 font-mono">$${v.montoBonoVacBrutoUSD.toFixed(2)}</td><td class="p-3 font-bold text-slate-200 font-mono">Bs. ${fNum(v.montoBonoVacBrutoUSD * v.tasaBCV)}</td></tr>
+        <tr class="hover:bg-slate-900/50"><td class="p-3 font-semibold text-white"><div>Bono de Alimentación (Cestaticket período completo)</div><span class="text-[10px] text-slate-400">Días continuos de ausencia (${v.totalDiasContinuos} días)</span></td><td class="p-3 text-center font-bold text-teal-400">${v.totalDiasContinuos} d</td><td class="p-3 text-slate-300 font-mono">$${v.bonoAlimDiario.toFixed(2)}</td><td class="p-3 font-bold text-emerald-400 font-mono">$${v.montoBonoAlimUSD.toFixed(2)}</td><td class="p-3 font-bold text-slate-200 font-mono">Bs. ${fNum(v.montoBonoAlimUSD * v.tasaBCV)}</td></tr>
+    `;
+
+    gId('tabla-vacaciones-foot').innerHTML = `<tr><td colspan="3" class="p-3 text-right uppercase tracking-wider font-extrabold text-xs">Total Neto Legal LOTTT:</td><td class="p-3 font-extrabold text-emerald-400 text-sm font-mono">$${v.totalNetoLeyUSD.toFixed(2)}</td><td class="p-3 font-extrabold text-emerald-400 text-sm font-mono">Bs. ${fNum(v.totalNetoLeyBs)}</td></tr>`;
+    gId('res-subsidio-total-usd').innerText = `$${v.totalNetoSubsidioUSD.toFixed(2)}`; 
+    gId('res-subsidio-total-bs').innerText = `Bs. ${fNum(v.totalNetoSubsidioBs)}`;
+    gId('res-gran-total-usd').innerText = `$${v.granTotalUSD.toFixed(2)}`; 
+    gId('res-gran-total-bs').innerText = `Bs. ${fNum(v.granTotalBs)}`;
+    
+    gId('vac-resultado-container').classList.remove('hidden'); 
+    showToast('Vacaciones calculadas exitosamente');
+}
         async function guardarVacaciones() {
             const v = appState.calculoVacacionesActual; 
             if(!v) return;
@@ -2879,46 +2917,57 @@ function enviarWhatsAppRecibo(id, f) {
             openModal('modal-recibos-nomina');
         }
         
-        function generarHTMLReciboVacacionImpresion(v) {
-            const emp = v.empleado;
-            return `<div class="recibo-vacaciones-print bg-white text-black p-4 font-sans max-w-4xl mx-auto border-2 border-black my-2 text-[10px]">
-                <div class="flex justify-between items-start mb-2 pb-1 border-b-2 border-black"><div><h2 class="text-xl font-black tracking-widest text-black uppercase">${appState.parametros.nombre_empresa.split('/')[0].trim()}</h2></div><div class="text-right"><h3 class="text-xs font-extrabold text-black uppercase">${appState.parametros.nombre_empresa}</h3><p class="text-[9px] text-slate-800 font-semibold">${appState.parametros.rif_empresa}</p></div></div>
-                <div class="bg-[#dbece0] text-center font-bold text-[10px] py-1 border border-black mb-2 uppercase tracking-wider text-black">LIQUIDACIÓN DE VACACIONES (${v.periodo})</div>
-                <table class="w-full text-[9.5px] border border-black mb-2 font-semibold">
-                    <tr><td class="bg-slate-100 px-1.5 py-0.5 border-r border-b border-black w-32 font-bold text-black">TRABAJADOR</td><td class="px-1.5 py-0.5 border-r border-b border-black font-bold uppercase text-black">${emp.nombre}</td><td class="bg-slate-100 px-1.5 py-0.5 border-r border-b border-black w-24 font-bold text-black">CÉDULA</td><td class="px-1.5 py-0.5 border-b border-black text-black">${emp.cedula||'-'}</td></tr>
-                    <tr><td class="bg-slate-100 px-1.5 py-0.5 border-r border-b border-black font-bold text-black">CARGO</td><td class="px-1.5 py-0.5 border-r border-b border-black uppercase text-black">${emp.cargos?.nombre||'-'}</td><td class="bg-slate-100 px-1.5 py-0.5 border-r border-b border-black font-bold text-black">DEPARTAMENTO</td><td class="px-1.5 py-0.5 border-b border-black uppercase text-black">${emp.departamentos?.nombre||'-'}</td></tr>
-                    <tr><td class="bg-slate-100 px-1.5 py-0.5 border-r border-b border-black font-bold text-black">FECHA INGRESO</td><td class="px-1.5 py-0.5 border-r border-b border-black text-black">${emp.fecha_ingreso||'-'}</td><td class="bg-slate-100 px-1.5 py-0.5 border-r border-b border-black font-bold text-black">ANTIGÜEDAD</td><td class="px-1.5 py-0.5 border-b border-black font-bold text-black">${v.aniosAntiguedad} año(s)</td></tr>
-                    <tr><td class="bg-slate-100 px-1.5 py-0.5 border-r border-black font-bold text-black">FECHA INICIO</td><td class="px-1.5 py-0.5 border-r border-black font-bold text-black">${v.fechaInicio}</td><td class="bg-slate-100 px-1.5 py-0.5 border-r border-black font-bold text-black">REINCORPORACIÓN</td><td class="px-1.5 py-0.5 font-bold text-black">${v.fechaReincorporacion}</td></tr>
-                </table>
-                <div class="font-bold text-[9px] uppercase text-black mb-0.5">1. Liquidación Legal LOTTT (Salario Base + Cestaticket) | Tasa BCV: ${v.tasaBCV.toFixed(2)} Bs/$</div>
-                <table class="w-full text-[9px] border border-black mb-2">
-                    <thead><tr class="bg-[#dbece0] font-bold border-b border-black text-black"><th class="px-1.5 py-0.5 text-left border-r border-black text-black">CONCEPTO LEGAL</th><th class="px-1.5 py-0.5 text-center border-r border-black w-14 text-black">DÍAS</th><th class="px-1.5 py-0.5 text-right border-r border-black w-24 text-black">MONTO ($)</th><th class="px-1.5 py-0.5 text-right w-32 text-black">MONTO (BS)</th></tr></thead>
-                    <tbody class="divide-y divide-slate-300">
-                        <tr><td class="px-1.5 py-0.5 text-black">Vacaciones Hábiles</td><td class="px-1.5 py-0.5 text-center font-mono text-black">${v.diasHabilesLegales} d</td><td class="px-1.5 py-0.5 text-right font-mono text-black">$${v.montoDisfruteBrutoUSD.toFixed(2)}</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(v.montoDisfruteBrutoUSD*v.tasaBCV)}</td></tr>
-                        <tr><td class="px-1.5 py-0.5 text-black">Fines Semana y Feriados</td><td class="px-1.5 py-0.5 text-center font-mono text-black">${v.finesDeSemanaYFeriados} d</td><td class="px-1.5 py-0.5 text-right font-mono text-black">$${v.montoDescansosUSD.toFixed(2)}</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(v.montoDescansosUSD*v.tasaBCV)}</td></tr>
-                        <tr><td class="px-1.5 py-0.5 text-black">Bono Vacacional</td><td class="px-1.5 py-0.5 text-center font-mono text-black">${v.diasBonoLegales} d</td><td class="px-1.5 py-0.5 text-right font-mono text-black">$${v.montoBonoVacBrutoUSD.toFixed(2)}</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(v.montoBonoVacBrutoUSD*v.tasaBCV)}</td></tr>
-                        <tr><td class="px-1.5 py-0.5 text-black">Bono de Alimentación</td><td class="px-1.5 py-0.5 text-center font-mono text-black">${v.totalDiasContinuos} d</td><td class="px-1.5 py-0.5 text-right font-mono text-black">$${v.montoBonoAlimUSD.toFixed(2)}</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(v.montoBonoAlimUSD*v.tasaBCV)}</td></tr>
-                        ${v.diasOtorgados>0?`<tr class="font-bold bg-slate-100 text-black"><td class="px-1.5 py-0.5">(-) Días Otorgados</td><td class="px-1.5 py-0.5 text-center font-mono">-${v.diasOtorgados*2} d</td><td class="px-1.5 py-0.5 text-right font-mono">-$${v.totalDeduccionesOtorgadosUSD.toFixed(2)}</td><td class="px-1.5 py-0.5 text-right font-mono">-${fNum(v.totalDeduccionesOtorgadosUSD*v.tasaBCV)}</td></tr>`:''}
-                    </tbody>
-                    <tfoot><tr class="font-bold border-t border-black bg-slate-50 text-black"><td class="px-1.5 py-0.5" colspan="2">TOTAL NETO LEGAL LOTTT</td><td class="px-1.5 py-0.5 text-right font-mono text-black">$${v.totalNetoLeyUSD.toFixed(2)}</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(v.totalNetoLeyBs)} Bs</td></tr></tfoot>
-                </table>
-                <div class="bg-slate-50 border border-black p-2 mb-2 flex justify-between items-center text-[9px] text-black">
-                    <div><span class="font-bold uppercase text-black">2. Subsidio Especial No Obligatorio</span><span class="text-[8px] text-slate-700 block">Asignación voluntaria complementaria otorgada por la empresa</span></div>
-                    <div class="text-right"><span class="text-[8px] uppercase font-bold text-slate-700 block">Total Subsidio Especial a Pagar:</span><span class="font-mono font-bold text-black text-[9.5px]">$${v.totalNetoSubsidioUSD.toFixed(2)} / ${fNum(v.totalNetoSubsidioBs)} Bs</span></div>
-                </div>
-                <div class="flex justify-between items-center bg-[#dbece0] border-2 border-black p-1.5 font-bold text-[10px] mb-2 text-black">
-                    <span class="uppercase font-black">GRAN TOTAL A COBRAR (LEY + SUBSIDIO):</span>
-                    <span class="font-mono text-xs font-black text-black">$${v.granTotalUSD.toFixed(2)} / ${fNum(v.granTotalBs)} Bs</span>
-                </div>
-               <div class="border border-black p-1.5 mb-2 text-[8.5px] text-black leading-tight bg-slate-50"><strong>OBSERVACIONES:</strong> El subsidio no posee naturaleza salarial, ya que no desprende de la intención retributiva del trabajo prestado sino un beneficio eminentemente social para cubrir parte de sus gastos por bienes y/o servicios básicos en que incurre el trabajador. Por tal motivo se otorga como una ayuda al trabajador sin que sea de carácter obligatorio en futuras ocasiones.</div>
-                <div class="border-t border-black pt-2 mt-2"><h4 class="text-center font-extrabold text-[9px] tracking-wider mb-4 text-black">RECIBO CONFORME DE VACACIONES</h4>
-                    <div class="grid grid-cols-2 gap-8 text-[9.5px] font-semibold text-black">
-                        <div class="flex items-end"><span class="mr-2">FIRMA PATRONO:</span><span class="border-b border-black flex-1"></span></div>
-                        <div class="flex items-end"><span class="mr-2">FIRMA TRABAJADOR:</span><span class="border-b border-black flex-1"></span></div>
-                    </div>
-                </div>
-            </div>`;
-        }
+function generarHTMLReciboVacacionImpresion(v) {
+    const emp = v.empleado;
+    const [iy, im, id] = (emp.fecha_ingreso || '').split('-');
+    const fechaIngresoFmt = (iy && im && id) ? `${id}/${im}/${iy}` : (emp.fecha_ingreso || '-');
+
+    const [fiY, fiM, fiD] = (v.fechaInicio || '').split('-');
+    const fechaInicioFmt = (fiY && fiM && fiD) ? `${fiD}/${fiM}/${fiY}` : (v.fechaInicio || '-');
+
+    return `<div class="recibo-vacaciones-print bg-white text-black p-4 font-sans max-w-4xl mx-auto border-2 border-black my-2 text-[10px]">
+        <div class="flex justify-between items-start mb-2 pb-1 border-b-2 border-black"><div><h2 class="text-xl font-black tracking-widest text-black uppercase">${appState.parametros.nombre_empresa.split('/')[0].trim()}</h2></div><div class="text-right"><h3 class="text-xs font-extrabold text-black uppercase">${appState.parametros.nombre_empresa}</h3><p class="text-[9px] text-slate-800 font-semibold">${appState.parametros.rif_empresa}</p></div></div>
+        <div class="bg-[#dbece0] text-center font-bold text-[10px] py-1 border border-black mb-2 uppercase tracking-wider text-black">LIQUIDACIÓN DE VACACIONES (${v.periodo})</div>
+        <table class="w-full text-[9.5px] border border-black mb-2 font-semibold">
+            <tr><td class="bg-slate-100 px-1.5 py-0.5 border-r border-b border-black w-32 font-bold text-black">TRABAJADOR</td><td class="px-1.5 py-0.5 border-r border-b border-black font-bold uppercase text-black">${emp.nombre}</td><td class="bg-slate-100 px-1.5 py-0.5 border-r border-b border-black w-24 font-bold text-black">CÉDULA</td><td class="px-1.5 py-0.5 border-b border-black text-black">${emp.cedula||'-'}</td></tr>
+            <tr><td class="bg-slate-100 px-1.5 py-0.5 border-r border-b border-black font-bold text-black">CARGO</td><td class="px-1.5 py-0.5 border-r border-b border-black uppercase text-black">${emp.cargos?.nombre||'-'}</td><td class="bg-slate-100 px-1.5 py-0.5 border-r border-b border-black font-bold text-black">DEPARTAMENTO</td><td class="px-1.5 py-0.5 border-b border-black uppercase text-black">${emp.departamentos?.nombre||'-'}</td></tr>
+            <tr><td class="bg-slate-100 px-1.5 py-0.5 border-r border-b border-black font-bold text-black">FECHA INGRESO</td><td class="px-1.5 py-0.5 border-r border-b border-black text-black">${fechaIngresoFmt}</td><td class="bg-slate-100 px-1.5 py-0.5 border-r border-b border-black font-bold text-black">ANTIGÜEDAD</td><td class="px-1.5 py-0.5 border-b border-black font-bold text-black">${v.aniosAntiguedad} año(s)</td></tr>
+            <tr><td class="bg-slate-100 px-1.5 py-0.5 border-r border-black font-bold text-black">FECHA INICIO</td><td class="px-1.5 py-0.5 border-r border-black font-bold text-black">${fechaInicioFmt}</td><td class="bg-slate-100 px-1.5 py-0.5 border-r border-b border-black font-bold text-black">REINCORPORACIÓN</td><td class="px-1.5 py-0.5 font-bold text-black">${v.fechaReincorporacion}</td></tr>
+        </table>
+        
+        ${v.diasOtorgadosPrevios > 0 ? `
+        <div class="bg-slate-50 border border-black p-1.5 mb-2 text-[9px] text-black">
+            <strong>NOTA INFORMATIVA DE CONTROL:</strong> Consta en el expediente del trabajador que se le han otorgado <strong>${v.diasOtorgadosPrevios} días</strong> previamente dentro de este mismo período vacacional. (Dichos días no alteran ni descuentan el cálculo económico del presente disfrute).
+        </div>` : ''}
+
+        <div class="font-bold text-[9px] uppercase text-black mb-0.5">1. Liquidación Legal LOTTT (Salario Base + Cestaticket) | Tasa BCV: ${v.tasaBCV.toFixed(2)} Bs/$</div>
+        <table class="w-full text-[9px] border border-black mb-2">
+            <thead><tr class="bg-[#dbece0] font-bold border-b border-black text-black"><th class="px-1.5 py-0.5 text-left border-r border-black text-black">CONCEPTO LEGAL</th><th class="px-1.5 py-0.5 text-center border-r border-black w-14 text-black">DÍAS</th><th class="px-1.5 py-0.5 text-right border-r border-black w-24 text-black">MONTO ($)</th><th class="px-1.5 py-0.5 text-right w-32 text-black">MONTO (BS)</th></tr></thead>
+            <tbody class="divide-y divide-slate-300">
+                <tr><td class="px-1.5 py-0.5 text-black">Vacaciones Hábiles (Disfrute)</td><td class="px-1.5 py-0.5 text-center font-mono text-black">${v.diasHabilesDisfrute} d</td><td class="px-1.5 py-0.5 text-right font-mono text-black">$${v.montoDisfruteBrutoUSD.toFixed(2)}</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(v.montoDisfruteBrutoUSD*v.tasaBCV)}</td></tr>
+                <tr><td class="px-1.5 py-0.5 text-black">Fines Semana y Feriados</td><td class="px-1.5 py-0.5 text-center font-mono text-black">${v.finesDeSemanaYFeriados} d</td><td class="px-1.5 py-0.5 text-right font-mono text-black">$${v.montoDescansosUSD.toFixed(2)}</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(v.montoDescansosUSD*v.tasaBCV)}</td></tr>
+                <tr><td class="px-1.5 py-0.5 text-black">Bono Vacacional</td><td class="px-1.5 py-0.5 text-center font-mono text-black">${v.diasBonoLegales} d</td><td class="px-1.5 py-0.5 text-right font-mono text-black">$${v.montoBonoVacBrutoUSD.toFixed(2)}</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(v.montoBonoVacBrutoUSD*v.tasaBCV)}</td></tr>
+                <tr><td class="px-1.5 py-0.5 text-black">Bono de Alimentación</td><td class="px-1.5 py-0.5 text-center font-mono text-black">${v.totalDiasContinuos} d</td><td class="px-1.5 py-0.5 text-right font-mono text-black">$${v.montoBonoAlimUSD.toFixed(2)}</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(v.montoBonoAlimUSD*v.tasaBCV)}</td></tr>
+            </tbody>
+            <tfoot><tr class="font-bold border-t border-black bg-slate-50 text-black"><td class="px-1.5 py-0.5" colspan="2">TOTAL NETO LEGAL LOTTT</td><td class="px-1.5 py-0.5 text-right font-mono text-black">$${v.totalNetoLeyUSD.toFixed(2)}</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(v.totalNetoLeyBs)} Bs</td></tr></tfoot>
+        </table>
+        <div class="bg-slate-50 border border-black p-2 mb-2 flex justify-between items-center text-[9px] text-black">
+            <div><span class="font-bold uppercase text-black">2. Subsidio Especial No Obligatorio</span><span class="text-[8px] text-slate-700 block">Asignación voluntaria complementaria otorgada por la empresa</span></div>
+            <div class="text-right"><span class="text-[8px] uppercase font-bold text-slate-700 block">Total Subsidio Especial a Pagar:</span><span class="font-mono font-bold text-black text-[9.5px]">$${v.totalNetoSubsidioUSD.toFixed(2)} / ${fNum(v.totalNetoSubsidioBs)} Bs</span></div>
+        </div>
+        <div class="flex justify-between items-center bg-[#dbece0] border-2 border-black p-1.5 font-bold text-[10px] mb-2 text-black">
+            <span class="uppercase font-black">GRAN TOTAL A COBRAR (LEY + SUBSIDIO):</span>
+            <span class="font-mono text-xs font-black text-black">$${v.granTotalUSD.toFixed(2)} / ${fNum(v.granTotalBs)} Bs</span>
+        </div>
+       <div class="border border-black p-1.5 mb-2 text-[8.5px] text-black leading-tight bg-slate-50"><strong>OBSERVACIONES:</strong> El subsidio no posee naturaleza salarial, ya que no desprende de la intención retributiva del trabajo prestado sino un beneficio eminentemente social para cubrir parte de sus gastos por bienes y/o servicios básicos en que incurre el trabajador. Por tal motivo se otorga como una ayuda al trabajador sin que sea de carácter obligatorio en futuras ocasiones.</div>
+        <div class="border-t border-black pt-2 mt-2"><h4 class="text-center font-extrabold text-[9px] tracking-wider mb-4 text-black">RECIBO CONFORME DE VACACIONES</h4>
+            <div class="grid grid-cols-2 gap-8 text-[9.5px] font-semibold text-black">
+                <div class="flex items-end"><span class="mr-2">FIRMA PATRONO:</span><span class="border-b border-black flex-1"></span></div>
+                <div class="flex items-end"><span class="mr-2">FIRMA TRABAJADOR:</span><span class="border-b border-black flex-1"></span></div>
+            </div>
+        </div>
+    </div>`;
+}
 
         function imprimirReciboVacaciones() { const v = appState.calculoVacacionesActual; if(!v) return; gId('print-container').innerHTML = `<div class="print-page">${generarHTMLReciboVacacionImpresion(v)}</div>`; window.print(); }
 
