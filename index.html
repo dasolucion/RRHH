@@ -2728,7 +2728,7 @@ function enviarWhatsAppRecibo(id, f) {
             gId('vac-dias-pendientes').value = Math.max(0, dL - o);
         }
 
-  function calcularVacaciones() {
+function calcularVacaciones() {
     const id = gId('vac-emp-select').value; 
     const per = gId('vac-periodo').value; 
     const ini = gId('vac-fecha-inicio').value; 
@@ -2749,8 +2749,11 @@ function enviarWhatsAppRecibo(id, f) {
     const subD = (Number(e.otros_ingresos) || 0) / 30;
 
     const a = e.fecha_ingreso ? calcularAntiguedadAnios(e.fecha_ingreso, ini) : 1;
-    const dHabL = Math.min(30, 15 + Math.max(0, a - 1)); 
-    const dBonoL = Math.min(30, 16 + Math.max(0, a - 1));
+    const dHabL = Math.min(30, 15 + Math.max(0, a - 1));         // Días de disfrute legales totales (ej: 15)
+    const dBonoL = Math.min(30, 16 + Math.max(0, a - 1));        // Días de bono vacacional legales totales (ej: 16)
+
+    // Proporción real de bono vacacional a pagar restando lo otorgado previamente en este período
+    const diasBonoAPagar = Math.max(0, dBonoL - otor);
 
     let curr = new Date(ini + "T00:00:00"); 
     let hab = 0, fs = 0;
@@ -2770,17 +2773,17 @@ function enviarWhatsAppRecibo(id, f) {
     const fReinc = `${String(re.getDate()).padStart(2,'0')}/${String(re.getMonth()+1).padStart(2,'0')}/${re.getFullYear()}`;
     const tCont = pend + fs;
 
-    // Cálculo puro basado estrictamente en los días que se van a disfrutar (pend)
-    const mDLey = sD * pend; 
-    const mFsLey = sD * fs; 
-    const mBLey = sD * dBonoL; 
-    const mAlim = bD * tCont; 
+    // Cálculos económicos basados en los días puros a liquidar ahora
+    const mDLey = sD * pend;               // Disfrute por días hábiles pendientes
+    const mFsLey = sD * fs;              // Descansos y feriados del período de disfrute
+    const mBLey = sD * diasBonoAPagar;   // Bono vacacional proporcional a los días restantes
+    const mAlim = bD * tCont;            // Cestaticket por los días continuos de ausencia
     
     const tLey = Math.max(0, mDLey + mFsLey + mBLey + mAlim);
 
     const mDSub = subD * pend; 
     const mFsSub = subD * fs; 
-    const mBSub = subD * dBonoL; 
+    const mBSub = subD * diasBonoAPagar; 
     const tSub = Math.max(0, mDSub + mFsSub + mBSub);
 
     appState.calculoVacacionesActual = { 
@@ -2794,6 +2797,7 @@ function enviarWhatsAppRecibo(id, f) {
         finesDeSemanaYFeriados: fs, 
         totalDiasContinuos: tCont, 
         diasBonoLegales: dBonoL, 
+        diasBonoAPagar: diasBonoAPagar, 
         aniosAntiguedad: a, 
         salarioDiarioBase: sD, 
         bonoAlimDiario: bD, 
@@ -2835,7 +2839,7 @@ function enviarWhatsAppRecibo(id, f) {
     gId('tabla-vacaciones-body').innerHTML = `
         <tr class="hover:bg-slate-900/50"><td class="p-3 font-semibold text-white"><div>Días de Vacaciones / Disfrute Hábiles</div><span class="text-[10px] text-slate-400">Días a disfrutar en este período</span></td><td class="p-3 text-center font-bold text-teal-400">${v.diasHabilesDisfrute} d</td><td class="p-3 text-slate-300 font-mono">$${v.salarioDiarioBase.toFixed(2)}</td><td class="p-3 font-bold text-sky-400 font-mono">$${v.montoDisfruteBrutoUSD.toFixed(2)}</td><td class="p-3 font-bold text-slate-200 font-mono">Bs. ${fNum(v.montoDisfruteBrutoUSD * v.tasaBCV)}</td></tr>
         <tr class="hover:bg-slate-900/50"><td class="p-3 font-semibold text-white"><div>Fines de Semana y Feriados comprendidos</div><span class="text-[10px] text-slate-400">Descansos remunerados durante el período de disfrute</span></td><td class="p-3 text-center font-bold text-teal-400">${v.finesDeSemanaYFeriados} d</td><td class="p-3 text-slate-300 font-mono">$${v.salarioDiarioBase.toFixed(2)}</td><td class="p-3 font-bold text-sky-400 font-mono">$${v.montoDescansosUSD.toFixed(2)}</td><td class="p-3 font-bold text-slate-200 font-mono">Bs. ${fNum(v.montoDescansosUSD * v.tasaBCV)}</td></tr>
-        <tr class="hover:bg-slate-900/50"><td class="p-3 font-semibold text-white"><div>Bono Vacacional Legal (Art. 192 LOTTT)</div><span class="text-[10px] text-slate-400">Bonificación legal completa (${v.diasBonoLegales} días)</span></td><td class="p-3 text-center font-bold text-teal-400">${v.diasBonoLegales} d</td><td class="p-3 text-slate-300 font-mono">$${v.salarioDiarioBase.toFixed(2)}</td><td class="p-3 font-bold text-sky-400 font-mono">$${v.montoBonoVacBrutoUSD.toFixed(2)}</td><td class="p-3 font-bold text-slate-200 font-mono">Bs. ${fNum(v.montoBonoVacBrutoUSD * v.tasaBCV)}</td></tr>
+       <tr class="hover:bg-slate-900/50"><td class="p-3 font-semibold text-white"><div>Bono Vacacional Proporcional</div><span class="text-[10px] text-slate-400">Días legales (${v.diasBonoLegales}d) menos otorgados previos (${v.diasOtorgadosPrevios}d)</span></td><td class="p-3 text-center font-bold text-teal-400">${v.diasBonoAPagar} d</td><td class="p-3 text-slate-300 font-mono">$${v.salarioDiarioBase.toFixed(2)}</td><td class="p-3 font-bold text-sky-400 font-mono">$${v.montoBonoVacBrutoUSD.toFixed(2)}</td><td class="p-3 font-bold text-slate-200 font-mono">Bs. ${fNum(v.montoBonoVacBrutoUSD * v.tasaBCV)}</td></tr>
         <tr class="hover:bg-slate-900/50"><td class="p-3 font-semibold text-white"><div>Bono de Alimentación (Cestaticket período completo)</div><span class="text-[10px] text-slate-400">Días continuos de ausencia (${v.totalDiasContinuos} días)</span></td><td class="p-3 text-center font-bold text-teal-400">${v.totalDiasContinuos} d</td><td class="p-3 text-slate-300 font-mono">$${v.bonoAlimDiario.toFixed(2)}</td><td class="p-3 font-bold text-emerald-400 font-mono">$${v.montoBonoAlimUSD.toFixed(2)}</td><td class="p-3 font-bold text-slate-200 font-mono">Bs. ${fNum(v.montoBonoAlimUSD * v.tasaBCV)}</td></tr>
     `;
 
@@ -2848,21 +2852,49 @@ function enviarWhatsAppRecibo(id, f) {
     gId('vac-resultado-container').classList.remove('hidden'); 
     showToast('Vacaciones calculadas exitosamente');
 }
-        async function guardarVacaciones() {
-            const v = appState.calculoVacacionesActual; 
-            if(!v) return;
-            const p = { 
-                empleado_id: v.empleado.id, empleado: v.empleado.nombre, periodo: v.periodo, fecha_inicio: v.fechaInicio, 
-                gran_total_usd: v.granTotalUSD, gran_total_bs: v.granTotalBs, total_usd: v.granTotalUSD, total_bs: v.granTotalBs, detalle_calculo: v 
-            };
-            const insertado = await safeQuery(supabaseClient.from('vacaciones').insert([p]).select(), 'insert_vacaciones');
-            let registroLocal = { ...p, id: p.id || Date.now(), created_at: new Date().toISOString() };
-            if (insertado && insertado[0]) { registroLocal = { ...insertado[0], ...p, id: insertado[0].id, created_at: insertado[0].created_at || registroLocal.created_at }; }
-            appState.vacaciones.unshift(registroLocal);
-            localStorage.setItem('nomina_vacaciones_cache', JSON.stringify(appState.vacaciones));
-            renderHistoricoVacaciones();
-            showToast('Liquidación de vacaciones guardada en la base de datos');
-        }
+async function guardarVacaciones() {
+    const v = appState.calculoVacacionesActual; 
+    if(!v) return;
+
+    // Limpiar objetos relacionales circulares de empleado para evitar fallos en Supabase JSONB
+    const empleadoLimpio = {
+        id: v.empleado.id,
+        nombre: v.empleado.nombre,
+        cedula: v.empleado.cedula,
+        telefono: v.empleado.telefono,
+        fecha_ingreso: v.empleado.fecha_ingreso,
+        cargo: v.empleado.cargos?.nombre || '-',
+        departamento: v.empleado.departamentos?.nombre || '-'
+    };
+
+    const calculoLimpio = { ...v, empleado: empleadoLimpio };
+
+    const p = { 
+        empleado_id: v.empleado.id, 
+        empleado: v.empleado.nombre, 
+        periodo: v.periodo, 
+        fecha_inicio: v.fechaInicio, 
+        gran_total_usd: Number(v.granTotalUSD) || 0, 
+        gran_total_bs: Number(v.granTotalBs) || 0, 
+        total_usd: Number(v.granTotalUSD) || 0, 
+        total_bs: Number(v.granTotalBs) || 0, 
+        detalle_calculo: calculoLimpio 
+    };
+
+    const insertado = await safeQuery(supabaseClient.from('vacaciones').insert([p]).select(), 'insert_vacaciones');
+    
+    let registroLocal = { ...p, id: Date.now(), created_at: new Date().toISOString() };
+    if (insertado && insertado[0]) { 
+        registroLocal = { ...insertado[0], id: insertado[0].id, created_at: insertado[0].created_at || registroLocal.created_at }; 
+        showToast('Liquidación de vacaciones guardada en la nube');
+    } else {
+        showToast('Guardado localmente (Supabase no respondió)', 'error');
+    }
+
+    appState.vacaciones.unshift(registroLocal);
+    localStorage.setItem('nomina_vacaciones_cache', JSON.stringify(appState.vacaciones));
+    renderHistoricoVacaciones();
+}
 
         function renderHistoricoVacaciones() {
             const isMaster = appState.usuarioActual?.rol === 'master';
@@ -2946,7 +2978,7 @@ function generarHTMLReciboVacacionImpresion(v) {
             <tbody class="divide-y divide-slate-300">
                 <tr><td class="px-1.5 py-0.5 text-black">Vacaciones Hábiles (Disfrute)</td><td class="px-1.5 py-0.5 text-center font-mono text-black">${v.diasHabilesDisfrute} d</td><td class="px-1.5 py-0.5 text-right font-mono text-black">$${v.montoDisfruteBrutoUSD.toFixed(2)}</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(v.montoDisfruteBrutoUSD*v.tasaBCV)}</td></tr>
                 <tr><td class="px-1.5 py-0.5 text-black">Fines Semana y Feriados</td><td class="px-1.5 py-0.5 text-center font-mono text-black">${v.finesDeSemanaYFeriados} d</td><td class="px-1.5 py-0.5 text-right font-mono text-black">$${v.montoDescansosUSD.toFixed(2)}</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(v.montoDescansosUSD*v.tasaBCV)}</td></tr>
-                <tr><td class="px-1.5 py-0.5 text-black">Bono Vacacional</td><td class="px-1.5 py-0.5 text-center font-mono text-black">${v.diasBonoLegales} d</td><td class="px-1.5 py-0.5 text-right font-mono text-black">$${v.montoBonoVacBrutoUSD.toFixed(2)}</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(v.montoBonoVacBrutoUSD*v.tasaBCV)}</td></tr>
+                <tr><td class="px-1.5 py-0.5 text-black">Bono Vacacional Proporcional</td><td class="px-1.5 py-0.5 text-center font-mono text-black">${v.diasBonoAPagar} d</td><td class="px-1.5 py-0.5 text-right font-mono text-black">$${v.montoBonoVacBrutoUSD.toFixed(2)}</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(v.montoBonoVacBrutoUSD*v.tasaBCV)}</td></tr>
                 <tr><td class="px-1.5 py-0.5 text-black">Bono de Alimentación</td><td class="px-1.5 py-0.5 text-center font-mono text-black">${v.totalDiasContinuos} d</td><td class="px-1.5 py-0.5 text-right font-mono text-black">$${v.montoBonoAlimUSD.toFixed(2)}</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(v.montoBonoAlimUSD*v.tasaBCV)}</td></tr>
             </tbody>
             <tfoot><tr class="font-bold border-t border-black bg-slate-50 text-black"><td class="px-1.5 py-0.5" colspan="2">TOTAL NETO LEGAL LOTTT</td><td class="px-1.5 py-0.5 text-right font-mono text-black">$${v.totalNetoLeyUSD.toFixed(2)}</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(v.totalNetoLeyBs)} Bs</td></tr></tfoot>
