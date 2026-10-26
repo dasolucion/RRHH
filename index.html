@@ -1,0 +1,1053 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Nómina y RRHH</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="css/estilos.css">
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans antialiased min-h-screen flex flex-col overflow-x-hidden">
+
+    <div id="print-container"></div>
+    <div id="toast" class="fixed bottom-5 right-5 z-50 hidden px-4 py-3 rounded-lg text-xs font-semibold shadow-xl transition-all border"></div>
+
+    <div id="login-screen" class="fixed inset-0 z-50 bg-slate-950 flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-8 shadow-2xl space-y-6 relative overflow-hidden">
+            <div class="absolute -top-24 -left-24 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
+            <div class="absolute -bottom-24 -right-24 w-48 h-48 bg-sky-500/10 rounded-full blur-3xl pointer-events-none"></div>
+            <div class="text-center space-y-2">
+                <div class="inline-flex bg-emerald-500/20 text-emerald-400 p-3 rounded-xl mb-1"><i class="fa-solid fa-shield-halved text-2xl"></i></div>
+                <h1 class="text-xl font-bold text-white tracking-wide">Acceso al Sistema</h1>
+                <p class="text-xs text-slate-400">Control de Nómina, Prestaciones y RRHH</p>
+            </div>
+            <form onsubmit="ejecutarLogin(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Usuario</label>
+                    <div class="relative"><span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500"><i class="fa-solid fa-user"></i></span>
+                    <input type="text" id="login-username" required autocomplete="username" placeholder="Ingresa tu usuario" class="w-full bg-slate-950 border border-slate-700 rounded-lg pl-9 pr-3 py-2.5 text-xs text-white outline-none focus:border-emerald-500 transition"></div>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Contraseña</label>
+                    <div class="relative"><span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500"><i class="fa-solid fa-lock"></i></span>
+                    <input type="password" id="login-password" required autocomplete="current-password" placeholder="Ingresa tu contraseña" class="w-full bg-slate-950 border border-slate-700 rounded-lg pl-9 pr-3 py-2.5 text-xs text-white outline-none focus:border-emerald-500 transition"></div>
+                </div>
+                <div id="login-error" class="hidden text-xs text-rose-400 bg-rose-950/40 border border-rose-800/50 p-2.5 rounded-lg text-center font-medium"></div>
+                <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 rounded-lg text-xs transition shadow-lg shadow-emerald-600/25 flex items-center justify-center space-x-2">
+                    <i class="fa-solid fa-arrow-right-to-bracket"></i><span>Iniciar Sesión</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div id="app-wrapper" class="hidden flex-row w-full h-screen overflow-hidden relative">
+        <div id="mobile-overlay" onclick="toggleMobileMenu()" class="fixed inset-0 bg-slate-950/80 z-40 hidden backdrop-blur-sm md:hidden"></div>
+
+        <aside id="sidebar" class="fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 border-r border-slate-800 p-4 flex flex-col justify-between shrink-0 overflow-y-auto h-full custom-scrollbar transform -translate-x-full transition-transform duration-300 md:relative md:translate-x-0">
+            <div>
+                <div class="flex items-center space-x-3 px-2 py-3 border-b border-slate-800 mb-4 relative">
+                    <button onclick="toggleMobileMenu()" class="md:hidden absolute -top-1 -right-2 text-slate-500 hover:text-white p-2"><i class="fa-solid fa-xmark text-xl"></i></button>
+                    <div class="bg-emerald-500/20 text-emerald-400 p-2 rounded-lg"><i class="fa-solid fa-file-invoice-dollar text-xl"></i></div>
+                    <div><h1 class="font-bold text-sm tracking-wide text-white" id="brand-sidebar-title">NóminaApp</h1><p class="text-[10px] text-slate-400" id="brand-sidebar-rif">Control de Pagos & RRHH</p></div>
+                </div>
+                <nav class="space-y-1" id="main-navigation">
+                    <button id="nav-dashboard" onclick="switchTab('dashboard')" class="tab-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-semibold bg-slate-800 text-sky-400 border border-slate-700 transition"><i class="fa-solid fa-chart-pie w-5 text-center"></i><span>Dashboard</span></button>
+                    <div id="sep-personal" class="pt-2 my-1 border-t border-slate-800"></div>
+                    <button id="nav-departamentos" onclick="switchTab('departamentos')" class="tab-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition"><i class="fa-solid fa-building w-5 text-center"></i><span>Departamentos</span></button>
+                    <button id="nav-cargos" onclick="switchTab('cargos')" class="tab-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition"><i class="fa-solid fa-briefcase w-5 text-center"></i><span>Cargos</span></button>
+                    <button id="nav-empleados" onclick="switchTab('empleados')" class="tab-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition"><i class="fa-solid fa-users w-5 text-center"></i><span>Empleados</span></button>
+                    <div id="sep-salarios" class="pt-2 my-1 border-t border-slate-800"></div>
+                    <button id="nav-salarios" onclick="switchTab('salarios')" class="tab-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition"><i class="fa-solid fa-chart-line w-5 text-center text-cyan-400"></i><span>Histórico Salarial</span></button>
+                    <button id="nav-prestamos" onclick="switchTab('prestamos')" class="tab-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition"><i class="fa-solid fa-hand-holding-dollar w-5 text-center text-emerald-400"></i><span>Préstamos y Anticipos</span></button>
+                    <div id="sep-nomina" class="pt-2 my-1 border-t border-slate-800"></div>
+                    <button id="nav-nomina" onclick="switchTab('nomina')" class="tab-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition"><i class="fa-solid fa-calculator w-5 text-center"></i><span>Procesar Nómina</span></button>
+                    <button id="nav-historico" onclick="switchTab('historico')" class="tab-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition"><i class="fa-solid fa-clock-rotate-left w-5 text-center"></i><span>Nóminas Procesadas</span></button>
+                    <div id="sep-vacaciones" class="pt-2 my-1 border-t border-slate-800"></div>
+                    <button id="nav-vacaciones" onclick="switchTab('vacaciones')" class="tab-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition"><i class="fa-solid fa-umbrella-beach w-5 text-center text-teal-400"></i><span>Calcular Vacaciones</span></button>
+                    <button id="nav-vacaciones-historico" onclick="switchTab('vacaciones-historico')" class="tab-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition"><i class="fa-solid fa-folder-open w-5 text-center text-teal-600"></i><span>Vacaciones Procesadas</span></button>
+                    <div id="sep-utilidades" class="pt-2 my-1 border-t border-slate-800"></div>
+                    <button id="nav-utilidades" onclick="switchTab('utilidades')" class="tab-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition"><i class="fa-solid fa-gift w-5 text-center text-rose-400"></i><span>Calcular Utilidades</span></button>
+                    <button id="nav-utilidades-historico" onclick="switchTab('utilidades-historico')" class="tab-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition"><i class="fa-solid fa-box-archive w-5 text-center text-rose-600"></i><span>Utilidades Procesadas</span></button>
+                    <div id="sep-antiguedad" class="pt-2 my-1 border-t border-slate-800"></div>
+                    <button id="nav-antiguedad" onclick="switchTab('antiguedad')" class="tab-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition"><i class="fa-solid fa-piggy-bank w-5 text-center text-cyan-400"></i><span>Prestaciones Antigüedad</span></button>
+                    <button id="nav-antiguedad-historico" onclick="switchTab('antiguedad-historico')" class="tab-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition"><i class="fa-solid fa-coins w-5 text-center text-cyan-600"></i><span>Prestaciones Procesadas</span></button>
+                    <div id="sep-liquidaciones" data-feature="liquidaciones.modulo" class="pt-2 my-1 border-t border-slate-800"></div>
+                    <button id="nav-liquidaciones" data-feature="liquidaciones.modulo" onclick="switchTab('liquidaciones')" class="tab-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition"><i class="fa-solid fa-scale-balanced w-5 text-center text-amber-500"></i><span>Liquidaciones</span></button>
+                    <button id="nav-liquidaciones-historico" data-feature="liquidaciones.modulo" onclick="switchTab('liquidaciones-historico')" class="tab-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition"><i class="fa-solid fa-file-signature w-5 text-center text-amber-700"></i><span>Liquidaciones Procesadas</span></button>
+                    <div id="sep-impuestos" data-feature="impuestos.modulo" class="pt-2 my-1 border-t border-slate-800"></div>
+                    <button id="nav-impuestos" data-feature="impuestos.modulo" onclick="switchTab('impuestos')" class="tab-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition"><i class="fa-solid fa-building-columns w-5 text-center text-emerald-400"></i><span>Deberes Formales / Cargas</span></button>
+                    <div id="sep-usuarios" class="pt-2 my-1 border-t border-slate-800"></div>
+                    <button id="nav-usuarios" onclick="switchTab('usuarios')" class="tab-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition"><i class="fa-solid fa-users-gear w-5 text-center text-indigo-400"></i><span>Usuarios</span></button>
+                    <button id="nav-parametros" onclick="switchTab('parametros')" class="tab-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition"><i class="fa-solid fa-sliders w-5 text-center text-blue-400"></i><span>Parámetros</span></button>
+                </nav>
+            </div>
+            <div class="pt-4 border-t border-slate-800 space-y-3">
+                <div class="bg-slate-950 p-2.5 rounded-lg border border-slate-800 flex items-center justify-between">
+                    <div class="overflow-hidden mr-2"><div class="text-xs font-bold text-white truncate" id="user-badge-name">Usuario</div><div class="text-[10px] text-emerald-400 font-medium truncate" id="user-badge-role">Master</div></div>
+                    <button onclick="cerrarSesion()" class="text-slate-400 hover:text-rose-400 transition p-1.5" title="Cerrar Sesión"><i class="fa-solid fa-power-off text-sm"></i></button>
+                </div>
+                <div class="text-[10px] text-slate-500 flex justify-between items-center px-1"><span>Supabase DB</span><span class="inline-flex items-center text-emerald-400 font-semibold"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1 animate-pulse"></span> Online</span></div>
+            </div>
+        </aside>
+
+        <main class="flex-1 h-screen overflow-y-auto p-4 sm:p-6 space-y-6 relative">
+            <header class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-800 pb-4">
+                <div class="flex items-center gap-3">
+                    <button onclick="toggleMobileMenu()" class="md:hidden text-slate-400 hover:text-white focus:outline-none"><i class="fa-solid fa-bars text-2xl"></i></button>
+                    <div><h2 id="view-title" class="text-xl font-bold text-white">Panel de Control</h2><p id="view-desc" class="text-xs text-slate-400">Resumen general de nómina, personal y liquidaciones</p></div>
+                </div>
+            </header>
+
+            <!-- DASHBOARD -->
+            <div id="tab-dashboard-content" class="tab-content space-y-6">
+                <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl"><div class="flex justify-between items-center text-slate-400 mb-2"><span class="text-xs font-medium">Nómina Total Mensual</span><i class="fa-solid fa-dollar-sign text-emerald-400"></i></div><div class="text-2xl font-bold text-white" id="kpi-total-nomina">$0.00</div><span class="text-[10px] text-emerald-400 mt-1 inline-block"><i class="fa-solid fa-calculator"></i> Personal activo</span></div>
+                    <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl"><div class="flex justify-between items-center text-slate-400 mb-2"><span class="text-xs font-medium">Empleados Activos</span><i class="fa-solid fa-user-group text-sky-400"></i></div><div class="text-2xl font-bold text-white" id="kpi-total-empleados">0</div><span class="text-[10px] text-slate-400 mt-1 inline-block">Personal activo registrado</span></div>
+                    <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl"><div class="flex justify-between items-center text-slate-400 mb-2"><span class="text-xs font-medium">Departamentos</span><i class="fa-solid fa-building text-amber-400"></i></div><div class="text-2xl font-bold text-white" id="kpi-total-deptos">0</div><span class="text-[10px] text-amber-400 mt-1 inline-block">Áreas configuradas</span></div>
+                    <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl"><div class="flex justify-between items-center text-slate-400 mb-2"><span class="text-xs font-medium">Cargos Definidos</span><i class="fa-solid fa-briefcase text-purple-400"></i></div><div class="text-2xl font-bold text-white" id="kpi-total-cargos">0</div><span class="text-[10px] text-purple-400 mt-1 inline-block">Puestos de trabajo</span></div>
+                </section>
+            </div>
+
+            <!-- DEPARTAMENTOS -->
+            <div id="tab-departamentos-content" class="tab-content hidden space-y-6">
+                <section class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
+                    <div class="p-4 border-b border-slate-800 flex justify-between items-center"><h3 class="font-bold text-sm text-white flex items-center"><i class="fa-solid fa-building text-amber-400 mr-2"></i> Gestión de Departamentos</h3>
+                    <button onclick="abrirCrearDepartamento()" class="bg-amber-600 hover:bg-amber-500 text-white text-xs px-3 py-1.5 rounded-lg font-semibold flex items-center space-x-1"><i class="fa-solid fa-plus"></i><span>Nuevo Departamento</span></button></div>
+                    <div class="overflow-x-auto overflow-y-auto max-h-[65vh] custom-scrollbar">
+                        <table class="w-full text-left text-xs"><thead class="bg-slate-950 text-slate-400 uppercase text-[10px] tracking-wider sticky top-0 z-20 shadow-[0_1px_0_0_#1e293b]"><tr><th class="p-3.5">ID</th><th class="p-3.5">Nombre del Departamento</th><th class="p-3.5 text-right">Acciones</th></tr></thead>
+                        <tbody id="tabla-deptos-body" class="divide-y divide-slate-800/50"></tbody></table>
+                    </div>
+                </section>
+            </div>
+
+            <!-- CARGOS -->
+            <div id="tab-cargos-content" class="tab-content hidden space-y-6">
+                <section class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
+                    <div class="p-4 border-b border-slate-800 flex justify-between items-center"><h3 class="font-bold text-sm text-white flex items-center"><i class="fa-solid fa-briefcase text-purple-400 mr-2"></i> Gestión de Cargos</h3>
+                    <button onclick="abrirCrearCargo()" class="bg-purple-600 hover:bg-purple-500 text-white text-xs px-3 py-1.5 rounded-lg font-semibold flex items-center space-x-1"><i class="fa-solid fa-plus"></i><span>Nuevo Cargo</span></button></div>
+                    <div class="overflow-x-auto overflow-y-auto max-h-[65vh] custom-scrollbar">
+                        <table class="w-full text-left text-xs"><thead class="bg-slate-950 text-slate-400 uppercase text-[10px] tracking-wider sticky top-0 z-20 shadow-[0_1px_0_0_#1e293b]"><tr><th class="p-3.5">ID</th><th class="p-3.5">Nombre del Cargo</th><th class="p-3.5 text-right">Acciones</th></tr></thead>
+                        <tbody id="tabla-cargos-body" class="divide-y divide-slate-800/50"></tbody></table>
+                    </div>
+                </section>
+            </div>
+
+            <!-- EMPLEADOS -->
+            <div id="tab-empleados-content" class="tab-content hidden space-y-6">
+                <section class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
+                    <div class="p-4 border-b border-slate-800 flex justify-between items-center">
+                        <h3 class="font-bold text-sm text-white flex items-center"><i class="fa-solid fa-users text-sky-400 mr-2"></i> Directorio de Personal</h3>
+                        <button onclick="abrirCrearEmpleado()" class="bg-sky-600 hover:bg-sky-500 text-white text-xs px-3.5 py-2 rounded-lg font-semibold flex items-center space-x-2 transition shadow-lg shadow-sky-600/20"><i class="fa-solid fa-user-plus"></i><span>Nuevo Empleado</span></button>
+                    </div>
+                    <div class="overflow-x-auto overflow-y-auto max-h-[65vh] custom-scrollbar">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-slate-950 text-slate-400 uppercase text-[10px] tracking-wider sticky top-0 z-20 shadow-[0_1px_0_0_#1e293b]">
+                               <tr>
+                                    <th class="p-3.5 text-center">Activo</th>
+                                    <th class="p-3.5">F. Ingreso</th>
+                                    <th class="p-3.5">Cédula</th>
+                                    <th class="p-3.5">Nombre</th>
+                                    <th class="p-3.5">Teléfono</th>
+                                    <th class="p-3.5">Departamento</th>
+                                    <th class="p-3.5">Cargo</th>
+                                    <th class="p-3.5">Sueldo Base</th>
+                                    <th class="p-3.5">Bono Alim.</th>
+                                    <th class="p-3.5" data-feature="empleados.subsidio">Subsidio</th>
+                                    <th class="p-3.5 text-center min-w-[85px] whitespace-nowrap" data-feature="empleados.dahua">ID Dahua</th>
+                                    <th class="p-3.5 text-center min-w-[150px] whitespace-nowrap">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabla-empleados-body" class="divide-y divide-slate-800/50"></tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <!-- HISTÓRICO SALARIAL -->
+            <div id="tab-salarios-content" class="tab-content hidden space-y-6">
+                <section class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl space-y-5">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-800 pb-3">
+                        <div><h3 class="font-bold text-sm text-white flex items-center"><i class="fa-solid fa-chart-line text-cyan-400 mr-2 text-base"></i> Historial Salarial Mes a Mes</h3>
+                        <p class="text-[11px] text-slate-400">Genera y edita el historial mensual desde la fecha de ingreso para cómputo de prestaciones LOTTT</p></div>
+                        <div id="badge-salarios-info" class="text-xs text-slate-400"></div>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-950 p-4 rounded-xl border border-slate-800">
+                        <div class="sm:col-span-2"><label class="text-[11px] font-semibold text-slate-400 block mb-1">Seleccionar Empleado</label>
+                        <select id="hist-sal-emp-select" onchange="alCambiarEmpleadoHistorico()" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-cyan-500"></select></div>
+                        <div class="flex items-end space-x-2">
+                            <button onclick="generarMesesHistorico()" class="w-full bg-cyan-600 hover:bg-cyan-500 text-white text-xs px-4 py-2.5 rounded-lg font-bold flex items-center justify-center space-x-1.5 transition shadow"><i class="fa-solid fa-wand-magic-sparkles"></i><span>Generar</span></button>
+                            <button onclick="guardarHistoricoMeses()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-4 py-2.5 rounded-lg font-bold flex items-center justify-center space-x-1.5 transition shadow"><i class="fa-solid fa-save"></i><span>Guardar Historial</span></button>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto overflow-y-auto max-h-[65vh] custom-scrollbar border border-slate-800 rounded-xl">
+                        <table class="w-full text-left text-xs whitespace-nowrap">
+                            <thead class="bg-slate-950 text-slate-400 uppercase text-[10px] tracking-wider sticky top-0 z-20 shadow-[0_1px_0_0_#1e293b]">
+                                <tr><th class="p-3">Mes (Año-Mes)</th><th class="p-3">Salario Base ($)</th><th class="p-3">Bono Alimentación ($)</th><th class="p-3">Subsidio ($)</th><th class="p-3">Total Devengado ($)</th></tr>
+                            </thead>
+                            <tbody id="tabla-salarios-body" class="divide-y divide-slate-800/50"><tr><td colspan="5" class="p-4 text-center text-slate-500">Seleccione un empleado y presione "Generar" para desplegar la relación mensual.</td></tr></tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <!-- PRÉSTAMOS -->
+            <div id="tab-prestamos-content" class="tab-content hidden space-y-6">
+                <section class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl p-5 space-y-5">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-800 pb-3">
+                        <div><h3 class="font-bold text-sm text-white flex items-center"><i class="fa-solid fa-hand-holding-dollar text-emerald-400 mr-2 text-base"></i> Control de Préstamos y Anticipos</h3>
+                        <p class="text-[11px] text-slate-400">Administración de deudas amortizables en nómina y anticipos de prestaciones (registrados con fecha para el cálculo correcto LOTTT)</p></div>
+                        <span class="inline-flex items-center text-xs px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium"><i class="fa-solid fa-rotate mr-1.5"></i> Descuento y Reintegro Automático</span>
+                    </div>
+                    <div class="overflow-x-auto overflow-y-auto max-h-[65vh] custom-scrollbar">
+                        <table class="w-full text-left text-xs whitespace-nowrap">
+                            <thead class="bg-slate-950 text-slate-400 uppercase text-[10px] tracking-wider sticky top-0 z-20 shadow-[0_1px_0_0_#1e293b]">
+                                <tr><th class="p-3.5">Empleado</th><th class="p-3.5">Cédula</th><th class="p-3.5">Saldo Préstamo Actual ($)</th><th class="p-3.5">Anticipos Prestaciones (Bs)</th><th class="p-3.5 text-right">Acciones</th></tr>
+                            </thead>
+                            <tbody id="tabla-prestamos-body" class="divide-y divide-slate-800/50"></tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <!-- PROCESAR NÓMINA -->
+            <div id="tab-nomina-content" class="tab-content hidden space-y-6">
+                <section class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-xl space-y-4">
+                    <div class="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-slate-950 p-4 rounded-lg border border-slate-800">
+                        <div class="flex flex-wrap items-center gap-4 w-full xl:w-auto">
+                            <div><label class="text-[11px] font-semibold text-slate-400 block mb-1">Salario Mínimo (Bs)</label>
+                            <input type="number" step="0.01" id="nom-salario-minimo" value="130.00" oninput="recalcularTodaLaNomina(); autoguardarBorradorNomina();" class="w-24 bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-emerald-500"></div>
+                            <div><label class="text-[11px] font-semibold text-slate-400 block mb-1">Fecha de Pago</label>
+                            <input type="date" id="nom-fecha-proceso" onchange="cargarBorradorParaFechaActual()" class="bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-emerald-500"></div>
+                            <div><label class="flex items-center text-[11px] font-semibold text-slate-400 mb-1" title="Sincronizar API DolarApi">Tasa BCV (Bs/$)
+                                <button onclick="fetchTasaBCV()" class="ml-1.5 text-sky-400 hover:text-sky-300 focus:outline-none transition"><i class="fa-solid fa-rotate-right" id="icon-sync-bcv"></i></button></label>
+                                <input type="number" step="0.01" id="nom-tasa-bcv" value="36.50" oninput="recalcularTodaLaNomina(); autoguardarBorradorNomina();" class="w-24 bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-emerald-500 transition-colors duration-500"></div>
+                            <div><label class="text-[11px] font-semibold text-slate-400 block mb-1" title="Lunes que se descuentan en esta quincena">Lunes (Quincena)</label>
+                            <input type="number" id="nom-lunes" value="2" min="1" max="5" oninput="recalcularTodaLaNomina(); autoguardarBorradorNomina();" class="w-20 bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-emerald-500"></div>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-3 w-full xl:w-auto justify-start xl:justify-end border-t xl:border-t-0 border-slate-800 pt-4 xl:pt-0">
+                            <div><label class="text-[11px] font-semibold text-slate-400 block mb-1">Total a Pagar ($)</label>
+                            <input type="text" id="nom-total-usd" value="$0.00" readonly class="w-28 bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-emerald-400 font-bold outline-none cursor-not-allowed"></div>
+                            <div><label class="text-[11px] font-semibold text-slate-400 block mb-1">Total a Pagar (Bs)</label>
+                            <input type="text" id="nom-total-bs" value="Bs. 0.00" readonly class="w-32 bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-emerald-400 font-bold outline-none cursor-not-allowed"></div>
+                            <button onclick="aplicarAsistenciaANomina()" class="w-full sm:w-auto bg-amber-600/20 hover:bg-amber-600/40 text-amber-400 border border-amber-500/40 text-xs px-4 py-2.5 rounded-lg font-bold flex items-center justify-center space-x-1.5 transition xl:mt-5" title="Lee asistencia_registros de Supabase y calcula días faltantes"><i class="fa-solid fa-fingerprint"></i><span>Aplicar Asistencia</span></button>
+                            <button onclick="guardarBorradorNominaManual()" class="w-full sm:w-auto bg-sky-600/20 hover:bg-sky-600/40 text-sky-400 border border-sky-500/40 text-xs px-4 py-2.5 rounded-lg font-bold flex items-center justify-center space-x-1.5 transition xl:mt-5" title="Guarda en la nube los valores para acceder desde cualquier dispositivo"><i class="fa-solid fa-cloud-arrow-up"></i><span>Guardar Pre-Nómina</span></button>
+                            <button onclick="limpiarBorradorNomina()" class="w-full sm:w-auto bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-rose-400 border border-slate-700 text-xs px-3 py-2.5 rounded-lg font-medium flex items-center justify-center transition xl:mt-5" title="Limpiar los datos introducidos"><i class="fa-solid fa-eraser"></i></button>
+                            <button onclick="procesarNominaGlobal()" class="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-5 py-2.5 rounded-lg font-bold flex items-center justify-center space-x-2 transition shadow-lg shadow-emerald-600/20 xl:mt-5"><i class="fa-solid fa-file-invoice-dollar"></i><span>Procesar Definitivo</span></button>
+                        </div>
+                    </div>
+                    <div id="badge-estado-prenomina" class="text-xs px-3 py-1.5 rounded-lg bg-sky-950/40 border border-sky-800/60 text-sky-300 flex items-center justify-between">
+                        <span><i class="fa-solid fa-cloud mr-1.5"></i> <strong>Pre-Nómina en la Nube:</strong> Cualquier ajuste que hagas queda almacenado en Supabase y disponible en cualquier dispositivo.</span>
+                        <span id="txt-ultima-prenomina" class="text-[11px] font-mono text-slate-400">Sin borrador guardado</span>
+                    </div>
+                    <div class="overflow-x-auto overflow-y-auto max-h-[calc(100vh-300px)] border border-slate-800 rounded-xl custom-scrollbar shadow-inner">
+                        <table class="w-full text-left text-xs whitespace-nowrap relative">
+                            <thead class="bg-slate-950 text-slate-400 uppercase text-[10px] tracking-wider sticky top-0 z-20 shadow-[0_1px_0_0_#1e293b]">
+                                <tr>
+                                    <th class="p-3 min-w-[170px]">Empleado</th>
+                                    <th class="p-3 min-w-[95px]">S. Integral ($)</th>
+                                    <th class="p-3 text-center min-w-[70px]">Días Falt.</th>
+                                    <th class="p-3 text-center min-w-[65px]" data-feature="nomina.recargos_lottt" title="Horas Extras Diurnas (Recargo 50% Art. 118)">H. Ext (50%)</th>
+                                    <th class="p-3 text-center min-w-[65px]" data-feature="nomina.recargos_lottt" title="Horas Nocturnas (Recargo 30% Art. 117)">H. Noct (30%)</th>
+                                    <th class="p-3 text-center min-w-[65px]" data-feature="nomina.recargos_lottt" title="Días Feriados/Descanso trabajados (Recargo 1.5x Art. 119/120)">Feriados</th>
+                                    <th class="p-3 min-w-[95px]">Otras Asig. ($)</th>
+                                    <th class="p-3 text-center min-w-[70px]">Hrs. Desc.</th>
+                                    <th class="p-3 min-w-[95px]">Otros Desc. ($)</th>
+                                    <th class="p-3 min-w-[95px]" data-feature="nomina.adelantos">Adelantos ($)</th>
+                                    <th class="p-3 min-w-[95px]" data-feature="nomina.prestamos">Préstamos ($)</th>
+                                    <th class="p-3 text-center min-w-[70px]" data-feature="nomina.islr" title="Retención I.S.L.R. según porcentaje AR-I">% ISLR</th>
+                                    <th class="p-3 min-w-[95px]">Desc. Ley (Bs)</th>
+                                    <th class="p-3 min-w-[85px]">Neto ($)</th>
+                                    <th class="p-3 min-w-[100px]">Neto (Bs)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabla-nomina-editable-body" class="divide-y divide-slate-800/50"></tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <!-- MODAL DESGLOSE UTILIDADES -->
+            <div id="modal-detalle-utilidades" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+                <div class="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-6xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+                    <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-950">
+                        <div><h3 class="font-bold text-sm text-white"><i class="fa-solid fa-list text-rose-400 mr-2"></i> Desglose Utilidades <span id="detalle-uti-periodo" class="text-sky-400"></span></h3></div>
+                        <div class="flex space-x-2">
+                            <button onclick="imprimirDesgloseUtilidades()" class="bg-sky-600 hover:bg-sky-500 text-white text-xs px-3.5 py-1.5 rounded-lg font-semibold flex items-center space-x-1.5"><i class="fa-solid fa-print"></i><span>Imprimir</span></button>
+                            <button onclick="closeModal('modal-detalle-utilidades')" class="text-slate-400 px-2"><i class="fa-solid fa-xmark text-lg"></i></button>
+                        </div>
+                    </div>
+                    <div id="area-impresion-utilidades" class="p-4 overflow-y-auto custom-scrollbar">
+                        <div class="hidden print:block mb-4 border-b pb-2"><h2 class="text-lg font-bold">Reporte General de Utilidades</h2><p class="text-xs">Período: <span id="print-uti-periodo"></span> | Fecha Pago: <span id="print-uti-fecha"></span></p></div>
+                        <table class="w-full text-left text-xs whitespace-nowrap">
+                            <thead class="bg-slate-950 text-slate-400 uppercase text-[9px] sticky top-0 z-20 shadow-[0_1px_0_0_#1e293b]">
+                                <tr><th class="p-2.5">Empleado</th><th class="p-2.5">Cargo</th><th class="p-2.5 text-center">Días Trab.</th><th class="p-2.5 text-center">Días Pag.</th><th class="p-2.5 text-center">% Pagado</th><th class="p-2.5">Utilidad ($)</th><th class="p-2.5">Subsidio ($)</th><th class="p-2.5">Total ($)</th><th class="p-2.5">Total (Bs)</th></tr>
+                            </thead>
+                            <tbody id="tabla-detalle-utilidades-body" class="divide-y divide-slate-800/50"></tbody>
+                            <tfoot id="tabla-detalle-utilidades-foot" class="bg-slate-950 font-bold border-t border-slate-700"></tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- NÓMINAS PROCESADAS -->
+            <div id="tab-historico-content" class="tab-content hidden space-y-6">
+                <section class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
+                    <div class="p-4 border-b border-slate-800 flex justify-between items-center"><h3 class="font-bold text-sm text-white flex items-center"><i class="fa-solid fa-clock-rotate-left text-sky-400 mr-2"></i> Histórico de Nóminas Procesadas</h3></div>
+                    <div class="overflow-x-auto overflow-y-auto max-h-[65vh] custom-scrollbar">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-slate-950 text-slate-400 uppercase text-[10px] tracking-wider sticky top-0 z-20 shadow-[0_1px_0_0_#1e293b]">
+                                <tr><th class="p-3.5">Fecha de Pago</th><th class="p-3.5 text-center">Empleados</th><th class="p-3.5">Tasa BCV</th><th class="p-3.5">Salario Mín. (Bs)</th><th class="p-3.5">Total ($)</th><th class="p-3.5">Total (Bs)</th><th class="p-3.5 text-right">Acciones</th></tr>
+                            </thead>
+                            <tbody id="tabla-historico-body" class="divide-y divide-slate-800/50"></tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <!-- DEBERES FORMALES Y CARGAS PATRONALES -->
+            <div id="tab-impuestos-content" class="tab-content hidden space-y-6">
+                <section class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl space-y-5">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-800 pb-3">
+                        <div>
+                            <h3 class="font-bold text-sm text-white flex items-center"><i class="fa-solid fa-building-columns text-emerald-400 mr-2 text-base"></i> Resumen de Obligaciones Fiscales y Cargas Patronales</h3>
+                            <p class="text-[11px] text-slate-400">Determinación mensual de retenciones al personal y aportes patronales (IVSS, RPE, BANAVIH, INCES, LPP SENIAT)</p>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <button onclick="imprimirReporteFiscalMensual()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-4 py-2 rounded-lg font-bold flex items-center space-x-1.5 transition shadow"><i class="fa-solid fa-print"></i><span>Imprimir Reporte Contable</span></button>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-slate-950 p-4 rounded-xl border border-slate-800 items-end">
+                        <div>
+                            <label class="text-[11px] font-semibold text-slate-400 block mb-1">Seleccionar Mes de Liquidación Fiscal</label>
+                            <input type="month" id="imp-mes-select" onchange="renderCuadroImpuestosMes()" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-emerald-500 font-mono font-bold">
+                        </div>
+                        <div class="sm:col-span-2 text-xs text-slate-400 flex flex-wrap gap-4 items-center justify-start sm:justify-end">
+                            <div>Riesgo IVSS: <strong id="lbl-riesgo-ivss-tag" class="text-white">9% (Mínimo)</strong></div>
+                            <div>Pensiones LPP: <strong id="lbl-lpp-tag" class="text-emerald-400">Activo (9%)</strong></div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div class="bg-slate-950 border border-slate-800 p-4 rounded-xl">
+                            <span class="text-[10px] uppercase font-bold text-slate-400 block mb-1">Total Retenciones a Trabajadores</span>
+                            <div class="text-xl font-black text-amber-400 font-mono" id="kpi-imp-retenciones">Bs. 0.00</div>
+                            <span class="text-[10px] text-slate-500" id="kpi-imp-retenciones-usd">$0.00</span>
+                        </div>
+                        <div class="bg-slate-950 border border-slate-800 p-4 rounded-xl">
+                            <span class="text-[10px] uppercase font-bold text-slate-400 block mb-1">Total Aportes Patronales (Empresa)</span>
+                            <div class="text-xl font-black text-rose-400 font-mono" id="kpi-imp-patronal">Bs. 0.00</div>
+                            <span class="text-[10px] text-slate-500" id="kpi-imp-patronal-usd">$0.00</span>
+                        </div>
+                        <div class="bg-slate-950 border-2 border-emerald-500/40 p-4 rounded-xl bg-gradient-to-r from-emerald-950/40 to-slate-950">
+                            <span class="text-[10px] uppercase font-extrabold text-emerald-400 block mb-1">Gran Total a Enterar a los Entes</span>
+                            <div class="text-2xl font-black text-emerald-400 font-mono" id="kpi-imp-total">Bs. 0.00</div>
+                            <span class="text-[11px] font-bold text-emerald-300 font-mono" id="kpi-imp-total-usd">$0.00</span>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto overflow-y-auto max-h-[calc(100vh-320px)] border border-slate-800 rounded-xl custom-scrollbar shadow-inner">
+                        <table class="w-full text-left text-xs whitespace-nowrap">
+                            <thead class="bg-slate-950 text-slate-400 uppercase text-[9px] tracking-wider sticky top-0 z-20 shadow-[0_1px_0_0_#1e293b]">
+                                <tr>
+                                    <th class="p-3">Concepto / Obligación Legal</th>
+                                    <th class="p-3">Ente Receptor</th>
+                                    <th class="p-3 text-right">Base Imponible (Bs)</th>
+                                    <th class="p-3 text-right text-amber-400">Retención Personal (Bs)</th>
+                                    <th class="p-3 text-right text-rose-400">Aporte Empresa (Bs)</th>
+                                    <th class="p-3 text-right text-emerald-400 font-bold">Total a Enterar (Bs)</th>
+                                    <th class="p-3 text-right text-emerald-400 font-bold">Equivalente ($)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabla-impuestos-body" class="divide-y divide-slate-800/50"></tbody>
+                            <tfoot id="tabla-impuestos-foot" class="bg-slate-950 font-bold border-t-2 border-slate-700 text-white"></tfoot>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <!-- VACACIONES -->
+            <div id="tab-vacaciones-content" class="tab-content hidden space-y-6">
+                <section class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl space-y-5">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-800 pb-3">
+                        <div><h3 class="font-bold text-sm text-white flex items-center"><i class="fa-solid fa-umbrella-beach text-teal-400 mr-2 text-base"></i> Cálculo de Nómina de Vacaciones</h3>
+                        <p class="text-[11px] text-slate-400">Liquidación legal (LOTTT) y Subsidio Especial No Obligatorio</p></div>
+                        <span class="inline-flex items-center text-xs px-2.5 py-1 rounded-full bg-teal-500/10 text-teal-400 border border-teal-500/20 font-medium"><i class="fa-solid fa-scale-balanced mr-1.5"></i> LOTTT Art. 190 / 192</span>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 bg-slate-950 p-4 rounded-xl border border-slate-800">
+                        <div><label class="text-[11px] font-semibold text-slate-400 block mb-1">Empleado</label>
+                        <select id="vac-emp-select" onchange="onCambioEmpleadoVacaciones()" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-teal-500 transition"></select></div>
+                        <div><label class="text-[11px] font-semibold text-slate-400 block mb-1">Período Vacacional</label>
+                        <input type="text" id="vac-periodo" placeholder="Ej: 2025 a 2026" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-teal-500"></div>
+                        <div><label class="text-[11px] font-semibold text-slate-400 block mb-1">Fecha de Inicio</label>
+                        <input type="date" id="vac-fecha-inicio" onchange="actualizarDiasPendientesVacaciones()" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-teal-500"></div>
+                        <div><label class="text-[11px] font-semibold text-slate-400 block mb-1">Días ya Otorgados</label>
+                        <input type="number" id="vac-dias-otorgados" value="0" min="0" oninput="actualizarDiasPendientesVacaciones()" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-teal-500"></div>
+                        <div><label class="text-[11px] font-semibold text-slate-400 block mb-1">Días Hábiles Pendientes</label>
+                        <input type="number" id="vac-dias-pendientes" value="15" min="0" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-teal-500 font-bold text-teal-400"></div>
+                    </div>
+                    <div class="flex justify-end"><button onclick="calcularVacaciones()" class="w-full sm:w-auto bg-teal-600 hover:bg-teal-500 text-white text-xs px-6 py-2.5 rounded-lg font-bold flex items-center justify-center space-x-2 transition shadow-lg shadow-teal-600/20"><i class="fa-solid fa-calculator text-sm"></i><span>Calcular Nómina de Vacaciones</span></button></div>
+                </section>
+                <div id="vac-resultado-container" class="hidden space-y-6">
+                    <section class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-2xl space-y-6 p-5">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-800 pb-4">
+                            <h3 class="font-bold text-base text-white flex items-center"><i class="fa-solid fa-receipt text-teal-400 mr-2"></i> Liquidación de Vacaciones - <span id="res-vac-emp-nombre" class="ml-1 text-teal-300 font-extrabold"></span></h3>
+                            <div class="flex items-center space-x-2 flex-wrap gap-y-2">
+                                <button onclick="guardarVacaciones()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-3.5 py-1.5 rounded-lg font-semibold flex items-center space-x-1.5 transition shadow"><i class="fa-solid fa-save text-sm"></i><span>Guardar</span></button>
+                                <button onclick="enviarWhatsAppVacaciones()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3.5 py-1.5 rounded-lg font-semibold flex items-center space-x-1.5 transition shadow"><i class="fa-brands fa-whatsapp text-sm"></i><span>WhatsApp</span></button>
+                                <button onclick="imprimirReciboVacaciones()" class="bg-teal-600 hover:bg-teal-500 text-white text-xs px-3.5 py-1.5 rounded-lg font-semibold flex items-center space-x-1.5 transition shadow"><i class="fa-solid fa-print text-sm"></i><span>Imprimir Recibo</span></button>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 bg-slate-950/70 p-3.5 rounded-lg border border-slate-800 text-xs">
+                            <div><span class="text-slate-400 text-[10px] block uppercase font-medium">Cédula:</span><span id="res-vac-cedula" class="font-bold text-white">-</span></div>
+                            <div><span class="text-slate-400 text-[10px] block uppercase font-medium">Cargo:</span><span id="res-vac-cargo" class="font-semibold text-purple-400">-</span></div>
+                            <div><span class="text-slate-400 text-[10px] block uppercase font-medium">Fecha Ingreso:</span><span id="res-vac-ingreso" class="font-mono text-slate-200">-</span></div>
+                            <div><span class="text-slate-400 text-[10px] block uppercase font-medium">Antigüedad:</span><span id="res-vac-antiguedad" class="font-bold text-teal-400">-</span></div>
+                            <div><span class="text-slate-400 text-[10px] block uppercase font-medium">Período:</span><span id="res-vac-periodo" class="font-bold text-sky-400">-</span></div>
+                            <div><span class="text-slate-400 text-[10px] block uppercase font-medium">Reincorporación:</span><span id="res-vac-reincorporacion" class="font-mono text-emerald-400 font-bold">-</span></div>
+                        </div>
+                        <div class="space-y-2">
+                            <div class="flex items-center justify-between"><h4 class="text-xs font-bold text-sky-400 uppercase tracking-wider flex items-center"><i class="fa-solid fa-scale-balanced mr-1.5"></i> 1. Legal LOTTT (Salario Base + CestaTicket)</h4>
+                            <span class="text-[11px] text-slate-400">Diario Base: <strong id="lbl-salario-diario-base" class="text-white">$0.00</strong> | Tasa: <strong id="lbl-tasa-bcv-vac" class="text-white">0.00</strong></span></div>
+                            <div class="overflow-x-auto overflow-y-auto max-h-[60vh] custom-scrollbar border border-slate-800 rounded-lg">
+                                <table class="w-full text-left text-xs"><thead class="bg-slate-950 text-slate-400 uppercase text-[10px] sticky top-0 z-20 shadow-[0_1px_0_0_#1e293b]"><tr><th class="p-3">Concepto Legal</th><th class="p-3 text-center">Días</th><th class="p-3">Base ($)</th><th class="p-3">Monto ($)</th><th class="p-3">Monto (Bs)</th></tr></thead>
+                                <tbody id="tabla-vacaciones-body" class="divide-y divide-slate-800/50"></tbody>
+                                <tfoot id="tabla-vacaciones-foot" class="bg-slate-950 font-bold border-t-2 border-slate-700 text-white"></tfoot></table>
+                            </div>
+                        </div>
+                        <div class="pt-2 border-t border-slate-800/80">
+                            <div class="bg-amber-950/20 border border-amber-500/30 p-4 rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                                <div><h4 class="text-xs font-bold text-amber-400 uppercase tracking-wider"><i class="fa-solid fa-hand-holding-dollar mr-2 text-sm"></i> 2. Subsidio Especial No Obligatorio</h4></div>
+                                <div class="text-right"><span class="text-[10px] text-amber-300/80 uppercase font-semibold block">Total Subsidio Especial a Pagar</span>
+                                <div class="flex items-center space-x-2 justify-end mt-0.5"><span id="res-subsidio-total-usd" class="text-base font-bold text-amber-400 font-mono">$0.00</span><span class="text-slate-500 font-mono">/</span><span id="res-subsidio-total-bs" class="text-base font-bold text-amber-300 font-mono">Bs. 0.00</span></div></div>
+                            </div>
+                        </div>
+                        <div class="bg-gradient-to-r from-teal-950/60 to-slate-900 border-2 border-teal-500/40 p-4 rounded-xl flex flex-col sm:flex-row justify-between items-center gap-4">
+                            <div><span class="text-xs uppercase font-extrabold tracking-wider text-teal-400 block">Gran Total Liquidación Vacaciones</span></div>
+                            <div class="text-right flex items-center space-x-4">
+                                <div><span class="text-[10px] text-slate-400 uppercase block font-semibold">Divisas</span><span id="res-gran-total-usd" class="text-xl font-black text-emerald-400 font-mono">$0.00</span></div>
+                                <div class="border-l border-slate-700 pl-4"><span class="text-[10px] text-slate-400 uppercase block font-semibold">Bolívares</span><span id="res-gran-total-bs" class="text-xl font-black text-emerald-400 font-mono">Bs. 0.00</span></div>
+                            </div>
+                        </div>
+                        <div class="bg-slate-950 border border-slate-800 p-3.5 rounded-lg text-[11px] text-slate-300 leading-relaxed">
+                            <span class="font-bold text-amber-400 block mb-1 uppercase tracking-wider text-[10px]"><i class="fa-solid fa-circle-info mr-1"></i> Observaciones:</span>
+                            El subsidio no posee naturaleza salarial, ya que no desprende de la intención retributiva del trabajo prestado sino un beneficio eminentemente social para cubrir parte de sus gastos por bienes y/o servicios básicos en que incurre el trabajador. Por tal motivo se otorga como una ayuda al trabajador sin que sea de carácter obligatorio en futuras ocasiones.
+                        </div>
+                    </section>
+                </div>
+            </div>
+
+            <!-- HISTÓRICO DE VACACIONES -->
+            <div id="tab-vacaciones-historico-content" class="tab-content hidden space-y-6">
+                <section class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
+                    <div class="p-4 border-b border-slate-800 flex justify-between items-center"><h3 class="font-bold text-sm text-white flex items-center"><i class="fa-solid fa-folder-open text-teal-600 mr-2"></i> Registro de Vacaciones Procesadas</h3></div>
+                    <div class="overflow-x-auto overflow-y-auto max-h-[65vh] custom-scrollbar">
+                        <table class="w-full text-left text-xs whitespace-nowrap">
+                            <thead class="bg-slate-950 text-slate-400 uppercase text-[10px] tracking-wider sticky top-0 z-20 shadow-[0_1px_0_0_#1e293b]">
+                                <tr><th class="p-3.5">Registro</th><th class="p-3.5">Empleado</th><th class="p-3.5 text-center">Período</th><th class="p-3.5 text-center">Fecha de Inicio</th><th class="p-3.5 text-center">Reincorporación</th><th class="p-3.5">Total ($)</th><th class="p-3.5">Total (Bs)</th><th class="p-3.5 text-right">Acciones</th></tr>
+                            </thead>
+                            <tbody id="tabla-historico-vacaciones-body" class="divide-y divide-slate-800/50"></tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <!-- UTILIDADES -->
+            <div id="tab-utilidades-content" class="tab-content hidden space-y-6">
+                <section class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl space-y-5">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-800 pb-3">
+                        <div>
+                            <h3 class="font-bold text-sm text-white flex items-center"><i class="fa-solid fa-gift text-rose-400 mr-2 text-base"></i> Cálculo de Utilidades</h3>
+                            <p class="text-[11px] text-slate-400">Beneficios anuales proporcionales (Art. 131 LOTTT) + Subsidio Especial No Obligatorio — Pagos parciales por porcentaje</p>
+                        </div>
+                        <span class="inline-flex items-center text-xs px-2.5 py-1 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 font-medium" id="badge-uti-dias-base">
+                            <i class="fa-solid fa-scale-balanced mr-1.5"></i> Base: 30 Días
+                        </span>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 bg-slate-950 p-4 rounded-xl border border-slate-800">
+                        <div><label class="text-[11px] font-semibold text-slate-400 block mb-1">Período (Año)</label><input type="number" id="uti-periodo" value="2026" onchange="verificarEstadoPeriodo()" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-rose-500"></div>
+                        <div><label class="text-[11px] font-semibold text-slate-400 block mb-1">Fecha de Pago</label><input type="date" id="uti-fecha-pago" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-rose-500"></div>
+                        <div><label class="text-[11px] font-semibold text-slate-400 block mb-1" title="Porcentaje que se paga en esta fecha del total anual">% a Pagar Ahora</label><input type="number" step="0.01" min="0" max="100" id="uti-porcentaje" value="100" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-rose-500 font-bold text-rose-300"></div>
+                        <div><label class="text-[11px] font-semibold text-slate-400 block mb-1" title="Tasa aplicable para este pago">Tasa BCV (Bs/$)</label><input type="number" step="0.01" id="uti-tasa-bcv" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-rose-500 transition-colors"></div>
+                        <div class="flex items-end"><button onclick="generarUtilidades()" class="w-full bg-rose-600 hover:bg-rose-500 text-white text-xs px-4 py-2.5 rounded-lg font-bold flex items-center justify-center space-x-2 transition"><i class="fa-solid fa-calculator"></i><span>Generar Cálculos</span></button></div>
+                    </div>
+                    <div id="uti-estado-pago-periodo" class="hidden text-xs px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-between">
+                        <span id="uti-estado-texto" class="text-slate-300"></span>
+                        <span id="uti-estado-porcentaje" class="font-mono font-bold"></span>
+                    </div>
+                    <div id="uti-resultados" class="hidden space-y-4">
+                        <div class="overflow-x-auto overflow-y-auto max-h-[65vh] custom-scrollbar border border-slate-800 rounded-lg">
+                            <table class="w-full text-left text-xs whitespace-nowrap">
+                                <thead class="bg-slate-950 text-slate-400 uppercase text-[10px] tracking-wider sticky top-0 z-20 shadow-[0_1px_0_0_#1e293b]">
+                                    <tr>
+                                        <th class="p-3">Empleado</th>
+                                        <th class="p-3">Fecha Ingreso</th>
+                                        <th class="p-3 text-center">Días Trab.</th>
+                                        <th class="p-3 text-center">Días a Pagar</th>
+                                        <th class="p-3 text-center text-sky-400">% Pagado Prev.</th>
+                                        <th class="p-3 text-center text-rose-300">% a Pagar</th>
+                                        <th class="p-3 text-right">Monto a Pagar ($)</th>
+                                        <th class="p-3 text-right">Monto a Pagar (Bs)</th>
+                                        <th class="p-3 text-right">Total Anual ($)</th>
+                                        <th class="p-3 text-right">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tabla-utilidades-body" class="divide-y divide-slate-800/50"></tbody>
+                            </table>
+                        </div>
+                        <div class="flex justify-end pt-4 border-t border-slate-800">
+                            <button onclick="procesarUtilidadesGlobal()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-6 py-2.5 rounded-lg font-bold flex items-center justify-center space-x-2">
+                                <i class="fa-solid fa-save"></i><span>Guardar Pago Parcial</span>
+                            </button>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- HISTÓRICO UTILIDADES -->
+            <div id="tab-utilidades-historico-content" class="tab-content hidden space-y-6">
+                <section class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
+                    <div class="p-4 border-b border-slate-800 flex justify-between items-center">
+                        <h3 class="font-bold text-sm text-white flex items-center"><i class="fa-solid fa-box-archive text-rose-600 mr-2"></i> Utilidades Procesadas (Pagos Parciales)</h3>
+                    </div>
+                    <div class="overflow-x-auto overflow-y-auto max-h-[65vh] custom-scrollbar">
+                        <table class="w-full text-left text-xs whitespace-nowrap">
+                            <thead class="bg-slate-950 text-slate-400 uppercase text-[10px] tracking-wider sticky top-0 z-20 shadow-[0_1px_0_0_#1e293b]">
+                                <tr>
+                                    <th class="p-3.5">Período / Año</th>
+                                    <th class="p-3.5">Fecha Pago</th>
+                                    <th class="p-3.5 text-center">Empleados</th>
+                                    <th class="p-3.5 text-center">% Pagado en Este Pago</th>
+                                    <th class="p-3.5 text-center">% Acumulado</th>
+                                    <th class="p-3.5 text-center">Estado</th>
+                                    <th class="p-3.5">Total Utilidad ($)</th>
+                                    <th class="p-3.5">Total Subsidio ($)</th>
+                                    <th class="p-3.5">Pago Este Período ($)</th>
+                                    <th class="p-3.5">Pago Este Período (Bs)</th>
+                                    <th class="p-3.5 text-right">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabla-historico-utilidades-body" class="divide-y divide-slate-800/50"></tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <!-- PRESTACIONES DE ANTIGÜEDAD -->
+            <div id="tab-antiguedad-content" class="tab-content hidden space-y-6">
+                <section class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl space-y-5">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-800 pb-3">
+                        <div><h3 class="font-bold text-sm text-white flex items-center"><i class="fa-solid fa-piggy-bank text-cyan-400 mr-2 text-base"></i> Prestaciones Sociales y Garantía de Antigüedad</h3>
+                        <p class="text-[11px] text-slate-400">Régimen Legal LOTTT Art. 142 & 143 (Cálculo Trimestral en Bs + Intereses BCV Tasa Promedio / 12)</p></div>
+                        <span class="inline-flex items-center text-xs px-2.5 py-1 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-medium"><i class="fa-solid fa-scale-balanced mr-1.5"></i> LOTTT Art. 122, 142 & 143</span>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-slate-950 p-4 rounded-xl border border-slate-800">
+                        <div><label class="text-[11px] font-semibold text-slate-400 block mb-1">Empleado</label><select id="ant-emp-select" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-cyan-500"></select></div>
+                        <div><label class="text-[11px] font-semibold text-slate-400 block mb-1">Fecha de Corte</label><input type="date" id="ant-fecha-corte" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-cyan-500"></div>
+                        <div class="flex items-end gap-2">
+                            <button onclick="calcularAntiguedad()" class="w-full bg-cyan-600 hover:bg-cyan-500 text-white text-xs px-4 py-2.5 rounded-lg font-bold flex items-center justify-center space-x-1.5 transition shadow-lg shadow-cyan-600/20"><i class="fa-solid fa-calculator"></i><span>Calcular</span></button>
+                            <button onclick="generarConciliacion()" class="w-full bg-slate-700 hover:bg-slate-600 text-cyan-300 border border-cyan-500/40 text-xs px-4 py-2.5 rounded-lg font-bold flex items-center justify-center space-x-1.5 transition"><i class="fa-solid fa-table-list"></i><span>Conciliación</span></button>
+                        </div>
+                    </div>
+                </section>
+                <div id="ant-resultado-container" class="hidden space-y-6">
+                    <section class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-2xl space-y-6 p-5">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-800 pb-4">
+                            <h3 class="font-bold text-base text-white flex items-center"><i class="fa-solid fa-file-invoice-dollar text-cyan-400 mr-2"></i> Estado de Cuenta - <span id="res-ant-emp-nombre" class="ml-1 text-cyan-300 font-extrabold"></span></h3>
+                            <div class="flex items-center space-x-2 flex-wrap gap-y-2">
+                                <button onclick="guardarAntiguedad()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-3.5 py-1.5 rounded-lg font-semibold flex items-center space-x-1.5 transition shadow"><i class="fa-solid fa-save text-sm"></i><span>Guardar</span></button>
+                                <button onclick="enviarWhatsAppAntiguedad()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3.5 py-1.5 rounded-lg font-semibold flex items-center space-x-1.5 transition shadow"><i class="fa-brands fa-whatsapp text-sm"></i><span>WhatsApp</span></button>
+                                <button onclick="imprimirReciboAntiguedad()" class="bg-cyan-600 hover:bg-cyan-500 text-white text-xs px-3.5 py-1.5 rounded-lg font-semibold flex items-center space-x-1.5 transition shadow"><i class="fa-solid fa-print text-sm"></i><span>Imprimir</span></button>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 bg-slate-950/70 p-3.5 rounded-lg border border-slate-800 text-xs">
+                            <div><span class="text-slate-400 text-[10px] block uppercase font-medium">Cédula:</span><span id="res-ant-cedula" class="font-bold text-white">-</span></div>
+                            <div><span class="text-slate-400 text-[10px] block uppercase font-medium">Cargo:</span><span id="res-ant-cargo" class="font-semibold text-purple-400">-</span></div>
+                            <div><span class="text-slate-400 text-[10px] block uppercase font-medium">Fecha Ingreso:</span><span id="res-ant-ingreso" class="font-mono text-slate-200">-</span></div>
+                            <div><span class="text-slate-400 text-[10px] block uppercase font-medium">Fecha Corte:</span><span id="res-ant-corte" class="font-mono text-emerald-400 font-bold">-</span></div>
+                            <div><span class="text-slate-400 text-[10px] block uppercase font-medium">Tiempo de Servicio:</span><span id="res-ant-tiempo" class="font-bold text-cyan-400">-</span></div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3">
+                                <div class="flex justify-between items-center border-b border-slate-800 pb-2"><h4 class="text-xs font-bold text-cyan-400 uppercase tracking-wider"><i class="fa-solid fa-landmark mr-1.5"></i> 1. Depósito Trimestral + Intereses (Art. 142 a, b)</h4><span class="text-[10px] px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800">15 d / 3 meses</span></div>
+                                <div class="space-y-1.5 text-xs text-slate-300">
+                                    <div class="flex justify-between"><span>Trimestres Transcurridos:</span><strong id="ant-m1-trimestres" class="text-white">0</strong></div>
+                                    <div class="flex justify-between"><span>Días Trimestrales (15 d/trim):</span><strong id="ant-m1-dias-trim" class="text-white">0 d</strong></div>
+                                    <div class="flex justify-between"><span>Días Adicionales:</span><strong id="ant-m1-dias-adic" class="text-cyan-400">0 d</strong></div>
+                                    <div class="flex justify-between border-t border-slate-800/80 pt-1 font-semibold"><span>Total Días Acreditados:</span><strong id="ant-m1-total-dias" class="text-white">0 d</strong></div>
+                                    <div class="flex justify-between"><span>Total Depósitos Acumulados:</span><strong id="ant-m1-capital-bs" class="text-slate-200 font-mono">Bs. 0.00</strong></div>
+                                    <div class="flex justify-between"><span>Intereses Devengados en Bs:</span><strong id="ant-m1-intereses-bs" class="text-amber-400 font-mono">Bs. 0.00</strong></div>
+                                    <div class="flex justify-between text-rose-400"><span>(-) Anticipos Aplicados por Fecha:</span><strong id="ant-m1-anticipos-usd" class="font-mono">Bs. 0.00</strong></div>
+                                    <div class="flex justify-between border-t border-slate-700 pt-2 font-bold text-sm bg-slate-900/60 p-2 rounded">
+                                        <span>Total Garantía Neto:</span>
+                                        <div class="text-right"><div id="ant-m1-total-bs" class="text-cyan-300 font-mono font-black">Bs. 0.00</div><div id="ant-m1-total-usd" class="text-[11px] text-emerald-400 font-mono font-semibold">$0.00</div></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3">
+                                <div class="flex justify-between items-center border-b border-slate-800 pb-2"><h4 class="text-xs font-bold text-purple-400 uppercase tracking-wider"><i class="fa-solid fa-clock-rotate-left mr-1.5"></i> 2. Retroactivo 30 días/año (Art. 142 lit. c)</h4><span class="text-[10px] px-2 py-0.5 rounded bg-purple-950 text-purple-300 border border-purple-800">30 d / año</span></div>
+                                <div class="space-y-1.5 text-xs text-slate-300">
+                                    <div class="flex justify-between"><span>Años de Servicio Computados:</span><strong id="ant-m2-anios" class="text-white">0</strong></div>
+                                    <div class="flex justify-between"><span>Días por Años:</span><strong id="ant-m2-dias-base" class="text-white">0 d</strong></div>
+                                    <div class="flex justify-between"><span>Días Adicionales:</span><strong id="ant-m2-dias-adic" class="text-purple-400">0 d</strong></div>
+                                    <div class="flex justify-between border-t border-slate-800/80 pt-1 font-semibold"><span>Total Días Retroactivos:</span><strong id="ant-m2-total-dias" class="text-white">0 d</strong></div>
+                                    <div class="flex justify-between"><span>Salario Integral Diario ($):</span><strong id="ant-m2-salario-diario" class="text-slate-200 font-mono">$0.00</strong></div>
+                                    <div class="flex justify-between text-slate-400 text-[11px]"><span>Salario Integral Diario (Bs):</span><strong id="ant-m2-salario-diario-bs" class="text-slate-300 font-mono">Bs. 0.00</strong></div>
+                                    <div class="flex justify-between text-rose-400"><span>(-) Anticipos Totales Otorgados:</span><strong id="ant-m2-anticipos-usd" class="font-mono">-Bs. 0.00</strong></div>
+                                    <div class="flex justify-between border-t border-slate-700 pt-2 font-bold text-sm bg-slate-900/60 p-2 rounded">
+                                        <span>Total Retroactivo Neto:</span>
+                                        <div class="text-right"><div id="ant-m2-total-bs" class="text-purple-300 font-mono font-black">Bs. 0.00</div><div id="ant-m2-total-usd" class="text-[11px] text-emerald-400 font-mono font-semibold">$0.00</div></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-gradient-to-r from-cyan-950/70 to-slate-900 border-2 border-cyan-500/50 p-4 rounded-xl flex flex-col sm:flex-row justify-between items-center gap-4">
+                            <div><span class="text-xs uppercase font-extrabold tracking-wider text-cyan-400 block">Monto Definitivo a Favor del Trabajador (Art. 142 lit. d)</span>
+                            <p id="lbl-criterio-favorable" class="text-[11px] text-slate-300 mt-0.5">El trabajador percibe el monto que resulte superior entre ambos cálculos legales.</p></div>
+                            <div class="text-right flex items-center space-x-4">
+                                <div><span class="text-[10px] text-slate-400 uppercase block font-semibold">Total en Bolívares (Bs)</span><span id="res-ant-gran-total-bs" class="text-xl font-black text-cyan-400 font-mono">Bs. 0.00</span></div>
+                                <div class="border-l border-slate-700 pl-4"><span class="text-[10px] text-slate-400 uppercase block font-semibold">Equivalente en Divisas ($)</span><span id="res-ant-gran-total-usd" class="text-xl font-black text-emerald-400 font-mono">$0.00</span></div>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+
+            <!-- HISTÓRICO PRESTACIONES -->
+            <div id="tab-antiguedad-historico-content" class="tab-content hidden space-y-6">
+                <section class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
+                    <div class="p-4 border-b border-slate-800 flex justify-between items-center"><h3 class="font-bold text-sm text-white flex items-center"><i class="fa-solid fa-coins text-cyan-600 mr-2"></i> Prestaciones de Antigüedad Procesadas</h3></div>
+                    <div class="overflow-x-auto overflow-y-auto max-h-[65vh] custom-scrollbar">
+                        <table class="w-full text-left text-xs whitespace-nowrap">
+                            <thead class="bg-slate-950 text-slate-400 uppercase text-[10px] tracking-wider sticky top-0 z-20 shadow-[0_1px_0_0_#1e293b]">
+                                <tr><th class="p-3.5">F. Corte</th><th class="p-3.5">Empleado</th><th class="p-3.5">Tiempo Serv.</th><th class="p-3.5">Garantía + Int (Bs)</th><th class="p-3.5">Retroactivo (Bs)</th><th class="p-3.5">Monto Definitivo (Bs)</th><th class="p-3.5">Equiv. ($)</th><th class="p-3.5 text-right">Acciones</th></tr>
+                            </thead>
+                            <tbody id="tabla-historico-antiguedad-body" class="divide-y divide-slate-800/50"></tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <!-- LIQUIDACIONES -->
+            <div id="tab-liquidaciones-content" class="tab-content hidden space-y-6">
+                <section class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl space-y-5">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-800 pb-3">
+                        <div><h3 class="font-bold text-sm text-white flex items-center"><i class="fa-solid fa-scale-balanced text-amber-500 mr-2 text-base"></i> Liquidaciones de Personal</h3>
+                        <p class="text-[11px] text-slate-400">Finiquito de relación laboral (Prestaciones Art. 142, Vacaciones y Utilidades Fracc. LOTTT)</p></div>
+                        <span class="inline-flex items-center text-xs px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20 font-medium"><i class="fa-solid fa-file-contract mr-1.5"></i> Liquidación Definitiva</span>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-3 bg-slate-950 p-4 rounded-xl border border-slate-800">
+                        <div class="lg:col-span-2"><label class="text-[11px] font-semibold text-slate-400 block mb-1">Empleado</label><select id="pres-emp-select" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-amber-500"></select></div>
+                        <div><label class="text-[11px] font-semibold text-slate-400 block mb-1">Fecha Egreso</label><input type="date" id="pres-fecha-calculo" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-amber-500"></div>
+                        <div><label class="text-[11px] font-semibold text-slate-400 block mb-1">Motivo Egreso</label><select id="pres-motivo" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-amber-500"><option>Renuncia Voluntaria</option><option>Despido Injustificado</option><option>Mutuo Acuerdo</option><option>Fin de Contrato</option></select></div>
+                        <div><label class="text-[11px] font-semibold text-slate-400 block mb-1">Concepto Deducción</label><input type="text" id="pres-desc-concepto" placeholder="Ej: Préstamo, Anticipo, CxC" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-amber-500"></div>
+                        <div><label class="text-[11px] font-semibold text-slate-400 block mb-1">Monto Deducción ($)</label><input type="number" step="0.01" id="pres-desc-monto" value="0.00" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-amber-500"></div>
+                    </div>
+                    <div class="flex justify-end"><button onclick="calcularPrestaciones()" class="w-full sm:w-auto bg-amber-600 hover:bg-amber-500 text-white text-xs px-6 py-2.5 rounded-lg font-bold flex items-center justify-center space-x-2"><i class="fa-solid fa-calculator text-sm mr-1"></i><span>Calcular Liquidación</span></button></div>
+                </section>
+                <div id="pres-resultado-container" class="hidden space-y-6">
+                    <section class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-2xl space-y-6 p-5">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-800 pb-4">
+                            <h3 class="font-bold text-base text-white"><i class="fa-solid fa-file-signature text-amber-500 mr-2"></i> Recibo de Liquidación - <span id="res-pres-emp-nombre" class="text-amber-400"></span></h3>
+                            <div class="flex space-x-2">
+                                <button onclick="guardarPrestaciones()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-3.5 py-1.5 rounded-lg font-semibold shadow"><i class="fa-solid fa-save mr-1"></i>Guardar</button>
+                                <button onclick="enviarWhatsAppPrestaciones()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3.5 py-1.5 rounded-lg font-semibold shadow"><i class="fa-brands fa-whatsapp mr-1"></i>WhatsApp</button>
+                                <button onclick="imprimirReciboPrestaciones()" class="bg-amber-600 hover:bg-amber-500 text-white text-xs px-3.5 py-1.5 rounded-lg font-semibold shadow"><i class="fa-solid fa-print mr-1"></i>Imprimir Recibo</button>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 bg-slate-950/70 p-3.5 rounded-lg border border-slate-800 text-xs">
+                            <div><span class="text-slate-400 text-[10px] block uppercase">Cédula:</span><span id="res-pres-cedula" class="font-bold text-white">-</span></div>
+                            <div><span class="text-slate-400 text-[10px] block uppercase">Cargo:</span><span id="res-pres-cargo" class="font-semibold text-purple-400">-</span></div>
+                            <div><span class="text-slate-400 text-[10px] block uppercase">Ingreso:</span><span id="res-pres-ingreso" class="font-mono text-emerald-400">-</span></div>
+                            <div><span class="text-slate-400 text-[10px] block uppercase">Egreso:</span><span id="res-pres-egreso" class="font-mono text-rose-400">-</span></div>
+                            <div><span class="text-slate-400 text-[10px] block uppercase">Tiempo Servicio:</span><span id="res-pres-tiempo" class="font-bold text-sky-400">-</span></div>
+                        </div>
+                        <div class="space-y-2">
+                            <div class="flex justify-between items-center"><h4 class="text-xs font-bold text-amber-500 uppercase"><i class="fa-solid fa-scale-balanced mr-1.5"></i> Conceptos de Finiquito (LOTTT)</h4><span class="text-[11px] text-slate-400">Salario Diario: <strong id="lbl-pres-salario-diario" class="text-white"></strong> | BCV: <strong id="lbl-tasa-bcv-pres" class="text-white"></strong></span></div>
+                            <div class="overflow-x-auto overflow-y-auto max-h-[65vh] custom-scrollbar border border-slate-800 rounded-lg">
+                                <table class="w-full text-left text-xs"><thead class="bg-slate-950 text-slate-400 uppercase text-[10px] sticky top-0 z-20 shadow-[0_1px_0_0_#1e293b]"><tr><th class="p-3">Concepto Legal</th><th class="p-3 text-center">Días</th><th class="p-3">Base Diario</th><th class="p-3">Monto ($)</th><th class="p-3">Monto (Bs)</th></tr></thead>
+                                <tbody id="tabla-liq-body" class="divide-y divide-slate-800/50"></tbody>
+                                <tfoot id="tabla-liq-foot" class="bg-slate-950 font-bold border-t-2 border-slate-700 text-white"></tfoot></table>
+                            </div>
+                        </div>
+                        <div class="bg-gradient-to-r from-amber-950/60 to-slate-900 border-2 border-amber-500/40 p-4 rounded-xl flex justify-between items-center">
+                            <span class="text-xs uppercase font-extrabold text-amber-500 block">Gran Total Liquidación Final</span>
+                            <div class="text-right flex space-x-4">
+                                <div><span class="text-[10px] text-slate-400 uppercase font-semibold">Divisas</span><span id="res-pres-gran-total-usd" class="text-xl font-black text-emerald-400 block font-mono"></span></div>
+                                <div class="border-l border-slate-700 pl-4"><span class="text-[10px] text-slate-400 uppercase font-semibold">Bolívares</span><span id="res-pres-gran-total-bs" class="text-xl font-black text-emerald-400 block font-mono"></span></div>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+
+            <!-- HISTÓRICO LIQUIDACIONES -->
+            <div id="tab-liquidaciones-historico-content" class="tab-content hidden space-y-6">
+                <section class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
+                    <div class="p-4 border-b border-slate-800 flex justify-between items-center"><h3 class="font-bold text-sm text-white flex items-center"><i class="fa-solid fa-file-signature text-amber-600 mr-2"></i> Liquidaciones Procesadas</h3></div>
+                    <div class="overflow-x-auto overflow-y-auto max-h-[65vh] custom-scrollbar">
+                        <table class="w-full text-left text-xs whitespace-nowrap">
+                            <thead class="bg-slate-950 text-slate-400 uppercase text-[10px] tracking-wider sticky top-0 z-20 shadow-[0_1px_0_0_#1e293b]">
+                                <tr><th class="p-3.5">F. Cálculo</th><th class="p-3.5">Empleado</th><th class="p-3.5">Motivo</th><th class="p-3.5">Tiempo Serv.</th><th class="p-3.5 text-center">Días Antig.</th><th class="p-3.5">Total ($)</th><th class="p-3.5">Total (Bs)</th><th class="p-3.5 text-right">Acciones</th></tr>
+                            </thead>
+                            <tbody id="tabla-historico-prestaciones-body" class="divide-y divide-slate-800/50"></tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <!-- GESTIÓN DE USUARIOS -->
+            <div id="tab-usuarios-content" class="tab-content hidden space-y-6">
+                <section class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
+                    <div class="p-4 border-b border-slate-800 flex justify-between items-center">
+                        <div><h3 class="font-bold text-sm text-white flex items-center"><i class="fa-solid fa-users-gear text-indigo-400 mr-2"></i> Control de Usuarios y Permisos</h3>
+                        <p class="text-[11px] text-slate-400">Usuarios sincronizados en la nube de Supabase (Accesibles desde cualquier dispositivo)</p></div>
+                        <button onclick="abrirCrearUsuario()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-3.5 py-2 rounded-lg font-semibold flex items-center space-x-1.5 transition shadow-lg shadow-indigo-600/20"><i class="fa-solid fa-user-plus"></i><span>Nuevo Usuario</span></button>
+                    </div>
+                    <div class="overflow-x-auto overflow-y-auto max-h-[65vh] custom-scrollbar">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-slate-950 text-slate-400 uppercase text-[10px] tracking-wider sticky top-0 z-20 shadow-[0_1px_0_0_#1e293b]">
+                                <tr><th class="p-3.5 text-center">Estado</th><th class="p-3.5">Nombre Completo</th><th class="p-3.5">Nombre de Usuario</th><th class="p-3.5">Nivel / Rol</th><th class="p-3.5">Módulos Asignados</th><th class="p-3.5 text-right">Acciones</th></tr>
+                            </thead>
+                            <tbody id="tabla-usuarios-body" class="divide-y divide-slate-800/50"></tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <!-- PARÁMETROS -->
+            <div id="tab-parametros-content" class="tab-content hidden space-y-6">
+                <section class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl space-y-6">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-800 pb-3">
+                        <div><h3 class="font-bold text-sm text-white flex items-center"><i class="fa-solid fa-sliders text-blue-400 mr-2 text-base"></i> Parámetros de la Empresa y Cálculos</h3>
+                        <p class="text-[11px] text-slate-400">Datos corporativos para recibos y tabla de tasas mensuales (Intereses BCV y Cambiaria)</p></div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <label class="bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-400 border border-emerald-500/30 text-xs px-3.5 py-2 rounded-lg font-bold flex items-center space-x-1.5 transition shadow cursor-pointer" title="Carga el archivo Excel 1_3_18.xlsx descargado del portal del BCV"><i class="fa-solid fa-file-excel"></i><span>Importar 1_3_18.xlsx (BCV)</span><input type="file" id="input-bcv-excel" accept=".xlsx, .xls" class="hidden" onchange="importarExcelBCV(event)"></label>
+                            <button id="btn-sync-tasas-mes" onclick="sincronizarTasasCierreMesBCV()" class="bg-sky-600/20 hover:bg-sky-600/40 text-sky-400 border border-sky-500/30 text-xs px-3.5 py-2 rounded-lg font-bold flex items-center space-x-1.5 transition shadow"><i class="fa-solid fa-cloud-arrow-down"></i><span>Sincronizar Cierres BCV</span></button>
+                            <button onclick="guardarParametrosGenerales()" class="bg-blue-600 hover:bg-blue-500 text-white text-xs px-4 py-2 rounded-lg font-bold flex items-center space-x-1.5 shadow"><i class="fa-solid fa-save"></i><span>Guardar Cambios</span></button>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 bg-slate-950 p-4 rounded-xl border border-slate-800">
+                        <div><label class="text-[11px] font-semibold text-slate-400 block mb-1">Nombre de la Empresa (Recibos)</label><input type="text" id="param-empresa-nombre" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-blue-500"></div>
+                        <div><label class="text-[11px] font-semibold text-slate-400 block mb-1">RIF de la Empresa</label><input type="text" id="param-empresa-rif" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-blue-500"></div>
+                        <div><label class="text-[11px] font-semibold text-slate-400 block mb-1">Días Utilidades Base</label><input type="number" id="param-dias-utilidades" value="30" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-blue-500"></div>
+                        <div><label class="text-[11px] font-semibold text-slate-400 block mb-1">Valor U.T. Vigente (SENIAT Bs.)</label><input type="number" step="0.01" id="param-valor-ut" value="9.00" class="w-full bg-slate-900 border border-amber-500/40 rounded-lg p-2 text-xs text-amber-300 font-bold font-mono outline-none focus:border-amber-500"></div>
+                        <div>
+                            <label class="text-[11px] font-semibold text-slate-400 block mb-1">Riesgo IVSS (Aporte Empresa)</label>
+                            <select id="param-riesgo-ivss" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-blue-500">
+                                <option value="9">Riesgo Mínimo (9% Patronal)</option>
+                                <option value="10">Riesgo Medio (10% Patronal)</option>
+                                <option value="11">Riesgo Máximo (11% Patronal)</option>
+                            </select>
+                        </div>
+                        <div class="flex items-center pt-5">
+                            <input type="checkbox" id="param-aplica-lpp" checked class="w-4 h-4 text-emerald-600 rounded bg-slate-950 border-slate-800">
+                            <label for="param-aplica-lpp" class="ml-2 text-xs text-slate-300 font-medium">Aplicar Ley Protección Pensiones (9% SENIAT)</label>
+                        </div>
+                    </div>
+                    <div class="space-y-3">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                            <h4 class="text-xs font-bold text-blue-400 uppercase tracking-wider flex items-center"><i class="fa-solid fa-calendar-days mr-1.5"></i> Tasas Mensuales BCV (Columna E - 1_3_18.xlsx) y Cierre Dólar Oficial</h4>
+                            <div class="flex items-center space-x-2"><span class="text-[11px] text-slate-400">LOTTT Art. 143 (Tasa Promedio / 12)</span>
+                            <button onclick="guardarTasasMensualesPermanente()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] px-3 py-1 rounded font-bold transition flex items-center space-x-1"><i class="fa-solid fa-floppy-disk"></i><span>Guardar Tasas</span></button></div>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 bg-slate-950 p-3.5 rounded-xl border border-slate-800">
+                            <div><label class="text-[11px] text-slate-400 block mb-1">Mes (Año-Mes)</label><input type="month" id="tasa-mes-input" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none"></div>
+                            <div><label class="text-[11px] text-slate-400 block mb-1">Tasa Promedio BCV (% Anual)</label><input type="number" step="0.01" id="tasa-prom-anual-input" value="47.56" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none"></div>
+                            <div><label class="text-[11px] text-slate-400 block mb-1">Tasa Dólar Cierre (Bs/$)</label><input type="number" step="0.01" id="tasa-dolar-mes-input" value="36.50" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none"></div>
+                            <div class="flex items-end"><button onclick="agregarTasaMensual()" class="w-full bg-blue-600 hover:bg-blue-500 text-white text-xs px-3 py-2.5 rounded-lg font-bold flex items-center justify-center space-x-1 transition"><i class="fa-solid fa-plus"></i><span>Registrar Tasa</span></button></div>
+                        </div>
+                        <div class="overflow-x-auto overflow-y-auto max-h-[65vh] custom-scrollbar border border-slate-800 rounded-xl">
+                            <table class="w-full text-left text-xs whitespace-nowrap">
+                                <thead class="bg-slate-950 text-slate-400 uppercase text-[10px] tracking-wider sticky top-0 z-20 shadow-[0_1px_0_0_#1e293b]">
+                                    <tr><th class="p-3">Mes</th><th class="p-3">Tasa Promedio BCV (% Anual)</th><th class="p-3">Tasa Mensual (%) [Promedio/12]</th><th class="p-3">Tasa Dólar Cierre (Bs/$)</th><th class="p-3 text-right">Acciones</th></tr>
+                                </thead>
+                                <tbody id="tabla-tasas-mes-body" class="divide-y divide-slate-800/50"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div id="panel-superadmin-features" class="border border-indigo-900/60 bg-slate-950 p-5 rounded-xl space-y-4 shadow-xl">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-indigo-950 pb-3">
+                            <div>
+                                <h4 class="text-xs font-bold text-indigo-400 uppercase tracking-wider flex items-center">
+                                    <i class="fa-solid fa-toggle-on mr-2 text-sm"></i> Matriz de Funcionalidades y Módulos Activos (Feature Flags)
+                                </h4>
+                                <p class="text-[10px] text-slate-400">Activa o desactiva opciones según el contrato y requerimientos de esta empresa</p>
+                            </div>
+                            <button onclick="guardarFeatureFlagsConfig()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-4 py-2 rounded-lg font-bold flex items-center space-x-1.5 transition shadow-lg shadow-indigo-600/30">
+                                <i class="fa-solid fa-floppy-disk"></i><span>Aplicar Cambios a la Empresa</span>
+                            </button>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="contenedor-features-checkboxes"></div>
+                    </div>
+                </section>
+            </div>
+        </main>
+
+        <!-- MODAL DESGLOSE NOMINA -->
+        <div id="modal-detalle-nomina" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+            <div class="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-6xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+                <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-950">
+                    <div><h3 class="font-bold text-sm text-white"><i class="fa-solid fa-list text-emerald-400 mr-2"></i> Desglose Nómina <span id="detalle-fecha-pago" class="text-sky-400"></span></h3></div>
+                    <div class="flex space-x-2">
+                        <button onclick="imprimirDesglose()" class="bg-sky-600 hover:bg-sky-500 text-white text-xs px-3.5 py-1.5 rounded-lg font-semibold flex items-center space-x-1.5"><i class="fa-solid fa-print"></i><span>Imprimir</span></button>
+                        <button onclick="closeModal('modal-detalle-nomina')" class="text-slate-400 px-2"><i class="fa-solid fa-xmark text-lg"></i></button>
+                    </div>
+                </div>
+                <div id="area-impresion" class="p-4 overflow-y-auto custom-scrollbar">
+                    <div class="hidden print:block mb-4 border-b pb-2"><h2 class="text-lg font-bold">Reporte General de Nómina</h2><p class="text-xs">Fecha: <span id="print-fecha-pago"></span></p></div>
+                    <table class="w-full text-left text-xs whitespace-nowrap">
+                        <thead class="bg-slate-950 text-slate-400 uppercase text-[9px] sticky top-0 z-20 shadow-[0_1px_0_0_#1e293b]">
+                            <tr><th class="p-2.5">Empleado</th><th class="p-2.5">Cargo</th><th class="p-2.5">S. Quincena</th><th class="p-2.5">Asignac.</th><th class="p-2.5">IVSS 4%</th><th class="p-2.5">RPE 0.5%</th><th class="p-2.5">FAOV 1%</th><th class="p-2.5">Otr. Desc</th><th class="p-2.5">Salario (Bs)</th><th class="p-2.5">Alimentación (Bs)</th><th class="p-2.5">Subsidio (Bs)</th><th class="p-2.5">Neto ($)</th><th class="p-2.5">Neto (Bs)</th></tr>
+                        </thead>
+                        <tbody id="tabla-detalle-body" class="divide-y divide-slate-800/50"></tbody>
+                        <tfoot id="tabla-detalle-foot" class="bg-slate-950 font-bold border-t border-slate-700"></tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL RECIBOS -->
+        <div id="modal-recibos-nomina" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+            <div class="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-4xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+                <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-950">
+                    <div><h3 class="font-bold text-sm text-white"><i class="fa-solid fa-receipt text-emerald-400 mr-2"></i> Recibos de Pago <span id="recibos-fecha-pago" class="text-emerald-400"></span></h3></div>
+                    <div class="flex space-x-2">
+                        <button onclick="imprimirRecibos()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-4 py-2 rounded-lg font-bold flex items-center space-x-1.5"><i class="fa-solid fa-print"></i><span>IMPRIMIR RECIBOS</span></button>
+                        <button onclick="closeModal('modal-recibos-nomina')" class="text-slate-400 px-2"><i class="fa-solid fa-xmark text-lg"></i></button>
+                    </div>
+                </div>
+                <div id="area-impresion-recibos" class="p-4 md:p-6 overflow-y-auto bg-slate-900 h-full custom-scrollbar"></div>
+            </div>
+        </div>
+
+        <!-- MODAL ANTICIPOS DE PRESTACIONES -->
+        <div id="modal-anticipos" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+            <div class="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-950">
+                    <div><h3 class="font-bold text-sm text-white"><i class="fa-solid fa-hand-holding-dollar text-cyan-400 mr-2"></i> Anticipos de Prestaciones - <span id="modal-anticipos-emp" class="text-cyan-400"></span></h3>
+                    <p class="text-[11px] text-slate-400 mt-0.5">Cada anticipo se descuenta del capital acumulado en su fecha (LOTTT Art. 143)</p></div>
+                    <button onclick="closeModal('modal-anticipos')" class="text-slate-400 px-2"><i class="fa-solid fa-xmark text-lg"></i></button>
+                </div>
+                <div class="p-4 bg-slate-950 border-b border-slate-800">
+                    <input type="hidden" id="anticipo-emp-id">
+                    <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+                        <div class="sm:col-span-3"><label class="text-[11px] text-slate-400 block mb-1">Fecha del Anticipo</label>
+                        <input type="date" id="anticipo-fecha" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-cyan-500"></div>
+                        <div class="sm:col-span-4"><label class="text-[11px] text-slate-400 block mb-1">Monto (Bs)</label>
+                        <input type="number" step="0.01" id="anticipo-monto" placeholder="0.00" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-cyan-500"></div>
+                        <div class="sm:col-span-5"><label class="text-[11px] text-slate-400 block mb-1">Concepto (Opcional)</label>
+                            <div class="flex gap-2">
+                                <input type="text" id="anticipo-concepto" placeholder="Ej: Adelanto personal" class="flex-1 bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-cyan-500">
+                                <button onclick="agregarAnticipo()" class="bg-cyan-600 hover:bg-cyan-500 text-white text-xs px-3 py-2 rounded-lg font-bold flex items-center justify-center space-x-1 transition"><i class="fa-solid fa-plus"></i><span>Registrar</span></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="overflow-y-auto custom-scrollbar p-4" style="max-height: 45vh;">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-slate-950 text-slate-400 uppercase text-[10px] sticky top-0 z-10"><tr><th class="p-2.5">Fecha</th><th class="p-2.5">Monto (Bs)</th><th class="p-2.5">Concepto</th><th class="p-2.5 text-right">Acción</th></tr></thead>
+                        <tbody id="tabla-anticipos-body" class="divide-y divide-slate-800/50"></tbody>
+                        <tfoot><tr class="bg-slate-900/60 font-bold"><td class="p-2.5 text-slate-300">TOTAL ANTICIPOS:</td><td class="p-2.5 text-cyan-300 font-mono" id="total-anticipos-bs">Bs. 0.00</td><td colspan="2"></td></tr></tfoot>
+                    </table>
+                </div>
+                <div class="p-4 border-t border-slate-800 flex justify-end bg-slate-950">
+                    <button onclick="closeModal('modal-anticipos')" class="px-4 py-2 rounded-lg text-xs bg-slate-800 text-slate-300 hover:bg-slate-700">Cerrar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL CONCILIACIÓN MES A MES PRESTACIONES -->
+        <div id="modal-conciliacion" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+            <div class="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-[95vw] shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+                <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-950">
+                    <div>
+                        <h3 class="font-bold text-sm text-white"><i class="fa-solid fa-table-list text-cyan-400 mr-2"></i> Conciliación Mes a Mes — Prestaciones (Art. 142/143 LOTTT)</h3>
+                        <p class="text-[11px] text-slate-400 mt-0.5" id="conciliacion-subtitulo">-</p>
+                    </div>
+                    <div class="flex space-x-2">
+                        <button onclick="imprimirConciliacion()" class="bg-cyan-600 hover:bg-cyan-500 text-white text-xs px-3.5 py-1.5 rounded-lg font-semibold flex items-center space-x-1.5"><i class="fa-solid fa-print"></i><span>Imprimir</span></button>
+                        <button onclick="closeModal('modal-conciliacion')" class="text-slate-400 px-2"><i class="fa-solid fa-xmark text-lg"></i></button>
+                    </div>
+                </div>
+                <div id="area-conciliacion" class="p-4 overflow-auto custom-scrollbar"></div>
+            </div>
+        </div>
+
+        <!-- MODAL USUARIO -->
+        <div id="modal-usuario" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+            <div class="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-md shadow-2xl overflow-hidden">
+                <div class="p-4 border-b border-slate-800 flex justify-between items-center"><h3 id="modal-usr-titulo" class="font-bold text-white text-sm flex items-center"><i class="fa-solid fa-user-shield text-indigo-400 mr-2"></i> Gestión de Usuario</h3>
+                <button onclick="closeModal('modal-usuario')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button></div>
+                <div class="p-5 space-y-4">
+                    <input type="hidden" id="usr-id">
+                    <div><label class="text-[11px] text-slate-300 font-semibold block mb-1">Nombre Completo</label><input type="text" id="usr-nombre" placeholder="Ej: María Hernández" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white outline-none focus:border-indigo-500"></div>
+                    <div><label class="text-[11px] text-slate-300 font-semibold block mb-1">Nombre de Usuario (Login)</label><input type="text" id="usr-login" placeholder="Ej: maria.rrhh" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white outline-none focus:border-indigo-500"></div>
+                    <div><label class="text-[11px] text-slate-300 font-semibold block mb-1">Contraseña</label><input type="password" id="usr-clave" placeholder="Ingresa contraseña" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white outline-none focus:border-indigo-500"></div>
+                    <div><label class="text-[11px] text-slate-300 font-semibold block mb-1">Nivel / Rol de Acceso</label>
+                    <select id="usr-rol" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white outline-none focus:border-indigo-500"><option value="master">Master (Control Total + Licencias de Software)</option>
+<option value="administrador">Administrador (Gestión Completa de la Empresa)</option>
+<option value="consulta">Consulta (Solo Reportes e Históricos)</option></select></div>
+                    <div class="pt-1 flex items-center"><input type="checkbox" id="usr-activo" class="mr-2 w-4 h-4 text-indigo-600 rounded bg-slate-950 border-slate-800"><label for="usr-activo" class="text-xs text-slate-300 font-medium">Usuario Activo (Permite iniciar sesión)</label></div>
+                </div>
+                <div class="p-4 border-t border-slate-800 flex justify-end space-x-2 bg-slate-950">
+                    <button onclick="closeModal('modal-usuario')" class="px-3.5 py-1.5 rounded-lg text-xs bg-slate-800 text-slate-300 hover:bg-slate-700">Cancelar</button>
+                    <button onclick="guardarUsuario()" class="px-4 py-1.5 rounded-lg text-xs bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition">Guardar Usuario</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODALES CRUD -->
+        <div id="modal-empleado" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+            <div class="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-lg shadow-2xl overflow-hidden">
+                <div class="p-4 border-b border-slate-800 flex justify-between"><h3 id="modal-emp-titulo" class="font-bold text-white">Empleado</h3><button onclick="closeModal('modal-empleado')" class="text-slate-400"><i class="fa-solid fa-xmark"></i></button></div>
+                <div class="p-4 space-y-3">
+                    <input type="hidden" id="emp-id">
+                    <div class="grid grid-cols-2 gap-3"><div><label class="text-[11px] text-slate-400 block mb-1">F. Ingreso</label><input type="date" id="emp-fecha" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white"></div><div><label class="text-[11px] text-slate-400 block mb-1">Cédula</label><input type="text" id="emp-cedula" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white"></div></div>
+                    <div class="grid grid-cols-2 gap-3"><div><label class="text-[11px] text-slate-400 block mb-1">Nombre</label><input type="text" id="emp-nombre" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white"></div><div><label class="text-[11px] text-slate-400 block mb-1">Teléfono</label><input type="text" id="emp-telefono" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white"></div></div>
+                    <div class="grid grid-cols-2 gap-3"><div><label class="text-[11px] text-slate-400 block mb-1">Departamento</label><select id="emp-depto-select" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white"></select></div><div><label class="text-[11px] text-slate-400 block mb-1">Cargo</label><select id="emp-cargo-select" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white"></select></div></div>
+                    <div class="grid grid-cols-3 gap-3 border-t border-slate-800 pt-2"><div><label class="text-[11px] text-slate-400 block mb-1">Salario ($)</label><input type="number" step="0.01" id="emp-sueldo" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white"></div><div><label class="text-[11px] text-slate-400 block mb-1">B. Alim ($)</label><input type="number" step="0.01" id="emp-bono-alim" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white"></div><div data-feature="empleados.subsidio"><label class="text-[11px] text-slate-400 block mb-1">Subsidio ($)</label><input type="number" step="0.01" id="emp-otros-ing" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white"></div><div><label class="text-[11px] text-slate-400 block mb-1">% Retención ISLR (AR-I)</label><input type="number" step="0.01" id="emp-islr" placeholder="0.00" min="0" max="100" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-amber-300 font-bold font-mono outline-none focus:border-amber-500"></div></div>
+                    <div class="border-t border-slate-800 pt-2">
+<label class="text-[11px] text-amber-400 block mb-1"><i class="fa-solid fa-fingerprint mr-1"></i>ID Dispositivo Dahua (asistencia)</label>
+<input type="text" id="emp-device-user-id" placeholder="Ej: 7 (UserID que aparece en el reloj)" class="w-full bg-slate-950 border border-amber-500/30 rounded-lg p-2 text-xs text-white">
+<p class="text-[10px] text-slate-500 mt-1">Es el número que aparece como "ID de usuario" en el reporte del Dahua.</p>
+</div>
+                    <div class="pt-2"><input type="checkbox" id="emp-activo" class="mr-1"> <label class="text-xs text-slate-300">Empleado Activo</label></div>
+                </div>
+                <div class="p-4 border-t border-slate-800 flex justify-end space-x-2"><button onclick="closeModal('modal-empleado')" class="px-3 py-1.5 rounded-lg text-xs bg-slate-800 text-slate-300">Cancelar</button><button onclick="guardarEmpleado()" class="px-3 py-1.5 rounded-lg text-xs bg-sky-600 text-white font-bold">Guardar</button></div>
+            </div>
+        </div>
+
+        <div id="modal-departamento" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+            <div class="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-sm overflow-hidden shadow-2xl"><div class="p-4 border-b border-slate-800 flex justify-between"><h3 id="modal-depto-titulo" class="font-bold text-white">Depto</h3><button onclick="closeModal('modal-departamento')" class="text-slate-400"><i class="fa-solid fa-xmark"></i></button></div><div class="p-4"><input type="hidden" id="depto-id"><input type="text" id="depto-nombre" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white"></div><div class="p-4 border-t border-slate-800 flex justify-end space-x-2"><button onclick="closeModal('modal-departamento')" class="px-3 py-1.5 bg-slate-800 text-xs rounded-lg text-slate-300">Cancelar</button><button onclick="guardarDepartamento()" class="px-3 py-1.5 bg-amber-600 text-white text-xs font-bold rounded-lg">Guardar</button></div></div>
+        </div>
+
+        <div id="modal-cargo" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+            <div class="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-sm overflow-hidden shadow-2xl"><div class="p-4 border-b border-slate-800 flex justify-between"><h3 id="modal-cargo-titulo" class="font-bold text-white">Cargo</h3><button onclick="closeModal('modal-cargo')" class="text-slate-400"><i class="fa-solid fa-xmark"></i></button></div><div class="p-4"><input type="hidden" id="cargo-id"><input type="text" id="cargo-nombre" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white"></div><div class="p-4 border-t border-slate-800 flex justify-end space-x-2"><button onclick="closeModal('modal-cargo')" class="px-3 py-1.5 bg-slate-800 text-xs rounded-lg text-slate-300">Cancelar</button><button onclick="guardarCargo()" class="px-3 py-1.5 bg-purple-600 text-white text-xs font-bold rounded-lg">Guardar</button></div></div>
+        </div>
+
+        <!-- MODAL GENERADOR DE DOCUMENTOS LABORALES -->
+        <div id="modal-constancia" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+            <div class="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-4xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh]">
+                <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-950">
+                    <h3 class="font-bold text-sm text-white flex items-center">
+                        <i class="fa-solid fa-file-contract text-teal-400 mr-2"></i> Gestión de Documentos Laborales - <span id="doc-emp-nombre" class="ml-1 text-teal-300"></span>
+                    </h3>
+                    <div class="flex space-x-2">
+                        <button onclick="imprimirDocumentoLaboral()" class="bg-teal-600 hover:bg-teal-500 text-white text-xs px-3.5 py-1.5 rounded-lg font-semibold flex items-center space-x-1.5 transition shadow">
+                            <i class="fa-solid fa-print"></i><span>Imprimir Documento</span>
+                        </button>
+                        <button onclick="closeModal('modal-constancia')" class="text-slate-400 px-2"><i class="fa-solid fa-xmark text-lg"></i></button>
+                    </div>
+                </div>
+                <div class="p-4 bg-slate-950 border-b border-slate-800 space-y-3">
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                            <label class="text-[11px] font-semibold text-slate-400 block mb-1">Tipo de Documento</label>
+                            <select id="doc-tipo" onchange="toggleFormulariosDocumento()" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-teal-500 font-bold">
+                                <option value="constancia_con_sueldo">Constancia de Trabajo (Con Salario)</option>
+                                <option value="constancia_sin_sueldo">Constancia de Trabajo (Sin Salario)</option>
+                                <option value="amonestacion">Amonestación Escrita (Art. 79 LOTTT)</option>
+                            </select>
+                        </div>
+                        <div id="campo-dirigido">
+                            <label class="text-[11px] font-semibold text-slate-400 block mb-1">Destinatario</label>
+                            <input type="text" id="const-dirigido" value="A QUIEN PUEDA INTERESAR" oninput="actualizarVistaPreviaDocumento()" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-teal-500">
+                        </div>
+                        <div>
+                            <label class="text-[11px] font-semibold text-slate-400 block mb-1">Ciudad de Emisión</label>
+                            <input type="text" id="const-ciudad" value="Caracas" oninput="actualizarVistaPreviaDocumento()" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-teal-500">
+                        </div>
+                    </div>
+                    <div id="form-amonestacion-opciones" class="hidden grid grid-cols-1 sm:grid-cols-12 gap-3 pt-2 border-t border-slate-800">
+                        <div class="sm:col-span-5">
+                            <label class="text-[11px] font-semibold text-rose-400 block mb-1">Causal Legal (Art. 79 LOTTT)</label>
+                            <select id="amon-causal" onchange="actualizarVistaPreviaDocumento()" class="w-full bg-slate-900 border border-rose-900/60 rounded-lg p-2 text-xs text-white outline-none focus:border-rose-500">
+                                <option value="art79_f">Art. 79 lit. f: Inasistencia injustificada al trabajo</option>
+                                <option value="art79_i">Art. 79 lit. i: Impuntualidad o abandono reiterado</option>
+                                <option value="art79_a">Art. 79 lit. a: Falta de probidad o conducta inmoral</option>
+                                <option value="art79_c">Art. 79 lit. c: Falta grave de respeto o desobediencia</option>
+                            </select>
+                        </div>
+                        <div class="sm:col-span-2">
+                            <label class="text-[11px] font-semibold text-rose-400 block mb-1">Fecha de la Falta</label>
+                            <input type="date" id="amon-fecha-falta" onchange="actualizarVistaPreviaDocumento()" class="w-full bg-slate-900 border border-rose-900/60 rounded-lg p-2 text-xs text-white outline-none focus:border-rose-500">
+                        </div>
+                        <div class="sm:col-span-5">
+                            <label class="text-[11px] font-semibold text-rose-400 block mb-1">Relato Concreto de los Hechos</label>
+                            <input type="text" id="amon-hechos" placeholder="Ej: No se presentó a su jornada laboral sin presentar justificativo médico." oninput="actualizarVistaPreviaDocumento()" class="w-full bg-slate-900 border border-rose-900/60 rounded-lg p-2 text-xs text-white outline-none focus:border-rose-500">
+                        </div>
+                    </div>
+                </div>
+                <div id="area-impresion-constancia" class="p-6 overflow-y-auto bg-slate-900 h-full custom-scrollbar"></div>
+            </div>
+        </div>
+
+        <!-- MODAL GESTIÓN DE ENLACES E IMPRESIÓN AR-I -->
+        <div id="modal-gestion-ari" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+            <div class="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-xl shadow-2xl overflow-hidden flex flex-col">
+                <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-950">
+                    <h3 class="font-bold text-sm text-white flex items-center">
+                        <i class="fa-solid fa-receipt text-amber-400 mr-2"></i> Formulario AR-I (I.S.L.R.) - <span id="ari-modal-emp-nombre" class="ml-1 text-amber-300"></span>
+                    </h3>
+                    <button onclick="closeModal('modal-gestion-ari')" class="text-slate-400 px-2"><i class="fa-solid fa-xmark text-lg"></i></button>
+                </div>
+                <div class="p-5 space-y-4 text-xs">
+                    <input type="hidden" id="ari-modal-emp-id">
+                    <div class="bg-slate-950 p-3.5 rounded-lg border border-slate-800 flex justify-between items-center">
+                        <div>
+                            <span class="text-slate-400 text-[10px] uppercase font-bold block">Porcentaje de Retención Actual:</span>
+                            <span id="ari-modal-pct-actual" class="text-lg font-black font-mono text-emerald-400">0.00%</span>
+                        </div>
+                        <button onclick="imprimirPlanillaARISENIAT()" class="bg-sky-600/20 hover:bg-sky-600/40 text-sky-400 border border-sky-500/30 px-3 py-1.5 rounded-lg font-bold transition">
+                            <i class="fa-solid fa-print mr-1"></i> Imprimir Planilla SENIAT
+                        </button>
+                    </div>
+                    <div class="space-y-2 border-t border-slate-800 pt-3">
+                        <span class="font-bold text-white block">Generar Enlace Seguro de Un Solo Uso:</span>
+                        <p class="text-[11px] text-slate-400 leading-tight">
+                            Genera un link temporal (72 horas) para que el trabajador llene sus datos desde su teléfono. Una vez enviado, el link se autodestruye.
+                        </p>
+                        <div class="flex gap-2">
+                            <button onclick="generarTokenYEnlaceARI()" class="bg-amber-600 hover:bg-amber-500 text-white font-bold px-3 py-2 rounded-lg flex items-center space-x-1 transition shadow">
+                                <i class="fa-solid fa-wand-magic-sparkles mr-1"></i><span>Generar Enlace</span>
+                            </button>
+                            <input type="text" id="ari-enlace-generado" readonly placeholder="Presione Generar Enlace..." class="flex-1 bg-slate-950 border border-slate-700 rounded-lg p-2 font-mono text-slate-300 outline-none">
+                        </div>
+                    </div>
+                    <div id="contenedor-acciones-enlace" class="hidden flex gap-2 pt-1">
+                        <button onclick="copiarEnlaceARI()" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-200 py-2 rounded-lg font-semibold flex items-center justify-center space-x-1">
+                            <i class="fa-solid fa-copy mr-1"></i><span>Copiar Enlace</span>
+                        </button>
+                        <button onclick="enviarWhatsAppEnlaceARI()" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-lg font-bold flex items-center justify-center space-x-1 shadow">
+                            <i class="fa-brands fa-whatsapp mr-1"></i><span>Enviar por WhatsApp</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div> <!-- FIN APP WRAPPER -->
+
+    <!-- ============================================================
+         CARGA DE MÓDULOS JS (ORDEN DE DEPENDENCIA ESTRICTO)
+         ============================================================ -->
+    <script src="js/config.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/state.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/conexion.js"></script>
+    <script src="js/empleados.js"></script>
+    <script src="js/usuarios.js"></script>
+    <script src="js/dashboard.js"></script>
+    <script src="js/historico_salarios.js"></script>
+    <script src="js/nomina.js"></script>
+    <script src="js/prestamos.js"></script>
+    <script src="js/tasas.js"></script>
+    <script src="js/vacaciones.js"></script>
+    <script src="js/utilidades.js"></script>
+    <script src="js/antiguedad.js"></script>
+    <script src="js/liquidaciones.js"></script>
+    <script src="js/asistencia.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
