@@ -113,9 +113,6 @@
             firmaPad = new SignaturePad(canvas, { backgroundColor: 'rgba(255,255,255,0)' });
         }
 
-        // ═══════════════════════════════════════════════════════════════
-        // RECIBO IDÉNTICO AL DE NOMINA.JS (Pero adaptado para la firma)
-        // ═══════════════════════════════════════════════════════════════
         function generarHTMLRecibo(r, e, firmaBase64 = null) {
             const t = Number(r.tasa_bcv || 1);
             const sM = Number(r.salario_minimo_bs || 130);
@@ -182,11 +179,9 @@
             const mN = fO.toLocaleString('es-ES', { month: 'long' }).toUpperCase();
             const tP = `RECIBO DE PAGO ${qT} DE ${mN} ${y}`;
 
-            // Bloque de firma (inyectado solo en el PDF)
             const bloqueFirmaHtml = firmaBase64 
                 ? `<img src="${firmaBase64}" style="height: 30px; display: block; margin: 0 auto; object-fit: contain;">`
                 : '';
-            
             const cedulaHtml = firmaBase64 ? `<span class="font-bold text-[10px]">${e.cedula}</span>` : '';
 
             return `
@@ -242,7 +237,6 @@
                     
                     <div class="border border-black p-1 mb-1 text-[7.5px] text-black leading-tight bg-slate-50"><strong>OBSERVACIÓN:</strong> El subsidio no posee naturaleza salarial, ya que no desprende de la intención retributiva del trabajo prestado sino un beneficio eminentemente social para cubrir parte de sus gastos por bienes y/o servicios básicos en que incurre el trabajador. Por tal motivo se otorga como una ayuda al trabajador sin que sea de carácter obligatorio en futuras ocasiones.</div>
                     
-                    <!-- FIRMA Y CÉDULA -->
                     <div class="border-t border-black pt-1 mt-4">
                         <h4 class="text-center font-extrabold text-[8.5px] tracking-wider mb-2 text-black">RECIBO CONFORME</h4>
                         <div class="grid grid-cols-2 gap-4 text-[9px] font-semibold text-black items-end">
@@ -278,22 +272,24 @@
             btn.disabled = true;
 
             const firmaBase64 = firmaPad.toDataURL('image/png');
-            
-            // 1. Generar el HTML con la firma incrustada
             const htmlPDF = generarHTMLRecibo(docDataGlobal, empDataGlobal, firmaBase64);
 
-            // 2. Contenedor temporal visible para renderizar
+            // 1. Contenedor temporal para renderizar el PDF (invisible pero dibujado)
             const wrapper = document.createElement('div');
-            wrapper.style.cssText = `position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #fff; z-index: 99999; display: flex; justify-content: center; padding-top: 10px;`;
+            wrapper.style.cssText = `
+                position: absolute; top: 0; left: 0; width: 100%; z-index: -9999; opacity: 0.01; pointer-events: none;
+                display: flex; justify-content: center;
+            `;
             
-            // Ancho exacto para hoja A4 sin cortes
+            // 2. Ancho de 790px (estándar A4 a 96dpi) para evitar cortes laterales
             const inner = document.createElement('div');
-            inner.style.cssText = `width: 740px; background: #fff;`;
+            inner.style.cssText = `width: 790px; background: #fff; padding: 10px; box-sizing: border-box;`;
             inner.innerHTML = htmlPDF;
             
             wrapper.appendChild(inner);
             document.body.appendChild(wrapper);
 
+            // 3. Esperar a que la imagen de la firma cargue
             const img = inner.querySelector('img');
             if (img) {
                 await new Promise((resolve) => {
@@ -305,19 +301,26 @@
                     }
                 });
             }
-            await new Promise(r => setTimeout(r, 300));
+            await new Promise(r => setTimeout(r, 400)); // Delay para renderizado
 
-            // 3. Formatear nombre del archivo
+            // 4. Formatear nombre (Nomina 15/10/2026)
             const fecha = docDataGlobal.fecha_pago;
             const [y, m, d] = fecha.split('-');
-            const nombreArchivo = `Nomina - ${d}-${m}-${y}.pdf`;
+            const nombreDescriptivo = `Nomina ${d}/${m}/${y}`; // Título para la BD
+            const nombreArchivo = `Nomina ${d}-${m}-${y}.pdf`; // Nombre del archivo físico
 
-            // 4. Generar PDF
+            // 5. Generar PDF
             const opt = {
                 margin: 5,
                 filename: nombreArchivo,
                 image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+                html2canvas: { 
+                    scale: 2, 
+                    useCORS: true, 
+                    backgroundColor: '#ffffff',
+                    windowWidth: 800, // Forzar ancho de renderizado
+                    scrollY: 0
+                },
                 jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
             };
 
@@ -335,14 +338,13 @@
 
             document.body.removeChild(wrapper);
 
-            // 5. Subir a Supabase
+            // 6. Guardar en Supabase
             const pdfBlob = await (await fetch(pdfBase64)).blob();
             const arrayBuffer = await pdfBlob.arrayBuffer();
             const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
             const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
 
-            const sanitizedFileName = nombreArchivo.replace(/\s/g, '_');
-            const storagePath = `${firmaDataGlobal.empleado_id}/${sanitizedFileName}`;
+            const storagePath = `${firmaDataGlobal.empleado_id}/${nombreArchivo.replace(/\s/g, '_')}`;
 
             const { error: uploadError } = await supabaseClient.storage.from('expediente').upload(storagePath, pdfBlob, { upsert: true });
             
@@ -353,10 +355,11 @@
 
             const { data: urlData } = supabaseClient.storage.from('expediente').getPublicUrl(storagePath);
 
+            // Insertar con el nombre "Nomina 15/10/2026"
             await supabaseClient.from('expediente_documentos').insert([{
                 empleado_id: firmaDataGlobal.empleado_id,
                 tipo_documento: firmaDataGlobal.tipo_documento,
-                nombre_descriptivo: nombreArchivo.replace('.pdf', ''),
+                nombre_descriptivo: nombreDescriptivo,
                 url_archivo: urlData.publicUrl,
                 hash_sha256: hashHex,
                 visible_empleado: true,
