@@ -644,15 +644,6 @@ function generarHTMLReciboSolo(r, fecha) {
             <table class="w-full text-[9.5px] print:text-[8px] border border-black mb-1">
                 <tbody class="divide-y divide-slate-200">
                     <tr><td class="px-1.5 py-0.5 text-black">Días no laborados (${r.dias_faltantes || 0} d)</td><td class="px-1.5 py-0.5 text-right font-mono w-28 text-black">${fNum(dfb)}</td></tr>
-                    // En la celda de Días Faltantes, agregar:
-<td class="p-3 text-center" style="min-width: 90px;">
-    <div class="flex items-center gap-1 justify-center">
-        <input type="number" id="df-${e.id}" value="${dfVal}" min="0" ... class="...">
-        <button onclick="abrirJustificativoFalta(${e.id})" class="text-indigo-400 hover:text-indigo-300" title="Adjuntar justificativo">
-            <i class="fa-solid fa-paperclip text-xs"></i>
-        </button>
-    </div>
-</td>
                     <tr><td class="px-1.5 py-0.5 text-black">S.S.O. / IVSS (4%)</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(sso)}</td></tr>
                     <tr><td class="px-1.5 py-0.5 text-black">L.P.H. / FAOV (1%)</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(lph)}</td></tr>
                     <tr><td class="px-1.5 py-0.5 text-black">Paro Forzoso / RPE (0,5%)</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(rpe)}</td></tr>
@@ -754,7 +745,7 @@ const { data: firmasExistentes } = await supabaseClient
     .in('documento_id', regs.map(r => r.id));
 
     const mapaFirmas = {};
-    (firmasExistentes || []).forEach(f => { mapaFirmas[String(f.nomina_id)] = f; });
+    (firmasExistentes || []).forEach(f => { mapaFirmas[String(f.documento_id)] = f; });
 
     gId('tabla-firmas-body').innerHTML = regs.map(r => {
         const firma = mapaFirmas[String(r.id)];
