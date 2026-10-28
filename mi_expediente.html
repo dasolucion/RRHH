@@ -16,7 +16,7 @@
 
     <div id="portal" class="max-w-2xl mx-auto hidden"></div>
 
-    <script>
+ <script>
         const SUPABASE_URL = 'https://nrfplwpmwplpbskidtqs.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yZnBsd3Btd3BscGJza2lkdHFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc1OTA4MjIsImV4cCI6MjEwMzE2NjgyMn0.PZXrE9KtAVF2e4RbyM3-m1ClS8R8QaTCctLzZKAAYdQ';
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -33,21 +33,21 @@
         async function cargarPortal() {
             console.log("Token recibido:", token);
 
+            // Buscamos el token y hacemos el JOIN con la tabla empleados
             const { data: tokenData, error } = await supabaseClient
                 .from('tokens_portal_empleado')
                 .select('*, empleados(*)')
                 .eq('token', token)
                 .maybeSingle();
 
-            console.log("Respuesta de Supabase (TokenData):", tokenData);
-            console.log("Error de Supabase:", error);
-
             if (error) {
+                console.error("Error Supabase:", error);
                 document.getElementById('loading').innerHTML = `
-                    <div class="bg-white p-6 rounded-lg text-center max-w-md mx-auto">
+                    <div class="bg-white p-6 rounded-lg text-center max-w-md mx-auto border border-rose-200">
                         <i class="fa-solid fa-triangle-exclamation text-rose-500 text-4xl mb-3"></i>
-                        <h2 class="font-bold text-lg">Error de conexión</h2>
-                        <p class="text-sm text-slate-600">${error.message}</p>
+                        <h2 class="font-bold text-lg text-slate-900">Error de Base de Datos</h2>
+                        <p class="text-xs text-slate-600 mt-2 bg-rose-50 p-2 rounded">${error.message}</p>
+                        <p class="text-[10px] text-slate-400 mt-3">Detalle técnico: ${error.details || 'Sin detalles'}</p>
                     </div>
                 `;
                 return;
@@ -55,21 +55,11 @@
 
             if (!tokenData) {
                 document.getElementById('loading').innerHTML = `
-                    <div class="bg-white p-6 rounded-lg text-center max-w-md mx-auto">
-                        <i class="fa-solid fa-link-slash text-rose-500 text-4xl mb-3"></i>
-                        <h2 class="font-bold text-lg">Enlace inválido o desactivado</h2>
-                        <p class="text-sm text-slate-600">Este enlace no existe en la base de datos. Pídele a RRHH que lo genere de nuevo.</p>
-                    </div>
-                `;
-                return;
-            }
-
-            if (!tokenData.activo) {
-                document.getElementById('loading').innerHTML = `
-                    <div class="bg-white p-6 rounded-lg text-center max-w-md mx-auto">
-                        <i class="fa-solid fa-ban text-amber-500 text-4xl mb-3"></i>
-                        <h2 class="font-bold text-lg">Enlace desactivado</h2>
-                        <p class="text-sm text-slate-600">Este portal ha sido desactivado por Recursos Humanos.</p>
+                    <div class="bg-white p-6 rounded-lg text-center max-w-md mx-auto border border-amber-200">
+                        <i class="fa-solid fa-link-slash text-amber-500 text-4xl mb-3"></i>
+                        <h2 class="font-bold text-lg text-slate-900">Enlace inválido</h2>
+                        <p class="text-sm text-slate-600 mt-2">El token <b>${token.substring(0,8)}...</b> no existe en la base de datos.</p>
+                        <p class="text-xs text-slate-500 mt-2">Pídele a RRHH que vuelva a generar tu enlace desde el sistema principal.</p>
                     </div>
                 `;
                 return;
@@ -77,10 +67,10 @@
 
             if (!tokenData.empleados) {
                 document.getElementById('loading').innerHTML = `
-                    <div class="bg-white p-6 rounded-lg text-center max-w-md mx-auto">
+                    <div class="bg-white p-6 rounded-lg text-center max-w-md mx-auto border border-rose-200">
                         <i class="fa-solid fa-user-xmark text-rose-500 text-4xl mb-3"></i>
-                        <h2 class="font-bold text-lg">Empleado no encontrado</h2>
-                        <p class="text-sm text-slate-600">El enlace está vinculado a un empleado que ya no existe en el sistema.</p>
+                        <h2 class="font-bold text-lg text-slate-900">Empleado no encontrado</h2>
+                        <p class="text-sm text-slate-600 mt-2">El enlace está vinculado a un empleado que ya no existe o fue eliminado de la base de datos.</p>
                     </div>
                 `;
                 return;
@@ -89,12 +79,17 @@
             const emp = tokenData.empleados;
             await supabaseClient.from('tokens_portal_empleado').update({ last_access: new Date().toISOString() }).eq('token', token);
 
-            const { data: pendientes } = await supabaseClient
+            // Verificar si hay firmas pendientes
+            const { data: pendientes, error: errPend } = await supabaseClient
                 .from('firmas_recibos')
                 .select('*')
                 .eq('empleado_id', emp.id)
                 .eq('estado', 'pendiente')
                 .order('fecha_emision', { ascending: false });
+
+            if (errPend) {
+                console.warn("Error buscando pendientes:", errPend);
+            }
 
             if (pendientes && pendientes.length > 0) {
                 mostrarPantallaBloqueo(emp, pendientes);
