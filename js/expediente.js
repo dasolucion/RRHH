@@ -60,13 +60,16 @@ async function cargarArchivosExpediente(empId) {
         const badge = doc.visible_empleado
             ? '<span class="text-[9px] bg-emerald-950 text-emerald-300 px-1.5 py-0.5 rounded">Visible al empleado</span>'
             : '<span class="text-[9px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded">Solo sistema</span>';
+        
         return `<tr class="border-b border-slate-800 hover:bg-slate-800/40">
             <td class="p-2">
                 <div class="flex items-center gap-2">
                     <i class="fa-solid ${tipo.icon} text-${tipo.color}-400"></i>
                     <div>
-                        <div class="text-xs font-bold text-white">${doc.nombre_descriptivo}</div>
-                        <div class="text-[9px] text-slate-500">${tipo.label}</div>
+                        <!-- TÍTULO (Lista desplegable) -->
+                        <div class="text-xs font-bold text-white">${tipo.label}</div>
+                        <!-- SUBTÍTULO (Lo que el usuario escribió) -->
+                        <div class="text-[9px] text-slate-400">${doc.nombre_descriptivo}</div>
                     </div>
                 </div>
             </td>
