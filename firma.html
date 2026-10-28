@@ -53,6 +53,7 @@
         const token = urlParams.get('token');
         let firmaPad = null;
         let firmaDataGlobal = null;
+        let empDataGlobal = null;
         let paramsEmpresa = { nombre_empresa: 'EMPRESA', rif_empresa: 'J-00000000-0' };
 
         function fNum(n) {
@@ -84,7 +85,6 @@
                 return;
             }
             
-            // ⚡ VALIDACIÓN DE EXPIRACIÓN (30 MIN)
             if (firmaData.expira_en && new Date(firmaData.expira_en) < new Date()) {
                 document.getElementById('loading').innerHTML = `
                     <div class="bg-white rounded-xl shadow-lg p-8 max-w-md mx-auto text-center">
@@ -136,6 +136,7 @@
                 .select('*')
                 .eq('id', firmaData.empleado_id)
                 .single();
+            empDataGlobal = empData;
 
             renderizarDocumento(firmaData, docData, empData);
 
@@ -311,101 +312,200 @@
             if (firmaPad) firmaPad.clear();
         }
 
-        async function enviarFirma() {
-            if (!firmaPad || firmaPad.isEmpty()) {
-                alert('Por favor, firme el recibo antes de enviar.');
-                return;
-            }
-            const btn = document.querySelector('button[onclick="enviarFirma()"]');
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Procesando...';
-            btn.disabled = true;
+      async function enviarFirma() {
+    if (!firmaPad || firmaPad.isEmpty()) {
+        alert('Por favor, firme el recibo antes de enviar.');
+        return;
+    }
+    const btn = document.querySelector('button[onclick="enviarFirma()"]');
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Procesando...';
+    btn.disabled = true;
 
-            const firmaBase64 = firmaPad.toDataURL('image/png');
-            const element = document.getElementById('recibo-html');
+    const firmaBase64 = firmaPad.toDataURL('image/png');
+    const elementOriginal = document.getElementById('recibo-html');
 
-            const bloqueFirma = document.createElement('div');
-            bloqueFirma.style.marginTop = '20px';
-            bloqueFirma.style.paddingTop = '10px';
-            bloqueFirma.style.borderTop = '1px solid #000';
-            bloqueFirma.innerHTML = `
-                <div style="font-size: 9px; font-weight: bold; text-align: center; margin-bottom: 8px;">FIRMA DIGITAL DEL TRABAJADOR</div>
-                <img src="${firmaBase64}" style="width: 180px; display: block; margin: 0 auto; border-bottom: 1px solid #000;">
-                <div style="font-size: 8px; text-align: center; margin-top: 4px; color: #555;">Firmado digitalmente el ${new Date().toLocaleString('es-VE')}</div>
-            `;
-            element.appendChild(bloqueFirma);
+    // ═══════════════════════════════════════════════════════════════
+    // 1. CLONAR EL RECIBO PRIMERO (sin firma todavía)
+    // ═══════════════════════════════════════════════════════════════
+    const clone = elementOriginal.cloneNode(true);
+    clone.style.cssText = `
+        width: 800px !important;
+        max-width: 800px !important;
+        min-width: 800px !important;
+        background: #ffffff !important;
+        padding: 20px !important;
+        box-sizing: border-box !important;
+        font-family: ui-sans-serif, system-ui, -apple-system, sans-serif !important;
+        color: #000000 !important;
+    `;
 
-            const opt = {
-                margin: 10,
-                filename: 'documento_firmado.pdf',
-                image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { scale: 2, useCORS: true },
-                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-            };
+    // ═══════════════════════════════════════════════════════════════
+    // 2. AGREGAR BLOQUE DE FIRMA AL CLON (no al original)
+    // ═══════════════════════════════════════════════════════════════
+    const bloqueFirma = document.createElement('div');
+    bloqueFirma.style.cssText = `
+        margin-top: 15px;
+        padding-top: 10px;
+        border-top: 1px solid #000;
+    `;
+    bloqueFirma.innerHTML = `
+        <div style="font-size: 9px; font-weight: bold; text-align: center; margin-bottom: 6px; letter-spacing: 1px; color: #000;">
+            FIRMA DIGITAL DEL TRABAJADOR
+        </div>
+        <div style="display: flex; justify-content: center;">
+            <img id="img-firma-pdf" src="${firmaBase64}" style="width: 220px; display: block;">
+        </div>
+        <div style="border-bottom: 1px solid #000; width: 240px; margin: 2px auto 0 auto;"></div>
+        <div style="font-size: 9px; text-align: center; margin-top: 6px; line-height: 1.5; color: #000;">
+            <div><strong>${empDataGlobal?.nombre || 'Trabajador'}</strong></div>
+            <div>C.I. ${empDataGlobal?.cedula || '-'}</div>
+            <div style="color: #666; margin-top: 3px; font-size: 8px;">
+                Firmado digitalmente el ${new Date().toLocaleString('es-VE')}
+            </div>
+        </div>
+    `;
+    clone.appendChild(bloqueFirma);
 
-            const pdfBase64 = await html2pdf().from(element).set(opt).outputPdf('datauristring');
+    // ═══════════════════════════════════════════════════════════════
+    // 3. WRAPPER INVISIBLE (overflow hidden, no top: -10000px)
+    // ═══════════════════════════════════════════════════════════════
+    const wrapper = document.createElement('div');
+    wrapper.style.cssText = `
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 800px !important;
+        height: 0 !important;
+        overflow: hidden !important;
+        z-index: -1 !important;
+        pointer-events: none !important;
+    `;
+    wrapper.appendChild(clone);
+    document.body.appendChild(wrapper);
 
-            bloqueFirma.remove();
+    // ═══════════════════════════════════════════════════════════════
+    // 4. ESPERAR FUENTES E IMAGEN DE LA FIRMA
+    // ═══════════════════════════════════════════════════════════════
+    try { await document.fonts.ready; } catch (e) {}
+    
+    await new Promise((resolve) => {
+        const img = clone.querySelector('#img-firma-pdf');
+        if (!img || img.complete) return resolve();
+        img.onload = resolve;
+        img.onerror = resolve;
+        setTimeout(resolve, 1500); // timeout de seguridad
+    });
+    
+    await new Promise(r => setTimeout(r, 300));
 
-            const pdfBlob = await (await fetch(pdfBase64)).blob();
-            const arrayBuffer = await pdfBlob.arrayBuffer();
-            const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
-            const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+    // ═══════════════════════════════════════════════════════════════
+    // 5. GENERAR PDF
+    // ═══════════════════════════════════════════════════════════════
+    const opt = {
+        margin: 5,
+        filename: `recibo_${(firmaDataGlobal.periodo_nomina || 'documento').replace(/\//g, '-')}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: {
+            scale: 2.5,
+            useCORS: true,
+            logging: false,
+            backgroundColor: '#ffffff'
+        },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
 
-            const tipoLabel = {
-                nomina: 'Nomina',
-                vacaciones: 'Vacaciones',
-                prestaciones: 'Prestaciones',
-                utilidades: 'Utilidades',
-                liquidacion: 'Liquidacion'
-            }[firmaDataGlobal.tipo_documento] || 'Documento';
+    let pdfBase64;
+    try {
+        pdfBase64 = await html2pdf().from(clone).set(opt).outputPdf('datauristring');
+    } catch (e) {
+        console.error('Error generando PDF:', e);
+        alert('Error al generar PDF: ' + (e.message || 'desconocido'));
+        document.body.removeChild(wrapper);
+        btn.innerHTML = '<i class="fa-solid fa-check mr-1"></i> Firmar y Enviar';
+        btn.disabled = false;
+        return;
+    }
 
-            const sanitizedPeriodo = (firmaDataGlobal.periodo_nomina || 'SinPeriodo').replace(/[^a-zA-Z0-9]/g, '_');
-            const fileName = `${firmaDataGlobal.empleado_id}/${tipoLabel}_${sanitizedPeriodo}_${firmaDataGlobal.id.substring(0, 6)}.pdf`;
+    // ═══════════════════════════════════════════════════════════════
+    // 6. LIMPIAR (remover wrapper)
+    // ═══════════════════════════════════════════════════════════════
+    document.body.removeChild(wrapper);
 
-            const { error: uploadError } = await supabaseClient.storage
-                .from('expediente')
-                .upload(fileName, pdfBlob, { upsert: true });
+    // ═══════════════════════════════════════════════════════════════
+    // 7. HASH SHA-256
+    // ═══════════════════════════════════════════════════════════════
+    const pdfBlob = await (await fetch(pdfBase64)).blob();
+    const arrayBuffer = await pdfBlob.arrayBuffer();
+    const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+    const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
 
-            if (uploadError) {
-                alert('Error al subir: ' + uploadError.message);
-                btn.innerHTML = '<i class="fa-solid fa-check mr-1"></i> Firmar y Enviar';
-                btn.disabled = false;
-                return;
-            }
+    // ═══════════════════════════════════════════════════════════════
+    // 8. SUBIR A STORAGE
+    // ═══════════════════════════════════════════════════════════════
+    const tipoLabel = {
+        nomina: 'Nomina',
+        vacaciones: 'Vacaciones',
+        prestaciones: 'Prestaciones',
+        utilidades: 'Utilidades',
+        liquidacion: 'Liquidacion'
+    }[firmaDataGlobal.tipo_documento] || 'Documento';
 
-            const { data: urlData } = supabaseClient.storage.from('expediente').getPublicUrl(fileName);
+    const sanitizedPeriodo = (firmaDataGlobal.periodo_nomina || 'SinPeriodo').replace(/[^a-zA-Z0-9]/g, '_');
+    const fileName = `${firmaDataGlobal.empleado_id}/${tipoLabel}_${sanitizedPeriodo}_${firmaDataGlobal.id.substring(0, 6)}.pdf`;
 
-            await supabaseClient.from('expediente_documentos').insert([{
-                empleado_id: firmaDataGlobal.empleado_id,
-                tipo_documento: firmaDataGlobal.tipo_documento,
-                nombre_descriptivo: `${tipoLabel} - ${firmaDataGlobal.periodo_nomina || 'Sin período'}`,
-                url_archivo: urlData.publicUrl,
-                hash_sha256: hashHex,
-                visible_empleado: true,
-                subido_por: 'empleado'
-            }]);
+    const { error: uploadError } = await supabaseClient.storage
+        .from('expediente')
+        .upload(fileName, pdfBlob, { upsert: true });
 
-            await supabaseClient.from('firmas_recibos').update({
-                estado: 'firmado',
-                url_pdf_firmado: urlData.publicUrl,
-                hash_sha256_pdf: hashHex,
-                fecha_firmado: new Date().toISOString(),
-                user_agent_firmado: navigator.userAgent.substring(0, 200)
-            }).eq('token', token);
+    if (uploadError) {
+        alert('Error al subir: ' + uploadError.message);
+        btn.innerHTML = '<i class="fa-solid fa-check mr-1"></i> Firmar y Enviar';
+        btn.disabled = false;
+        return;
+    }
 
-            document.getElementById('contenido-recibo').innerHTML = `
-                <div class="bg-white rounded-xl shadow-lg p-8 text-center max-w-md mx-auto">
-                    <div class="text-emerald-500 text-6xl mb-4"><i class="fa-solid fa-circle-check"></i></div>
-                    <h2 class="text-xl font-bold mb-2 text-slate-900">¡Documento Firmado!</h2>
-                    <p class="text-sm text-slate-600 mb-2">Su firma fue registrada exitosamente.</p>
-                    <p class="text-[10px] text-slate-500 mb-4 font-mono">Hash de integridad: ${hashHex.substring(0, 16)}...</p>
-                    <a href="${urlData.publicUrl}" target="_blank" class="bg-sky-600 hover:bg-sky-700 text-white px-6 py-3 rounded-lg text-sm font-bold inline-block shadow-lg">
-                        <i class="fa-solid fa-download mr-2"></i> Descargar Recibo Firmado
-                    </a>
-                    <p class="text-[10px] text-slate-500 mt-4">También fue guardado automáticamente en su expediente digital.</p>
-                </div>
-            `;
-        }
+    const { data: urlData } = supabaseClient.storage.from('expediente').getPublicUrl(fileName);
+
+    // ═══════════════════════════════════════════════════════════════
+    // 9. REGISTRAR EN EXPEDIENTE
+    // ═══════════════════════════════════════════════════════════════
+    await supabaseClient.from('expediente_documentos').insert([{
+        empleado_id: firmaDataGlobal.empleado_id,
+        tipo_documento: firmaDataGlobal.tipo_documento,
+        nombre_descriptivo: `${tipoLabel} - ${firmaDataGlobal.periodo_nomina || 'Sin período'}`,
+        url_archivo: urlData.publicUrl,
+        hash_sha256: hashHex,
+        visible_empleado: true,
+        subido_por: 'empleado'
+    }]);
+
+    // ═══════════════════════════════════════════════════════════════
+    // 10. MARCAR FIRMA COMO COMPLETADA
+    // ═══════════════════════════════════════════════════════════════
+    await supabaseClient.from('firmas_recibos').update({
+        estado: 'firmado',
+        url_pdf_firmado: urlData.publicUrl,
+        hash_sha256_pdf: hashHex,
+        fecha_firmado: new Date().toISOString(),
+        user_agent_firmado: navigator.userAgent.substring(0, 200)
+    }).eq('token', token);
+
+    // ═══════════════════════════════════════════════════════════════
+    // 11. PANTALLA DE ÉXITO
+    // ═══════════════════════════════════════════════════════════════
+    document.getElementById('contenido-recibo').innerHTML = `
+        <div class="bg-white rounded-xl shadow-lg p-8 text-center max-w-md mx-auto">
+            <div class="text-emerald-500 text-6xl mb-4"><i class="fa-solid fa-circle-check"></i></div>
+            <h2 class="text-xl font-bold mb-2 text-slate-900">¡Documento Firmado!</h2>
+            <p class="text-sm text-slate-600 mb-2">Su firma fue registrada exitosamente.</p>
+            <p class="text-[10px] text-slate-500 mb-4 font-mono">Hash de integridad: ${hashHex.substring(0, 16)}...</p>
+            <a href="${urlData.publicUrl}" target="_blank" class="bg-sky-600 hover:bg-sky-700 text-white px-6 py-3 rounded-lg text-sm font-bold inline-block shadow-lg">
+                <i class="fa-solid fa-download mr-2"></i> Descargar Recibo Firmado
+            </a>
+            <p class="text-[10px] text-slate-500 mt-4">También fue guardado automáticamente en su expediente digital.</p>
+        </div>
+    `;
+}
     </script>
 </body>
 </html>
