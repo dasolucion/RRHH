@@ -12,6 +12,9 @@
     <style>
         body { font-family: ui-sans-serif, system-ui, sans-serif; }
         #firma-canvas { touch-action: none; }
+        /* Forzar el ajuste de texto en las tablas del PDF */
+        .pdf-table { width: 100%; border-collapse: collapse; table-layout: fixed; margin-bottom: 5px; }
+        .pdf-table td, .pdf-table th { overflow: hidden; word-wrap: break-word; border: 1px solid #000; padding: 4px; font-size: 10px; }
     </style>
 </head>
 <body class="bg-slate-100 text-slate-800 p-3 font-sans min-h-screen">
@@ -111,7 +114,7 @@
         }
 
         // ═══════════════════════════════════════════════════════════════
-        // RECIBO PARA PANTALLA
+        // RECIBO PARA PANTALLA (Igual al de la app)
         // ═══════════════════════════════════════════════════════════════
         function generarHTMLReciboPantalla(r, e) {
             const t = Number(r.tasa_bcv || 1);
@@ -186,7 +189,7 @@
         }
 
         // ═══════════════════════════════════════════════════════════════
-        // RECIBO PARA PDF (Ajustado para no cortar y con firma centrada)
+        // RECIBO PARA PDF (Ajustado estrictamente al tamaño A4 con CSS)
         // ═══════════════════════════════════════════════════════════════
         function generarHTMLParaPDF(r, e, firmaBase64) {
             const t = Number(r.tasa_bcv || 1);
@@ -234,117 +237,123 @@
             const tP = `RECIBO DE PAGO ${qT} DE ${mN} ${y}`;
 
             return `
-            <div style="width: 100%; background: #fff; font-family: Arial, sans-serif; color: #000; padding: 5px; box-sizing: border-box;">
+            <div style="width: 100%; background: #fff; font-family: Arial, sans-serif; color: #000; padding: 0; box-sizing: border-box;">
                 
-                <table style="width: 100%; border-collapse: collapse; margin-bottom: 4px; border-bottom: 2px solid #000;">
+                <table style="width: 100%; border-collapse: collapse; margin-bottom: 5px; border-bottom: 2px solid #000;">
                     <tr>
                         <td style="text-align: left; padding-bottom: 4px;">
-                            <h1 style="font-size: 20px; font-weight: 900; margin: 0; text-transform: uppercase;">${paramsEmpresa.nombre_empresa.split('/')[0].trim()}</h1>
+                            <h1 style="font-size: 18px; font-weight: 900; margin: 0; text-transform: uppercase;">${paramsEmpresa.nombre_empresa.split('/')[0].trim()}</h1>
                         </td>
                         <td style="text-align: right; padding-bottom: 4px;">
-                            <div style="font-size: 11px; font-weight: bold; text-transform: uppercase;">${paramsEmpresa.nombre_empresa}</div>
+                            <div style="font-size: 10px; font-weight: bold; text-transform: uppercase;">${paramsEmpresa.nombre_empresa}</div>
                             <div style="font-size: 9px;">${paramsEmpresa.rif_empresa}</div>
                         </td>
                     </tr>
                 </table>
 
-                <div style="background-color: #dbece0; text-align: center; font-weight: bold; font-size: 12px; padding: 5px; border: 1px solid #000; margin-bottom: 5px; text-transform: uppercase;">
+                <div style="background-color: #dbece0; text-align: center; font-weight: bold; font-size: 11px; padding: 4px; border: 1px solid #000; margin-bottom: 5px; text-transform: uppercase;">
                     ${tP}
                 </div>
 
-                <table style="width: 100%; border-collapse: collapse; margin-bottom: 5px; table-layout: fixed;">
+                <!-- Tabla Datos Empleado (100% ancho) -->
+                <table class="pdf-table">
                     <tr>
-                        <td style="width: 20%; background-color: #f1f5f9; border: 1px solid #000; padding: 4px; font-size: 10px; font-weight: bold;">TRABAJADOR</td>
-                        <td style="width: 40%; border: 1px solid #000; padding: 4px; font-size: 10px; font-weight: bold; text-transform: uppercase;">${r.empleado}</td>
-                        <td style="width: 15%; background-color: #f1f5f9; border: 1px solid #000; padding: 4px; font-size: 10px; font-weight: bold;">CARGO</td>
-                        <td style="width: 25%; border: 1px solid #000; padding: 4px; font-size: 10px; text-transform: uppercase;">${r.cargo || e?.cargos?.nombre || '-'}</td>
+                        <td style="width: 20%; background-color: #f1f5f9; font-weight: bold;">TRABAJADOR</td>
+                        <td style="width: 40%; font-weight: bold; text-transform: uppercase;">${r.empleado}</td>
+                        <td style="width: 15%; background-color: #f1f5f9; font-weight: bold;">CARGO</td>
+                        <td style="width: 25%; text-transform: uppercase;">${r.cargo || e?.cargos?.nombre || '-'}</td>
                     </tr>
                     <tr>
-                        <td style="background-color: #f1f5f9; border: 1px solid #000; padding: 4px; font-size: 10px; font-weight: bold;">CÉDULA</td>
-                        <td style="border: 1px solid #000; padding: 4px; font-size: 10px;">${e?.cedula || r.cedula || '-'}</td>
-                        <td style="background-color: #f1f5f9; border: 1px solid #000; padding: 4px; font-size: 10px; font-weight: bold;">F. INGRESO</td>
-                        <td style="border: 1px solid #000; padding: 4px; font-size: 10px;">${e?.fecha_ingreso || '-'}</td>
+                        <td style="background-color: #f1f5f9; font-weight: bold;">CÉDULA</td>
+                        <td>${e?.cedula || r.cedula || '-'}</td>
+                        <td style="background-color: #f1f5f9; font-weight: bold;">F. INGRESO</td>
+                        <td>${e?.fecha_ingreso || '-'}</td>
                     </tr>
                     <tr>
-                        <td style="background-color: #f1f5f9; border: 1px solid #000; padding: 4px; font-size: 10px; font-weight: bold;">SALARIO MENSUAL</td>
-                        <td colspan="3" style="border: 1px solid #000; padding: 4px; font-size: 10px; font-weight: bold;">${fNum(sm * t)} Bs. ($${sm.toFixed(2)}) | Tasa: ${t.toFixed(2)} Bs/$</td>
+                        <td style="background-color: #f1f5f9; font-weight: bold;">SALARIO MENSUAL</td>
+                        <td colspan="3" style="font-weight: bold;">${fNum(sm * t)} Bs. ($${sm.toFixed(2)}) | Tasa: ${t.toFixed(2)} Bs/$</td>
                     </tr>
                 </table>
 
-                <table style="width: 100%; border-collapse: collapse; margin-bottom: 5px; table-layout: fixed;">
+                <!-- Asignaciones -->
+                <table class="pdf-table">
                     <thead>
                         <tr>
-                            <th style="border: 1px solid #000; padding: 4px; font-size: 10px; font-weight: bold; background-color: #dbece0; text-align: left;" colspan="2">ASIGNACIÓN</th>
-                            <th style="border: 1px solid #000; padding: 4px; font-size: 10px; font-weight: bold; background-color: #dbece0; text-align: right; width: 25%;">MONTO (BS)</th>
+                            <th style="background-color: #dbece0; text-align: left;" colspan="2">ASIGNACIÓN</th>
+                            <th style="background-color: #dbece0; text-align: right; width: 30%;">MONTO (BS)</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <tr><td style="border: 1px solid #000; padding: 4px; font-size: 10px;">Salario quincenal (15 d)</td><td style="border: 1px solid #000; padding: 4px; font-size: 10px; text-align: center; width: 10%;">15 d</td><td style="border: 1px solid #000; padding: 4px; font-size: 10px; text-align: right; font-family: monospace;">${fNum(sqb)}</td></tr>
-                        <tr><td style="border: 1px solid #000; padding: 4px; font-size: 10px;" colspan="2">Bono de alimentación</td><td style="border: 1px solid #000; padding: 4px; font-size: 10px; text-align: right; font-family: monospace;">${fNum(bab)}</td></tr>
-                        <tr><td style="border: 1px solid #000; padding: 4px; font-size: 10px;" colspan="2">Subsidio especial no obligatorio</td><td style="border: 1px solid #000; padding: 4px; font-size: 10px; text-align: right; font-family: monospace;">${fNum(oib + oab)}</td></tr>
+                        <tr><td>Salario quincenal (15 d)</td><td style="text-align: center; width: 10%;">15 d</td><td style="text-align: right; font-family: monospace;">${fNum(sqb)}</td></tr>
+                        <tr><td colspan="2">Bono de alimentación</td><td style="text-align: right; font-family: monospace;">${fNum(bab)}</td></tr>
+                        <tr><td colspan="2">Subsidio especial no obligatorio</td><td style="text-align: right; font-family: monospace;">${fNum(oib + oab)}</td></tr>
                     </tbody>
                     <tfoot>
                         <tr>
-                            <td style="border: 1px solid #000; padding: 4px; font-size: 10px; font-weight: bold; background-color: #f8fafc; text-align: right;" colspan="2">TOTAL ASIGNACIONES</td>
-                            <td style="border: 1px solid #000; padding: 4px; font-size: 10px; text-align: right; font-family: monospace; font-weight: bold; background-color: #f8fafc;">${fNum(tab)}</td>
+                            <td style="background-color: #f8fafc; font-weight: bold; text-align: right;" colspan="2">TOTAL ASIGNACIONES</td>
+                            <td style="background-color: #f8fafc; text-align: right; font-family: monospace; font-weight: bold;">${fNum(tab)}</td>
                         </tr>
                     </tfoot>
                 </table>
 
-                <table style="width: 100%; border-collapse: collapse; margin-bottom: 5px; table-layout: fixed;">
+                <!-- Deducciones -->
+                <table class="pdf-table">
                     <tbody>
-                        <tr><td style="border: 1px solid #000; padding: 4px; font-size: 10px;">Días no laborados (${r.dias_faltantes || 0} d)</td><td style="border: 1px solid #000; padding: 4px; font-size: 10px; text-align: right; font-family: monospace; width: 25%;">${fNum(dfb)}</td></tr>
-                        <tr><td style="border: 1px solid #000; padding: 4px; font-size: 10px;">S.S.O. / IVSS (4%)</td><td style="border: 1px solid #000; padding: 4px; font-size: 10px; text-align: right; font-family: monospace;">${fNum(sso)}</td></tr>
-                        <tr><td style="border: 1px solid #000; padding: 4px; font-size: 10px;">L.P.H. / FAOV (1%)</td><td style="border: 1px solid #000; padding: 4px; font-size: 10px; text-align: right; font-family: monospace;">${fNum(lph)}</td></tr>
-                        <tr><td style="border: 1px solid #000; padding: 4px; font-size: 10px;">Paro Forzoso / RPE (0,5%)</td><td style="border: 1px solid #000; padding: 4px; font-size: 10px; text-align: right; font-family: monospace;">${fNum(rpe)}</td></tr>
-                        ${islrBs > 0 ? `<tr><td style="border: 1px solid #000; padding: 4px; font-size: 10px;">I.S.L.R. Retención (${islrPctVal.toFixed(2)}%)</td><td style="border: 1px solid #000; padding: 4px; font-size: 10px; text-align: right; font-family: monospace;">${fNum(islrBs)}</td></tr>` : ''}
-                        <tr><td style="border: 1px solid #000; padding: 4px; font-size: 10px;">Préstamos / Adelantos amortizados</td><td style="border: 1px solid #000; padding: 4px; font-size: 10px; text-align: right; font-family: monospace;">${fNum(prb)}</td></tr>
-                        <tr><td style="border: 1px solid #000; padding: 4px; font-size: 10px;">Otras deducciones</td><td style="border: 1px solid #000; padding: 4px; font-size: 10px; text-align: right; font-family: monospace;">${fNum(odb)}</td></tr>
-                        <tr><td style="border: 1px solid #000; padding: 4px; font-size: 10px;">Horas descontadas (${r.horas_descuento || 0} hrs)</td><td style="border: 1px solid #000; padding: 4px; font-size: 10px; text-align: right; font-family: monospace;">${fNum(hdb)}</td></tr>
+                        <tr><td>Días no laborados (${r.dias_faltantes || 0} d)</td><td style="text-align: right; font-family: monospace; width: 30%;">${fNum(dfb)}</td></tr>
+                        <tr><td>S.S.O. / IVSS (4%)</td><td style="text-align: right; font-family: monospace;">${fNum(sso)}</td></tr>
+                        <tr><td>L.P.H. / FAOV (1%)</td><td style="text-align: right; font-family: monospace;">${fNum(lph)}</td></tr>
+                        <tr><td>Paro Forzoso / RPE (0,5%)</td><td style="text-align: right; font-family: monospace;">${fNum(rpe)}</td></tr>
+                        ${islrBs > 0 ? `<tr><td>I.S.L.R. Retención (${islrPctVal.toFixed(2)}%)</td><td style="text-align: right; font-family: monospace;">${fNum(islrBs)}</td></tr>` : ''}
+                        <tr><td>Préstamos / Adelantos amortizados</td><td style="text-align: right; font-family: monospace;">${fNum(prb)}</td></tr>
+                        <tr><td>Otras deducciones</td><td style="text-align: right; font-family: monospace;">${fNum(odb)}</td></tr>
+                        <tr><td>Horas descontadas (${r.horas_descuento || 0} hrs)</td><td style="text-align: right; font-family: monospace;">${fNum(hdb)}</td></tr>
                     </tbody>
                     <tfoot>
                         <tr>
-                            <td style="border: 1px solid #000; padding: 4px; font-size: 10px; font-weight: bold; background-color: #f8fafc; text-align: right;">TOTAL DEDUCCIONES</td>
-                            <td style="border: 1px solid #000; padding: 4px; font-size: 10px; text-align: right; font-family: monospace; font-weight: bold; background-color: #f8fafc;">${fNum(tdb)}</td>
+                            <td style="background-color: #f8fafc; font-weight: bold; text-align: right;">TOTAL DEDUCCIONES</td>
+                            <td style="background-color: #f8fafc; text-align: right; font-family: monospace; font-weight: bold;">${fNum(tdb)}</td>
                         </tr>
                     </tfoot>
                 </table>
 
-                <table style="width: 100%; border-collapse: collapse; margin-bottom: 5px; table-layout: fixed;">
+                <!-- Resumen Colores -->
+                <table class="pdf-table">
                     <tr>
-                        <td style="width: 33.33%; background-color: #e0f2fe; border: 1px solid #000; padding: 4px; text-align: center;">
+                        <td style="width: 33.33%; background-color: #e0f2fe; text-align: center; padding: 6px;">
                             <div style="font-size: 9px; font-weight: bold; text-transform: uppercase;">SALARIO</div>
                             <div style="font-size: 11px; font-family: monospace; font-weight: bold;">Bs. ${fNum(salarioBs)}</div>
                         </td>
-                        <td style="width: 33.33%; background-color: #dcfce7; border: 1px solid #000; padding: 4px; text-align: center;">
+                        <td style="width: 33.33%; background-color: #dcfce7; text-align: center; padding: 6px;">
                             <div style="font-size: 9px; font-weight: bold; text-transform: uppercase;">ALIMENTACIÓN</div>
                             <div style="font-size: 11px; font-family: monospace; font-weight: bold;">Bs. ${fNum(alimBs)}</div>
                         </td>
-                        <td style="width: 33.33%; background-color: #fef3c7; border: 1px solid #000; padding: 4px; text-align: center;">
+                        <td style="width: 33.33%; background-color: #fef3c7; text-align: center; padding: 6px;">
                             <div style="font-size: 9px; font-weight: bold; text-transform: uppercase;">SUBSIDIO</div>
                             <div style="font-size: 11px; font-family: monospace; font-weight: bold;">Bs. ${fNum(subsBs)}</div>
                         </td>
                     </tr>
                 </table>
 
-                <div style="display: flex; justify-content: space-between; align-items: center; background-color: #dbece0; border: 1px solid #000; padding: 6px; font-weight: bold; font-size: 13px; margin-bottom: 5px;">
+                <!-- Total Neto -->
+                <div style="display: flex; justify-content: space-between; align-items: center; background-color: #dbece0; border: 1px solid #000; padding: 6px; font-weight: bold; font-size: 12px; margin-bottom: 5px;">
                     <span>TOTAL NETO A COBRAR</span>
                     <span style="font-family: monospace; font-size: 14px;">${fNum(tnb)} Bs.</span>
                 </div>
 
-                <div style="border: 1px solid #000; padding: 6px; font-size: 9px; background-color: #f8fafc; margin-bottom: 30px; text-align: justify; line-height: 1.3;">
+                <!-- Observación -->
+                <div style="border: 1px solid #000; padding: 6px; font-size: 9px; background-color: #f8fafc; margin-bottom: 30px; text-align: justify; line-height: 1.2;">
                     <strong>OBSERVACIÓN:</strong> El subsidio no posee naturaleza salarial, ya que no desprende de la intención retributiva del trabajo prestado sino un beneficio eminentemente social para cubrir parte de sus gastos por bienes y/o servicios básicos en que incurre el trabajador. Por tal motivo se otorga como una ayuda al trabajador sin que sea de carácter obligatorio en futuras ocasiones.
                 </div>
 
-                <!-- FIRMA CENTRADA ÚNICAMENTE DEL EMPLEADO -->
-                <table style="width: 100%; border-collapse: collapse; margin-top: 40px;">
+                <!-- Firma -->
+                <table style="width: 100%; border-collapse: collapse; margin-top: 30px;">
                     <tr>
                         <td style="text-align: center; vertical-align: bottom;">
-                            <img src="${firmaBase64}" style="height: 70px; margin: 0 auto; display: block; object-fit: contain;">
+                            <img src="${firmaBase64}" style="height: 60px; margin: 0 auto; display: block; object-fit: contain;">
                             <div style="border-top: 1px solid #000; width: 250px; margin: 0 auto;"></div>
-                            <div style="font-size: 11px; font-weight: bold; margin-top: 5px;">${e?.nombre || 'Trabajador'}</div>
+                            <div style="font-size: 11px; font-weight: bold; margin-top: 4px;">${e?.nombre || 'Trabajador'}</div>
                             <div style="font-size: 10px;">C.I. ${e?.cedula || '-'}</div>
-                            <div style="font-size: 9px; color: #555; margin-top: 3px;">Firmado el ${new Date().toLocaleString('es-VE')}</div>
+                            <div style="font-size: 9px; color: #555; margin-top: 2px;">Firmado el ${new Date().toLocaleString('es-VE')}</div>
                         </td>
                     </tr>
                 </table>
@@ -367,6 +376,7 @@
             const firmaBase64 = firmaPad.toDataURL('image/png');
             const htmlPDF = generarHTMLParaPDF(docDataGlobal, empDataGlobal, firmaBase64);
 
+            // El contenedor tendrá exactamente 720px (ancho que entra perfecto en la hoja A4)
             const wrapper = document.createElement('div');
             wrapper.style.cssText = `
                 position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -374,9 +384,8 @@
                 padding-top: 20px; box-sizing: border-box;
             `;
             
-            // Ancho de 760px para evitar que se corte por la derecha
             const inner = document.createElement('div');
-            inner.style.cssText = `width: 760px; min-height: 1000px; background: #fff;`;
+            inner.style.cssText = `width: 720px; background: #fff; padding: 10px;`;
             inner.innerHTML = htmlPDF;
             
             wrapper.appendChild(inner);
@@ -401,14 +410,10 @@
             const nombreArchivo = `Nomina - ${d}-${m}-${y}.pdf`;
 
             const opt = {
-                margin: 10, // Margen de 10mm
+                margin: 0, // Margen 0 porque el tamaño interno ya está ajustado
                 filename: nombreArchivo,
                 image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { 
-                    scale: 2, 
-                    useCORS: true, 
-                    backgroundColor: '#ffffff'
-                },
+                html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
                 jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
             };
 
