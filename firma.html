@@ -3,21 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Firma de Recibo</title>
+    <title>Firma de Documento</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <!-- Librerías para generar PDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.1.7/dist/signature_pad.umd.min.js"></script>
 </head>
-<body class="bg-slate-100 text-slate-800 p-4 font-sans">
+<body class="bg-slate-100 text-slate-800 p-4 font-sans min-h-screen">
 
-    <div id="loading" class="text-center mt-10 font-bold text-slate-500">Cargando recibo...</div>
+    <div id="loading" class="text-center mt-10 font-bold text-slate-500">
+        <i class="fa-solid fa-spinner fa-spin mr-2"></i> Cargando documento...
+    </div>
 
     <div id="contenido-recibo" class="bg-white p-5 rounded-lg shadow-lg max-w-md mx-auto hidden">
-        <!-- Aquí se inyectará el HTML del recibo -->
         <div id="recibo-html"></div>
         
-        <!-- Área de Firma -->
         <div class="mt-6 border-t pt-4">
             <p class="text-sm font-bold mb-2">Firme aquí con su dedo:</p>
             <canvas id="firma-canvas" class="border-2 border-dashed border-slate-300 rounded-lg w-full bg-slate-50 touch-none" height="200"></canvas>
@@ -30,104 +30,177 @@
     </div>
 
     <script>
-        const SUPABASE_URL = https://nrfplwpmwplpbskidtqs.supabase.co; // <-- PON AQUÍ TU URL
-        const SUPABASE_ANON_KEY = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yZnBsd3Btd3BscGJza2lkdHFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc1OTA4MjIsImV4cCI6MjEwMzE2NjgyMn0.PZXrE9KtAVF2e4RbyM3-m1ClS8R8QaTCctLzZKAAYdQ; // <-- PON AQUÍ TU KEY
+        // ⚠️ REEMPLAZAR con tus credenciales
+        const SUPABASE_URL = 'https://nrfplwpmwplpbskidtqs.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yZnBsd3Btd3BscGJza2lkdHFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc1OTA4MjIsImV4cCI6MjEwMzE2NjgyMn0.PZXrE9KtAVF2e4RbyM3-m1ClS8R8QaTCctLzZKAAYdQ';
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         const urlParams = new URLSearchParams(window.location.search);
         const token = urlParams.get('token');
         let firmaPad = null;
+        let firmaDataGlobal = null;
+        let nominaDataGlobal = null;
 
         if (!token) {
-            document.getElementById('loading').innerText = 'Enlace inválido o expirado.';
+            document.getElementById('loading').innerText = 'Enlace inválido.';
         } else {
             iniciarFirma();
         }
 
         async function iniciarFirma() {
-            // 1. Verificar token
             const { data: firmaData, error } = await supabaseClient
                 .from('firmas_recibos')
-                .select('*, nominas(*)')
+                .select('*')
                 .eq('token', token)
-                .eq('estado', 'pendiente')
                 .single();
 
             if (error || !firmaData) {
-                document.getElementById('loading').innerText = 'Enlace inválido, expirado o ya firmado.';
+                document.getElementById('loading').innerText = 'Enlace inválido o expirado.';
                 return;
             }
+            if (firmaData.estado === 'firmado') {
+                document.getElementById('loading').innerText = 'Este documento ya fue firmado.';
+                return;
+            }
+            if (firmaData.expira_en && new Date(firmaData.expira_en) < new Date()) {
+                document.getElementById('loading').innerText = 'Este enlace ha expirado. Contacte a RRHH.';
+                return;
+            }
+            firmaDataGlobal = firmaData;
 
-            // 2. Renderizar recibo (usamos los datos de la tabla nominas)
-            document.getElementById('recibo-html').innerHTML = `
-                <h2 class="text-lg font-bold text-center mb-4">Recibo de Pago</h2>
-                <p class="text-sm"><b>Empleado:</b> ${firmaData.nominas.empleado}</p>
-                <p class="text-sm"><b>Fecha:</b> ${firmaData.nominas.fecha_pago}</p>
-                <p class="text-sm"><b>Neto a Cobrar:</b> Bs. ${firmaData.nominas.neto_bs} ($${firmaData.nominas.neto_usd})</p>
-                <p class="text-xs text-slate-500 mt-4 italic">Al firmar, confirma la recepción de su pago.</p>
-            `;
+            // Cargar los datos del documento según el tipo
+            let tablaOrigen = '';
+            switch (firmaData.tipo_documento) {
+                case 'nomina': tablaOrigen = 'nominas'; break;
+                case 'vacaciones': tablaOrigen = 'vacaciones'; break;
+                case 'prestaciones': tablaOrigen = 'antiguedad'; break;
+                case 'utilidades': tablaOrigen = 'utilidades'; break;
+                case 'liquidacion': tablaOrigen = 'prestaciones'; break;
+                default: tablaOrigen = 'nominas';
+            }
+
+            const { data: docData } = await supabaseClient
+                .from(tablaOrigen)
+                .select('*')
+                .eq('id', firmaData.documento_id)
+                .single();
+
+            if (!docData) {
+                document.getElementById('loading').innerText = 'No se encontró el documento asociado.';
+                return;
+            }
+            nominaDataGlobal = docData;
+
+            // Traer datos del empleado
+            const { data: empData } = await supabaseClient
+                .from('empleados')
+                .select('*')
+                .eq('id', firmaData.empleado_id)
+                .single();
+
+            // Renderizar según tipo
+            renderizarDocumento(firmaData, docData, empData);
 
             document.getElementById('loading').classList.add('hidden');
             document.getElementById('contenido-recibo').classList.remove('hidden');
 
-            // 3. Iniciar el canvas de firma
             const canvas = document.getElementById('firma-canvas');
-            firmaPad = new SignaturePad(canvas); // Requiere librería signature_pad
+            firmaPad = new SignaturePad(canvas, { backgroundColor: 'rgba(255,255,255,0)' });
         }
 
-        function limpiarFirma() {
-            if (firmaPad) firmaPad.clear();
+        function renderizarDocumento(firma, doc, emp) {
+            const fechaEmision = new Date(firma.fecha_emision).toLocaleString('es-VE');
+            const periodo = firma.periodo_nomina || '-';
+            const tipoLabel = {
+                nomina: 'Recibo de Nómina',
+                vacaciones: 'Recibo de Vacaciones',
+                prestaciones: 'Recibo de Prestaciones',
+                utilidades: 'Recibo de Utilidades',
+                liquidacion: 'Recibo de Liquidación Final'
+            }[firma.tipo_documento] || 'Recibo';
+
+            // Datos del documento (varían según tipo)
+            const netoUSD = doc.neto_usd || doc.gran_total_usd || doc.monto_definitivo_usd || doc.total_usd || 0;
+            const netoBs = doc.neto_bs || doc.gran_total_bs || doc.monto_definitivo_bs || doc.total_bs || 0;
+
+            document.getElementById('recibo-html').innerHTML = `
+                <h2 class="text-lg font-bold text-center mb-3 text-black">${tipoLabel}</h2>
+                <div class="text-[11px] space-y-1 border border-black p-2 rounded bg-slate-50">
+                    <p><b>Empleado:</b> ${emp?.nombre || doc.empleado || '-'}</p>
+                    <p><b>Cédula:</b> ${emp?.cedula || '-'}</p>
+                    <p><b>Período:</b> ${periodo}</p>
+                    <p><b>Fecha Emisión:</b> ${fechaEmision}</p>
+                    <p><b>ID Documento:</b> <span class="font-mono text-[9px]">${firma.id.substring(0,8)}</span></p>
+                    <p><b>Versión:</b> ${firma.version_documento}</p>
+                    <hr class="my-1 border-slate-400">
+                    <p class="text-base font-bold text-emerald-700">Neto a Cobrar: Bs. ${Number(netoBs).toLocaleString('es-VE',{minimumFractionDigits:2})} ($${Number(netoUSD).toFixed(2)})</p>
+                </div>
+                <p class="text-[10px] text-slate-500 mt-3 italic">Al firmar, confirma la recepción de este documento. Su firma será registrada con trazabilidad completa (fecha/hora, hash de integridad, navegador).</p>
+            `;
         }
+
+        function limpiarFirma() { if (firmaPad) firmaPad.clear(); }
 
         async function enviarFirma() {
             if (!firmaPad || firmaPad.isEmpty()) {
-                alert('Por favor, firme el recibo antes de enviar.');
+                alert('Por favor, firme antes de enviar.');
                 return;
             }
-
             const btn = document.querySelector('button[onclick="enviarFirma()"]');
-            btn.innerText = 'Enviando...';
+            btn.innerText = 'Procesando...';
             btn.disabled = true;
 
-            // 1. Obtener la firma como imagen Base64
             const firmaBase64 = firmaPad.toDataURL('image/png');
-
-            // 2. Generar el PDF
             const element = document.getElementById('contenido-recibo');
-            // Ocultar los botones temporalmente para que no salgan en el PDF
             const botones = element.querySelector('.flex.gap-2');
             if (botones) botones.style.display = 'none';
 
+            // Inyectar firma visual en el HTML del PDF
+            const imgFirma = document.createElement('img');
+            imgFirma.src = firmaBase64;
+            imgFirma.style.width = '180px';
+            imgFirma.style.marginTop = '10px';
+            imgFirma.style.borderBottom = '1px solid #000';
+            element.appendChild(imgFirma);
+
             const opt = {
                 margin: 10,
-                filename: 'recibo_firmado.pdf',
+                filename: 'documento_firmado.pdf',
                 image: { type: 'jpeg', quality: 0.98 },
                 html2canvas: { scale: 2 },
                 jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
             };
 
-            // Convertir la firma a imagen para inyectarla en el HTML temporalmente
-            const imgFirma = document.createElement('img');
-            imgFirma.src = firmaBase64;
-            imgFirma.style.width = '150px';
-            imgFirma.style.marginTop = '10px';
-            element.appendChild(imgFirma);
-
             const pdfBase64 = await html2pdf().from(element).set(opt).outputPdf('datauristring');
 
-            // Restaurar botones
             if (botones) botones.style.display = 'flex';
             imgFirma.remove();
 
-            // 3. Subir el PDF a Supabase Storage
+            // Calcular hash SHA-256 del PDF
             const pdfBlob = await (await fetch(pdfBase64)).blob();
-            const fileName = `${firmaData.empleado_id}/firma_recibo_${token}.pdf`; // firmaData debe estar accesible globalmente
+            const arrayBuffer = await pdfBlob.arrayBuffer();
+            const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+            const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+
+            // Nombre del archivo: nombre del documento + período
+            const tipoLabel = {
+                nomina: 'Nomina',
+                vacaciones: 'Vacaciones',
+                prestaciones: 'Prestaciones',
+                utilidades: 'Utilidades',
+                liquidacion: 'Liquidacion'
+            }[firmaDataGlobal.tipo_documento] || 'Documento';
+
+            const sanitizedPeriodo = (firmaDataGlobal.periodo_nomina || 'SinPeriodo').replace(/[^a-zA-Z0-9]/g, '_');
+            const fileName = `${firmaDataGlobal.empleado_id}/${tipoLabel}_${sanitizedPeriodo}_${firmaDataGlobal.id.substring(0,6)}.pdf`;
+
+            // Subir a Storage
             const { error: uploadError } = await supabaseClient.storage
                 .from('expediente')
                 .upload(fileName, pdfBlob);
 
             if (uploadError) {
-                alert('Error al subir el PDF: ' + uploadError.message);
+                alert('Error al subir: ' + uploadError.message);
                 btn.innerText = 'Firmar y Enviar';
                 btn.disabled = false;
                 return;
@@ -135,25 +208,41 @@
 
             const { data: urlData } = supabaseClient.storage.from('expediente').getPublicUrl(fileName);
 
-            // 4. Actualizar estado del token
+            // Registrar PDF firmado en expediente_documentos (visible al empleado)
+            await supabaseClient.from('expediente_documentos').insert([{
+                empleado_id: firmaDataGlobal.empleado_id,
+                tipo_documento: firmaDataGlobal.tipo_documento,
+                nombre_descriptivo: `${tipoLabel} - ${firmaDataGlobal.periodo_nomina || 'Sin período'}`,
+                url_archivo: urlData.publicUrl,
+                hash_sha256: hashHex,
+                visible_empleado: true,
+                subido_por: 'empleado'
+            }]);
+
+            // Actualizar estado de la firma
             await supabaseClient.from('firmas_recibos').update({
                 estado: 'firmado',
                 url_pdf_firmado: urlData.publicUrl,
-                fecha_firmado: new Date().toISOString()
+                hash_sha256_pdf: hashHex,
+                fecha_firmado: new Date().toISOString(),
+                ip_firmado: 'desconocida',
+                user_agent_firmado: navigator.userAgent.substring(0, 200)
             }).eq('token', token);
 
-            // 5. Mostrar éxito y permitir descargar
+            // Pantalla de éxito
             document.getElementById('contenido-recibo').innerHTML = `
                 <div class="text-center py-10">
-                    <div class="text-emerald-500 text-5xl mb-4"><i class="fa-solid fa-circle-check"></i></div>
-                    <h2 class="text-xl font-bold mb-2">¡Recibo Firmado!</h2>
-                    <p class="text-sm text-slate-600 mb-4">Su firma ha sido guardada en su expediente.</p>
-                    <a href="${urlData.publicUrl}" target="_blank" class="bg-sky-600 text-white px-4 py-2 rounded-lg text-sm font-bold">Descargar Recibo</a>
+                    <div class="text-emerald-500 text-6xl mb-4"><i class="fa-solid fa-circle-check"></i></div>
+                    <h2 class="text-xl font-bold mb-2">¡Documento Firmado!</h2>
+                    <p class="text-sm text-slate-600 mb-2">Su firma fue registrada exitosamente.</p>
+                    <p class="text-[10px] text-slate-500 mb-4 font-mono">Hash de integridad: ${hashHex.substring(0, 16)}...</p>
+                    <a href="${urlData.publicUrl}" target="_blank" class="bg-sky-600 text-white px-6 py-3 rounded-lg text-sm font-bold inline-block shadow-lg">
+                        <i class="fa-solid fa-download mr-2"></i> Descargar Recibo
+                    </a>
+                    <p class="text-[10px] text-slate-500 mt-4">También fue guardado automáticamente en su expediente digital.</p>
                 </div>
             `;
         }
     </script>
-    <!-- Librería para capturar firma -->
-    <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.1.7/dist/signature_pad.umd.min.js"></script>
 </body>
 </html>
