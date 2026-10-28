@@ -346,6 +346,8 @@ function renderHistoricoNominas() {
             <td class="p-3.5 text-right space-x-1 sm:space-x-2">
                 <button onclick="verDetalleNomina('${f}')" class="bg-sky-600/20 hover:bg-sky-600/40 text-sky-400 border border-sky-500/30 text-xs px-2.5 py-1 rounded-lg font-medium inline-flex items-center transition"><i class="fa-solid fa-list mr-1"></i> Resumen</button>
                 <button onclick="verRecibosNomina('${f}')" class="bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-400 border border-emerald-500/30 text-xs px-2.5 py-1 rounded-lg font-medium inline-flex items-center transition"><i class="fa-solid fa-receipt mr-1"></i> Recibos</button>
+                // Agrega este botón en la fila de acciones de la nómina:
+<button onclick="generarEnlaceFirma('${f}')" class="bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-400 border border-indigo-500/30 text-xs px-2.5 py-1 rounded-lg font-medium inline-flex items-center transition"><i class="fa-solid fa-signature mr-1"></i> Enviar a Firmar</button>
                 <button onclick="generarTXTAlimentacion('${f}')" class="bg-teal-600/20 hover:bg-teal-600/40 text-teal-400 border border-teal-500/30 text-xs px-2.5 py-1 rounded-lg font-medium inline-flex items-center transition"><i class="fa-solid fa-file-lines mr-1"></i> TXT Alimentación</button>
                 <button onclick="generarTXTSubsidio('${f}')" class="bg-purple-600/20 hover:bg-purple-600/40 text-purple-400 border border-purple-500/30 text-xs px-2.5 py-1 rounded-lg font-medium inline-flex items-center transition"><i class="fa-solid fa-file-lines mr-1"></i> TXT Subsidio</button>
                 ${isMaster ? `<button onclick="eliminarNominaProcesada('${f}')" class="bg-rose-600/20 hover:bg-rose-600/40 text-rose-400 border border-rose-500/30 text-xs px-2.5 py-1 rounded-lg font-medium inline-flex items-center transition"><i class="fa-solid fa-trash mr-1"></i> Eliminar</button>` : ''}
@@ -720,4 +722,39 @@ function imprimirDesglose() {
 function imprimirRecibos() {
     gId('print-container').innerHTML = gId('area-impresion-recibos').innerHTML;
     window.print();
+}
+
+async function generarEnlaceFirma(fechaPago) {
+    const regs = appState.nominas.filter(n => n.fecha_pago === fechaPago);
+    if (regs.length === 0) return showToast('No hay recibos para esta fecha', 'error');
+    
+    // Por simplicidad, generamos enlaces para todos los empleados de esa nómina
+    let enlacesGenerados = 0;
+    
+    for (const r of regs) {
+        const token = crypto.randomUUID(); // Genera un ID único
+        
+        const { error } = await supabaseClient.from('firmas_recibos').insert([{
+            token: token,
+            nomina_id: r.id, // Asumiendo que tienes el ID del registro
+            empleado_id: r.empleado_id,
+            estado: 'pendiente'
+        }]);
+        
+        if (!error) {
+            enlacesGenerados++;
+            const baseUrl = window.location.origin; // Ej: https://tuapp.github.io
+            const enlace = `${baseUrl}/firma.html?token=${token}`;
+            
+            // Opcional: Abrir WhatsApp automáticamente
+            const emp = appState.empleados.find(e => String(e.id) === String(r.empleado_id));
+            if (emp && emp.telefono) {
+                let tel = emp.telefono.replace(/\D/g, '');
+                if (tel.startsWith('0')) tel = '58' + tel.substring(1);
+                const msj = `Hola ${emp.nombre}, por favor firma tu recibo de nómina aquí: ${enlace}`;
+                window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msj)}`, '_blank');
+            }
+        }
+    }
+    showToast(`${enlacesGenerados} enlaces de firma generados`);
 }
