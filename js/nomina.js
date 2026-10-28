@@ -644,6 +644,15 @@ function generarHTMLReciboSolo(r, fecha) {
             <table class="w-full text-[9.5px] print:text-[8px] border border-black mb-1">
                 <tbody class="divide-y divide-slate-200">
                     <tr><td class="px-1.5 py-0.5 text-black">Días no laborados (${r.dias_faltantes || 0} d)</td><td class="px-1.5 py-0.5 text-right font-mono w-28 text-black">${fNum(dfb)}</td></tr>
+                    // En la celda de Días Faltantes, agregar:
+<td class="p-3 text-center" style="min-width: 90px;">
+    <div class="flex items-center gap-1 justify-center">
+        <input type="number" id="df-${e.id}" value="${dfVal}" min="0" ... class="...">
+        <button onclick="abrirJustificativoFalta(${e.id})" class="text-indigo-400 hover:text-indigo-300" title="Adjuntar justificativo">
+            <i class="fa-solid fa-paperclip text-xs"></i>
+        </button>
+    </div>
+</td>
                     <tr><td class="px-1.5 py-0.5 text-black">S.S.O. / IVSS (4%)</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(sso)}</td></tr>
                     <tr><td class="px-1.5 py-0.5 text-black">L.P.H. / FAOV (1%)</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(lph)}</td></tr>
                     <tr><td class="px-1.5 py-0.5 text-black">Paro Forzoso / RPE (0,5%)</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(rpe)}</td></tr>
@@ -852,4 +861,33 @@ async function generarTodosEnlacesFaltantes() {
     for (const r of faltantes) {
         await generarEnlaceIndividual(r.id, r.empleado_id);
     }
+}
+
+async function abrirJustificativoFalta(empId) {
+    const emp = appState.empleados.find(e => String(e.id) === String(empId));
+    if (!emp) return;
+    
+    const motivo = prompt(`Justificativo de falta para ${emp.nombre}\n\nMotivo:`);
+    if (!motivo) return;
+    
+    const fechaFalta = prompt('Fecha de la falta (YYYY-MM-DD):', new Date().toISOString().split('T')[0]);
+    if (!fechaFalta) return;
+    
+    const { error } = await supabaseClient.from('justificativos_faltas').insert([{
+        empleado_id: empId,
+        fecha_falta: fechaFalta,
+        motivo: motivo
+    }]);
+    
+    if (error) return showToast('Error: ' + error.message, 'error');
+    
+    // Reducir los días faltantes automáticamente
+    const inputDf = gId(`df-${empId}`);
+    const actual = parseFloat(inputDf.value) || 0;
+    if (actual > 0) {
+        inputDf.value = Math.max(0, actual - 1);
+        actualizarFilaYTotales(empId);
+    }
+    
+    showToast('Justificativo registrado. Días faltantes reducidos.');
 }
