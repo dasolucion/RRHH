@@ -57,6 +57,8 @@ function renderEmpleados() {
             <td class="p-3.5 text-center min-w-[150px] space-x-1.5 whitespace-nowrap">
                 <button data-feature="empleados.ari" onclick="abrirModalGestionARI(${e.id})" class="text-amber-400 hover:text-amber-300 p-1.5 transition" title="Gestionar Formulario AR-I (I.S.L.R.)"><i class="fa-solid fa-receipt"></i></button>
                 <button data-feature="documentos.constancias" onclick="abrirModalDocumentoLaboral(${e.id})" class="text-teal-400 hover:text-teal-300 p-1.5 transition" title="Emitir Constancia o Amonestación"><i class="fa-solid fa-file-contract"></i></button>
+                // En la columna de acciones, junto a los otros botones:
+<button onclick="abrirExpediente(${e.id})" class="text-indigo-400 hover:text-indigo-300 p-1.5 transition" title="Expediente Digital"><i class="fa-solid fa-folder-open"></i></button>
                 <button onclick="editarEmpleado(${e.id})" class="text-sky-400 hover:text-sky-300 p-1.5 transition" title="Editar"><i class="fa-solid fa-pen"></i></button>
                 <button onclick="eliminarEmpleado(${e.id})" class="text-slate-500 hover:text-red-400 p-1.5 transition" title="Eliminar"><i class="fa-solid fa-trash"></i></button>
             </td>
