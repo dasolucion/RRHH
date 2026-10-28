@@ -191,21 +191,31 @@
                 : '<p class="text-xs text-slate-500 italic">Aún no tiene recibos firmados.</p>';
         }
 
-        function renderDocItem(d) {
-            const fecha = new Date(d.created_at).toLocaleDateString('es-VE');
-            return `<div class="flex items-center justify-between border border-slate-200 p-2 rounded-lg hover:bg-slate-50">
-                <div class="flex items-center gap-2">
-                    <i class="fa-solid fa-file-pdf text-rose-500"></i>
-                    <div>
-                        <div class="text-xs font-bold text-slate-900">${d.nombre_descriptivo}</div>
-                        <div class="text-[10px] text-slate-500">${fecha}</div>
-                    </div>
-                </div>
-                <a href="${d.url_archivo}" target="_blank" class="text-sky-600 hover:text-sky-700 text-xs font-bold">
-                    <i class="fa-solid fa-download mr-1"></i> Ver
-                </a>
-            </div>`;
-        }
+function renderDocItem(d) {
+    const fecha = new Date(d.created_at).toLocaleDateString('es-VE');
+    const tipoLabel = {
+        cedula: 'Cédula de Identidad', rif: 'RIF', planilla_ingreso: 'Planilla de Ingreso',
+        referencia: 'Referencia', ivss: 'Constancia IVSS', nomina: 'Nómina',
+        vacaciones: 'Vacaciones', prestaciones: 'Prestaciones', utilidades: 'Utilidades',
+        liquidacion: 'Liquidación', justificativo: 'Justificativo', otro: 'Otro Documento'
+    }[d.tipo_documento] || 'Documento';
+
+    return `<div class="flex items-center justify-between border border-slate-200 p-2 rounded-lg hover:bg-slate-50">
+        <div class="flex items-center gap-2">
+            <i class="fa-solid fa-file-pdf text-rose-500"></i>
+            <div>
+                <!-- TÍTULO (Lista desplegable) -->
+                <div class="text-xs font-bold text-slate-900">${tipoLabel}</div>
+                <!-- SUBTÍTULO (El nombre del archivo) -->
+                <div class="text-[10px] text-slate-500">${d.nombre_descriptivo}</div>
+                <div class="text-[9px] text-slate-400 mt-0.5">Subido el ${fecha}</div>
+            </div>
+        </div>
+        <a href="${d.url_archivo}" target="_blank" class="text-sky-600 hover:text-sky-700 text-xs font-bold">
+            <i class="fa-solid fa-download mr-1"></i> Ver
+        </a>
+    </div>`;
+}
     </script>
 </body>
 </html>
