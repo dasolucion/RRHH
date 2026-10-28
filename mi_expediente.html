@@ -204,10 +204,10 @@ function renderDocItem(d) {
         <div class="flex items-center gap-2">
             <i class="fa-solid fa-file-pdf text-rose-500"></i>
             <div>
-                <!-- TÍTULO (Lista desplegable) -->
-                <div class="text-xs font-bold text-slate-900">${tipoLabel}</div>
-                <!-- SUBTÍTULO (El nombre del archivo) -->
-                <div class="text-[10px] text-slate-500">${d.nombre_descriptivo}</div>
+                <!-- TÍTULO: Lo que dice el nombre -->
+                <div class="text-xs font-bold text-slate-900">${d.nombre_descriptivo}</div>
+                <!-- SUBTÍTULO: El tipo -->
+                <div class="text-[10px] text-slate-500">${tipoLabel}</div>
                 <div class="text-[9px] text-slate-400 mt-0.5">Subido el ${fecha}</div>
             </div>
         </div>
