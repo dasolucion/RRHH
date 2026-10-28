@@ -101,7 +101,6 @@
             empDataGlobal = empData;
             docDataGlobal = docData;
 
-            // Renderizamos el recibo en pantalla (Tailwind)
             document.getElementById('recibo-html').innerHTML = generarHTMLReciboPantalla(docData, empData);
             
             document.getElementById('loading').classList.add('hidden');
@@ -187,7 +186,7 @@
         }
 
         // ═══════════════════════════════════════════════════════════════
-        // RECIBO PARA PDF (HTML puro con tablas, a prueba de recortes)
+        // RECIBO PARA PDF (Ajustado para no cortar y con firma centrada)
         // ═══════════════════════════════════════════════════════════════
         function generarHTMLParaPDF(r, e, firmaBase64) {
             const t = Number(r.tasa_bcv || 1);
@@ -235,7 +234,7 @@
             const tP = `RECIBO DE PAGO ${qT} DE ${mN} ${y}`;
 
             return `
-            <div style="width: 100%; background: #fff; font-family: Arial, sans-serif; color: #000; padding: 10px; box-sizing: border-box;">
+            <div style="width: 100%; background: #fff; font-family: Arial, sans-serif; color: #000; padding: 5px; box-sizing: border-box;">
                 
                 <table style="width: 100%; border-collapse: collapse; margin-bottom: 4px; border-bottom: 2px solid #000;">
                     <tr>
@@ -253,7 +252,6 @@
                     ${tP}
                 </div>
 
-                <!-- Datos Empleado (tabla de 4 columnas para evitar desbordes) -->
                 <table style="width: 100%; border-collapse: collapse; margin-bottom: 5px; table-layout: fixed;">
                     <tr>
                         <td style="width: 20%; background-color: #f1f5f9; border: 1px solid #000; padding: 4px; font-size: 10px; font-weight: bold;">TRABAJADOR</td>
@@ -273,7 +271,6 @@
                     </tr>
                 </table>
 
-                <!-- Asignaciones -->
                 <table style="width: 100%; border-collapse: collapse; margin-bottom: 5px; table-layout: fixed;">
                     <thead>
                         <tr>
@@ -294,7 +291,6 @@
                     </tfoot>
                 </table>
 
-                <!-- Deducciones -->
                 <table style="width: 100%; border-collapse: collapse; margin-bottom: 5px; table-layout: fixed;">
                     <tbody>
                         <tr><td style="border: 1px solid #000; padding: 4px; font-size: 10px;">Días no laborados (${r.dias_faltantes || 0} d)</td><td style="border: 1px solid #000; padding: 4px; font-size: 10px; text-align: right; font-family: monospace; width: 25%;">${fNum(dfb)}</td></tr>
@@ -314,7 +310,6 @@
                     </tfoot>
                 </table>
 
-                <!-- Resumen Colores -->
                 <table style="width: 100%; border-collapse: collapse; margin-bottom: 5px; table-layout: fixed;">
                     <tr>
                         <td style="width: 33.33%; background-color: #e0f2fe; border: 1px solid #000; padding: 4px; text-align: center;">
@@ -341,19 +336,15 @@
                     <strong>OBSERVACIÓN:</strong> El subsidio no posee naturaleza salarial, ya que no desprende de la intención retributiva del trabajo prestado sino un beneficio eminentemente social para cubrir parte de sus gastos por bienes y/o servicios básicos en que incurre el trabajador. Por tal motivo se otorga como una ayuda al trabajador sin que sea de carácter obligatorio en futuras ocasiones.
                 </div>
 
-                <!-- Firmas (alineadas a la izquierda y derecha) -->
+                <!-- FIRMA CENTRADA ÚNICAMENTE DEL EMPLEADO -->
                 <table style="width: 100%; border-collapse: collapse; margin-top: 40px;">
                     <tr>
-                        <td style="width: 50%; text-align: center; vertical-align: bottom;">
-                            <div style="border-top: 1px solid #000; width: 80%; margin: 0 auto;"></div>
-                            <div style="font-size: 10px; font-weight: bold; margin-top: 4px;">FIRMA DEL EMPLEADOR</div>
-                        </td>
-                        <td style="width: 50%; text-align: center; vertical-align: bottom;">
-                            <img src="${firmaBase64}" style="height: 50px; margin: 0 auto; display: block; object-fit: contain;">
-                            <div style="border-top: 1px solid #000; width: 80%; margin: 0 auto;"></div>
-                            <div style="font-size: 10px; font-weight: bold; margin-top: 4px;">${e?.nombre || 'Trabajador'}</div>
-                            <div style="font-size: 9px;">C.I. ${e?.cedula || '-'}</div>
-                            <div style="font-size: 8px; color: #555; margin-top: 2px;">Firmado el ${new Date().toLocaleString('es-VE')}</div>
+                        <td style="text-align: center; vertical-align: bottom;">
+                            <img src="${firmaBase64}" style="height: 70px; margin: 0 auto; display: block; object-fit: contain;">
+                            <div style="border-top: 1px solid #000; width: 250px; margin: 0 auto;"></div>
+                            <div style="font-size: 11px; font-weight: bold; margin-top: 5px;">${e?.nombre || 'Trabajador'}</div>
+                            <div style="font-size: 10px;">C.I. ${e?.cedula || '-'}</div>
+                            <div style="font-size: 9px; color: #555; margin-top: 3px;">Firmado el ${new Date().toLocaleString('es-VE')}</div>
                         </td>
                     </tr>
                 </table>
@@ -376,8 +367,6 @@
             const firmaBase64 = firmaPad.toDataURL('image/png');
             const htmlPDF = generarHTMLParaPDF(docDataGlobal, empDataGlobal, firmaBase64);
 
-            // 1. Contenedor temporal VISIBLE (fondo blanco, cubre la pantalla)
-            // Esto obliga al navegador móvil a pintar el contenido correctamente
             const wrapper = document.createElement('div');
             wrapper.style.cssText = `
                 position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -385,15 +374,14 @@
                 padding-top: 20px; box-sizing: border-box;
             `;
             
-            // 2. El contenedor interno con ancho fijo (tamaño carta 800px)
+            // Ancho de 760px para evitar que se corte por la derecha
             const inner = document.createElement('div');
-            inner.style.cssText = `width: 800px; min-height: 1000px; background: #fff;`;
+            inner.style.cssText = `width: 760px; min-height: 1000px; background: #fff;`;
             inner.innerHTML = htmlPDF;
             
             wrapper.appendChild(inner);
             document.body.appendChild(wrapper);
 
-            // 3. Esperar a que la imagen de la firma cargue en memoria
             const img = inner.querySelector('img');
             if (img) {
                 await new Promise((resolve) => {
@@ -406,17 +394,14 @@
                 });
             }
             
-            // Delay extra para asegurar renderizado en móviles lentos
             await new Promise(r => setTimeout(r, 300));
 
-            // 4. Nombre del archivo
             const fecha = docDataGlobal.fecha_pago;
             const [y, m, d] = fecha.split('-');
             const nombreArchivo = `Nomina - ${d}-${m}-${y}.pdf`;
 
-            // 5. Generar PDF
             const opt = {
-                margin: 0,
+                margin: 10, // Margen de 10mm
                 filename: nombreArchivo,
                 image: { type: 'jpeg', quality: 0.98 },
                 html2canvas: { 
@@ -439,10 +424,8 @@
                 return;
             }
 
-            // 6. Limpiar el contenedor temporal
             document.body.removeChild(wrapper);
 
-            // 7. Subir a Supabase
             const pdfBlob = await (await fetch(pdfBase64)).blob();
             const arrayBuffer = await pdfBlob.arrayBuffer();
             const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
@@ -478,7 +461,6 @@
                 user_agent_firmado: navigator.userAgent.substring(0, 200)
             }).eq('token', token);
 
-            // 8. Mostrar pantalla de éxito
             document.getElementById('contenido-recibo').innerHTML = `
                 <div class="bg-white rounded-xl shadow-lg p-8 text-center max-w-md mx-auto">
                     <div class="text-emerald-500 text-6xl mb-4"><i class="fa-solid fa-circle-check"></i></div>
