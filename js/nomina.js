@@ -346,7 +346,7 @@ function renderHistoricoNominas() {
             <td class="p-3.5 text-right space-x-1 sm:space-x-2">
                 <button onclick="verDetalleNomina('${f}')" class="bg-sky-600/20 hover:bg-sky-600/40 text-sky-400 border border-sky-500/30 text-xs px-2.5 py-1 rounded-lg font-medium inline-flex items-center transition"><i class="fa-solid fa-list mr-1"></i> Resumen</button>
                 <button onclick="verRecibosNomina('${f}')" class="bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-400 border border-emerald-500/30 text-xs px-2.5 py-1 rounded-lg font-medium inline-flex items-center transition"><i class="fa-solid fa-receipt mr-1"></i> Recibos</button>
-                <button onclick="generarEnlaceFirma('${f}')" class="bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-400 border border-indigo-500/30 text-xs px-2.5 py-1 rounded-lg font-medium inline-flex items-center transition"><i class="fa-solid fa-signature mr-1"></i> Enviar a Firmar</button>
+                <button onclick="abrirModalFirmas('${f}')" class="bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-400 border border-indigo-500/30 text-xs px-2.5 py-1 rounded-lg font-medium inline-flex items-center transition"><i class="fa-solid fa-signature mr-1"></i> Firmas</button>
                 <button onclick="generarTXTAlimentacion('${f}')" class="bg-teal-600/20 hover:bg-teal-600/40 text-teal-400 border border-teal-500/30 text-xs px-2.5 py-1 rounded-lg font-medium inline-flex items-center transition"><i class="fa-solid fa-file-lines mr-1"></i> TXT Alimentación</button>
                 <button onclick="generarTXTSubsidio('${f}')" class="bg-purple-600/20 hover:bg-purple-600/40 text-purple-400 border border-purple-500/30 text-xs px-2.5 py-1 rounded-lg font-medium inline-flex items-center transition"><i class="fa-solid fa-file-lines mr-1"></i> TXT Subsidio</button>
                 ${isMaster ? `<button onclick="eliminarNominaProcesada('${f}')" class="bg-rose-600/20 hover:bg-rose-600/40 text-rose-400 border border-rose-500/30 text-xs px-2.5 py-1 rounded-lg font-medium inline-flex items-center transition"><i class="fa-solid fa-trash mr-1"></i> Eliminar</button>` : ''}
@@ -723,37 +723,133 @@ function imprimirRecibos() {
     window.print();
 }
 
-async function generarEnlaceFirma(fechaPago) {
+/* ============================================================
+   GESTIÓN DE FIRMAS DIGITALES (MODAL POR EMPLEADO)
+   ============================================================ */
+
+let firmaFechaActual = null;
+
+async function abrirModalFirmas(fechaPago) {
+    firmaFechaActual = fechaPago;
     const regs = appState.nominas.filter(n => n.fecha_pago === fechaPago);
-    if (regs.length === 0) return showToast('No hay recibos para esta fecha', 'error');
     
-    // Por simplicidad, generamos enlaces para todos los empleados de esa nómina
-    let enlacesGenerados = 0;
-    
-    for (const r of regs) {
-        const token = crypto.randomUUID(); // Genera un ID único
-        
-        const { error } = await supabaseClient.from('firmas_recibos').insert([{
-            token: token,
-            nomina_id: r.id, // Asumiendo que tienes el ID del registro
-            empleado_id: r.empleado_id,
-            estado: 'pendiente'
-        }]);
-        
-        if (!error) {
-            enlacesGenerados++;
-            const baseUrl = window.location.origin; // Ej: https://tuapp.github.io
-            const enlace = `${baseUrl}/firma.html?token=${token}`;
-            
-            // Opcional: Abrir WhatsApp automáticamente
-            const emp = appState.empleados.find(e => String(e.id) === String(r.empleado_id));
-            if (emp && emp.telefono) {
-                let tel = emp.telefono.replace(/\D/g, '');
-                if (tel.startsWith('0')) tel = '58' + tel.substring(1);
-                const msj = `Hola ${emp.nombre}, por favor firma tu recibo de nómina aquí: ${enlace}`;
-                window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msj)}`, '_blank');
-            }
+    gId('firmas-fecha-titulo').innerText = fechaPago;
+    gId('tabla-firmas-body').innerHTML = '<tr><td colspan="4" class="p-4 text-center text-slate-500">Cargando estados...</td></tr>';
+    openModal('modal-gestion-firmas');
+
+    // Traer todos los tokens de esta fecha
+    const { data: firmasExistentes } = await supabaseClient
+        .from('firmas_recibos')
+        .select('*')
+        .in('nomina_id', regs.map(r => r.id));
+
+    const mapaFirmas = {};
+    (firmasExistentes || []).forEach(f => { mapaFirmas[String(f.nomina_id)] = f; });
+
+    gId('tabla-firmas-body').innerHTML = regs.map(r => {
+        const firma = mapaFirmas[String(r.id)];
+        let estadoBadge, acciones;
+
+        if (!firma) {
+            estadoBadge = '<span class="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded">Sin enlace</span>';
+            acciones = `<button onclick="generarEnlaceIndividual(${r.id}, ${r.empleado_id})" class="bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] px-2.5 py-1 rounded font-bold"><i class="fa-solid fa-link mr-1"></i> Generar</button>`;
+        } else if (firma.estado === 'pendiente') {
+            estadoBadge = '<span class="text-[10px] bg-amber-950 text-amber-300 border border-amber-800 px-2 py-0.5 rounded font-bold">Pendiente</span>';
+            acciones = `
+                <button onclick="copiarEnlaceFirma('${firma.token}')" class="bg-slate-700 hover:bg-slate-600 text-white text-[10px] px-2 py-1 rounded" title="Copiar"><i class="fa-solid fa-copy"></i></button>
+                <button onclick="enviarWAEnlaceFirma('${firma.token}', ${r.empleado_id})" class="bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] px-2 py-1 rounded" title="WhatsApp"><i class="fa-brands fa-whatsapp"></i></button>
+                <button onclick="anularEnlaceFirma('${firma.token}')" class="bg-rose-600/20 hover:bg-rose-600/40 text-rose-400 text-[10px] px-2 py-1 rounded" title="Anular"><i class="fa-solid fa-xmark"></i></button>
+            `;
+        } else {
+            estadoBadge = '<span class="text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-800 px-2 py-0.5 rounded font-bold"><i class="fa-solid fa-check mr-0.5"></i> Firmado</span>';
+            acciones = `
+                <a href="${firma.url_pdf_firmado}" target="_blank" class="bg-sky-600 hover:bg-sky-500 text-white text-[10px] px-2 py-1 rounded inline-block" title="Ver PDF"><i class="fa-solid fa-file-pdf"></i></a>
+                <button onclick="anularEnlaceFirma('${firma.token}')" class="bg-slate-700 hover:bg-slate-600 text-white text-[10px] px-2 py-1 rounded" title="Regenerar"><i class="fa-solid fa-rotate"></i></button>
+            `;
         }
+
+        return `<tr class="border-b border-slate-800 hover:bg-slate-800/40">
+            <td class="p-2 text-xs font-semibold text-white">${r.empleado}</td>
+            <td class="p-2 text-center">${estadoBadge}</td>
+            <td class="p-2 text-center text-[10px] text-slate-400 font-mono">${r.neto_bs ? 'Bs. ' + fNum(r.neto_bs) : '-'}</td>
+            <td class="p-2 text-right space-x-1">${acciones}</td>
+        </tr>`;
+    }).join('');
+}
+
+function generarUUID() {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+        const r = Math.random() * 16 | 0;
+        return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+    });
+}
+
+async function generarEnlaceIndividual(nominaId, empleadoId) {
+    const token = generarUUID();
+    const { error } = await supabaseClient.from('firmas_recibos').insert([{
+        token: token,
+        nomina_id: nominaId,
+        empleado_id: empleadoId,
+        estado: 'pendiente'
+    }]);
+
+    if (error) return showToast('Error al generar enlace: ' + error.message, 'error');
+    
+    showToast('Enlace generado. Ya podés copiarlo o enviarlo.');
+    // Recargar el modal
+    await abrirModalFirmas(firmaFechaActual);
+}
+
+function obtenerEnlaceFirma(token) {
+    const baseUrl = window.location.origin + window.location.pathname.replace(/index\.html$/, '').replace(/\/$/, '');
+    return `${baseUrl}/firma.html?token=${token}`;
+}
+
+function copiarEnlaceFirma(token) {
+    const enlace = obtenerEnlaceFirma(token);
+    navigator.clipboard.writeText(enlace).then(() => {
+        showToast('Enlace copiado al portapapeles');
+    }).catch(() => {
+        prompt('Copiá este enlace manualmente:', enlace);
+    });
+}
+
+function enviarWAEnlaceFirma(token, empleadoId) {
+    const emp = appState.empleados.find(e => String(e.id) === String(empleadoId));
+    if (!emp || !emp.telefono) return showToast('Empleado sin teléfono', 'error');
+
+    let tel = emp.telefono.replace(/\D/g, '');
+    if (tel.startsWith('0')) tel = '58' + tel.substring(1);
+    else if (tel.length === 10) tel = '58' + tel;
+
+    const enlace = obtenerEnlaceFirma(token);
+    const msj = `Hola ${emp.nombre}, tu recibo de nómina del ${firmaFechaActual} está listo para firma digital. Ingresá aquí desde tu celular:\n\n${enlace}\n\nUna vez firmado, podrás descargar tu copia.`;
+    window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msj)}`, '_blank');
+}
+
+async function anularEnlaceFirma(token) {
+    if (!confirm('¿Estás seguro? Se eliminará el enlace actual y (si ya estaba firmado) se perderá la referencia al PDF. Podrás generar uno nuevo.')) return;
+    
+    await supabaseClient.from('firmas_recibos').delete().eq('token', token);
+    showToast('Enlace anulado');
+    await abrirModalFirmas(firmaFechaActual);
+}
+
+async function generarTodosEnlacesFaltantes() {
+    const regs = appState.nominas.filter(n => n.fecha_pago === firmaFechaActual);
+    const { data: existentes } = await supabaseClient
+        .from('firmas_recibos')
+        .select('nomina_id')
+        .in('nomina_id', regs.map(r => r.id));
+
+    const existentesSet = new Set((existentes || []).map(e => String(e.nomina_id)));
+    const faltantes = regs.filter(r => !existentesSet.has(String(r.id)));
+
+    if (faltantes.length === 0) return showToast('Todos los empleados ya tienen enlace', 'info');
+
+    showToast(`Generando ${faltantes.length} enlaces...`);
+    for (const r of faltantes) {
+        await generarEnlaceIndividual(r.id, r.empleado_id);
     }
-    showToast(`${enlacesGenerados} enlaces de firma generados`);
 }
