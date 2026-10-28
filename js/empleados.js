@@ -58,6 +58,7 @@ function renderEmpleados() {
                 <button data-feature="empleados.ari" onclick="abrirModalGestionARI(${e.id})" class="text-amber-400 hover:text-amber-300 p-1.5 transition" title="Gestionar Formulario AR-I (I.S.L.R.)"><i class="fa-solid fa-receipt"></i></button>
                 <button data-feature="documentos.constancias" onclick="abrirModalDocumentoLaboral(${e.id})" class="text-teal-400 hover:text-teal-300 p-1.5 transition" title="Emitir Constancia o Amonestación"><i class="fa-solid fa-file-contract"></i></button>
                 <button onclick="abrirExpediente(${e.id})" class="text-indigo-400 hover:text-indigo-300 p-1.5 transition" title="Expediente Digital"><i class="fa-solid fa-folder-open"></i></button>
+                <button onclick="generarEnlacePortal(${e.id})" class="text-emerald-400 hover:text-emerald-300 p-1.5 transition" title="Portal del Empleado"><i class="fa-solid fa-user-shield"></i></button>
                 <button onclick="editarEmpleado(${e.id})" class="text-sky-400 hover:text-sky-300 p-1.5 transition" title="Editar"><i class="fa-solid fa-pen"></i></button>
                 <button onclick="eliminarEmpleado(${e.id})" class="text-slate-500 hover:text-red-400 p-1.5 transition" title="Eliminar"><i class="fa-solid fa-trash"></i></button>
             </td>
@@ -212,4 +213,42 @@ async function eliminarCargo(id) {
     catch (e) {}
     appState.cargos = appState.cargos.filter(x => String(x.id) !== String(id));
     if (typeof fetchAllData === 'function') fetchAllData();
+}
+
+async function generarEnlacePortal(empId) {
+    const emp = appState.empleados.find(e => String(e.id) === String(empId));
+    if (!emp) return;
+    
+    // Buscar token activo o crear uno nuevo
+    let { data: tokenData } = await supabaseClient
+        .from('tokens_portal_empleado')
+        .select('*')
+        .eq('empleado_id', empId)
+        .eq('activo', true)
+        .maybeSingle();
+    
+    if (!tokenData) {
+        const { data: nuevo } = await supabaseClient
+            .from('tokens_portal_empleado')
+            .insert([{ empleado_id: empId }])
+            .select()
+            .single();
+        tokenData = nuevo;
+    }
+    
+    const baseUrl = window.location.origin + window.location.pathname.replace(/index\.html$/, '').replace(/\/$/, '');
+    const enlace = `${baseUrl}/mi_expediente.html?t=${tokenData.token}`;
+    
+    // Copiar al portapapeles
+    await navigator.clipboard.writeText(enlace);
+    showToast('Enlace copiado. Enviáselo al empleado por WhatsApp.');
+    
+    // Ofrecer enviar por WhatsApp
+    if (emp.telefono && confirm('¿Enviar el enlace por WhatsApp ahora?')) {
+        let tel = emp.telefono.replace(/\D/g, '');
+        if (tel.startsWith('0')) tel = '58' + tel.substring(1);
+        else if (tel.length === 10) tel = '58' + tel;
+        const msj = `Hola ${emp.nombre}, este es tu acceso personal a tu expediente digital (recibos, vacaciones, prestaciones y más):\n\n${enlace}\n\nGuardá este enlace. Es personal e intransferible.`;
+        window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msj)}`, '_blank');
+    }
 }
