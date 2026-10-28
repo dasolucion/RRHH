@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firma de Recibo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Librerías para generar PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+</head>
+<body class="bg-slate-100 text-slate-800 p-4 font-sans">
+
+    <div id="loading" class="text-center mt-10 font-bold text-slate-500">Cargando recibo...</div>
+
+    <div id="contenido-recibo" class="bg-white p-5 rounded-lg shadow-lg max-w-md mx-auto hidden">
+        <!-- Aquí se inyectará el HTML del recibo -->
+        <div id="recibo-html"></div>
+        
+        <!-- Área de Firma -->
+        <div class="mt-6 border-t pt-4">
+            <p class="text-sm font-bold mb-2">Firme aquí con su dedo:</p>
+            <canvas id="firma-canvas" class="border-2 border-dashed border-slate-300 rounded-lg w-full bg-slate-50 touch-none" height="200"></canvas>
+            
+            <div class="flex gap-2 mt-4">
+                <button onclick="limpiarFirma()" class="flex-1 bg-slate-200 text-slate-700 py-2 rounded font-bold">Limpiar</button>
+                <button onclick="enviarFirma()" class="flex-1 bg-emerald-600 text-white py-2 rounded font-bold shadow-lg">Firmar y Enviar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = https://nrfplwpmwplpbskidtqs.supabase.co; // <-- PON AQUÍ TU URL
+        const SUPABASE_ANON_KEY = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yZnBsd3Btd3BscGJza2lkdHFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc1OTA4MjIsImV4cCI6MjEwMzE2NjgyMn0.PZXrE9KtAVF2e4RbyM3-m1ClS8R8QaTCctLzZKAAYdQ; // <-- PON AQUÍ TU KEY
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const token = urlParams.get('token');
+        let firmaPad = null;
+
+        if (!token) {
+            document.getElementById('loading').innerText = 'Enlace inválido o expirado.';
+        } else {
+            iniciarFirma();
+        }
+
+        async function iniciarFirma() {
+            // 1. Verificar token
+            const { data: firmaData, error } = await supabaseClient
+                .from('firmas_recibos')
+                .select('*, nominas(*)')
+                .eq('token', token)
+                .eq('estado', 'pendiente')
+                .single();
+
+            if (error || !firmaData) {
+                document.getElementById('loading').innerText = 'Enlace inválido, expirado o ya firmado.';
+                return;
+            }
+
+            // 2. Renderizar recibo (usamos los datos de la tabla nominas)
+            document.getElementById('recibo-html').innerHTML = `
+                <h2 class="text-lg font-bold text-center mb-4">Recibo de Pago</h2>
+                <p class="text-sm"><b>Empleado:</b> ${firmaData.nominas.empleado}</p>
+                <p class="text-sm"><b>Fecha:</b> ${firmaData.nominas.fecha_pago}</p>
+                <p class="text-sm"><b>Neto a Cobrar:</b> Bs. ${firmaData.nominas.neto_bs} ($${firmaData.nominas.neto_usd})</p>
+                <p class="text-xs text-slate-500 mt-4 italic">Al firmar, confirma la recepción de su pago.</p>
+            `;
+
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('contenido-recibo').classList.remove('hidden');
+
+            // 3. Iniciar el canvas de firma
+            const canvas = document.getElementById('firma-canvas');
+            firmaPad = new SignaturePad(canvas); // Requiere librería signature_pad
+        }
+
+        function limpiarFirma() {
+            if (firmaPad) firmaPad.clear();
+        }
+
+        async function enviarFirma() {
+            if (!firmaPad || firmaPad.isEmpty()) {
+                alert('Por favor, firme el recibo antes de enviar.');
+                return;
+            }
+
+            const btn = document.querySelector('button[onclick="enviarFirma()"]');
+            btn.innerText = 'Enviando...';
+            btn.disabled = true;
+
+            // 1. Obtener la firma como imagen Base64
+            const firmaBase64 = firmaPad.toDataURL('image/png');
+
+            // 2. Generar el PDF
+            const element = document.getElementById('contenido-recibo');
+            // Ocultar los botones temporalmente para que no salgan en el PDF
+            const botones = element.querySelector('.flex.gap-2');
+            if (botones) botones.style.display = 'none';
+
+            const opt = {
+                margin: 10,
+                filename: 'recibo_firmado.pdf',
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2 },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            // Convertir la firma a imagen para inyectarla en el HTML temporalmente
+            const imgFirma = document.createElement('img');
+            imgFirma.src = firmaBase64;
+            imgFirma.style.width = '150px';
+            imgFirma.style.marginTop = '10px';
+            element.appendChild(imgFirma);
+
+            const pdfBase64 = await html2pdf().from(element).set(opt).outputPdf('datauristring');
+
+            // Restaurar botones
+            if (botones) botones.style.display = 'flex';
+            imgFirma.remove();
+
+            // 3. Subir el PDF a Supabase Storage
+            const pdfBlob = await (await fetch(pdfBase64)).blob();
+            const fileName = `${firmaData.empleado_id}/firma_recibo_${token}.pdf`; // firmaData debe estar accesible globalmente
+            const { error: uploadError } = await supabaseClient.storage
+                .from('expediente')
+                .upload(fileName, pdfBlob);
+
+            if (uploadError) {
+                alert('Error al subir el PDF: ' + uploadError.message);
+                btn.innerText = 'Firmar y Enviar';
+                btn.disabled = false;
+                return;
+            }
+
+            const { data: urlData } = supabaseClient.storage.from('expediente').getPublicUrl(fileName);
+
+            // 4. Actualizar estado del token
+            await supabaseClient.from('firmas_recibos').update({
+                estado: 'firmado',
+                url_pdf_firmado: urlData.publicUrl,
+                fecha_firmado: new Date().toISOString()
+            }).eq('token', token);
+
+            // 5. Mostrar éxito y permitir descargar
+            document.getElementById('contenido-recibo').innerHTML = `
+                <div class="text-center py-10">
+                    <div class="text-emerald-500 text-5xl mb-4"><i class="fa-solid fa-circle-check"></i></div>
+                    <h2 class="text-xl font-bold mb-2">¡Recibo Firmado!</h2>
+                    <p class="text-sm text-slate-600 mb-4">Su firma ha sido guardada en su expediente.</p>
+                    <a href="${urlData.publicUrl}" target="_blank" class="bg-sky-600 text-white px-4 py-2 rounded-lg text-sm font-bold">Descargar Recibo</a>
+                </div>
+            `;
+        }
+    </script>
+    <!-- Librería para capturar firma -->
+    <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.1.7/dist/signature_pad.umd.min.js"></script>
+</body>
+</html>
