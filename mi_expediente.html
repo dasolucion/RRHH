@@ -14,33 +14,7 @@
         <i class="fa-solid fa-spinner fa-spin mr-2"></i> Cargando su expediente...
     </div>
 
-    <div id="portal" class="max-w-2xl mx-auto hidden">
-        <div class="bg-white rounded-xl shadow-lg p-5 mb-4">
-            <div class="flex items-center gap-3 mb-2">
-                <div class="bg-indigo-600 text-white p-3 rounded-lg"><i class="fa-solid fa-folder-open text-xl"></i></div>
-                <div>
-                    <h1 class="text-lg font-bold text-slate-900">Mi Expediente Digital</h1>
-                    <p class="text-xs text-slate-500" id="emp-info">-</p>
-                </div>
-            </div>
-        </div>
-
-        <div class="bg-white rounded-xl shadow-lg p-4 mb-4">
-            <h2 class="text-sm font-bold text-slate-900 mb-3 flex items-center"><i class="fa-solid fa-file-shield text-emerald-600 mr-2"></i> Documentos de Ingreso</h2>
-            <div id="lista-docs-ingreso" class="space-y-2"></div>
-        </div>
-
-        <div class="bg-white rounded-xl shadow-lg p-4 mb-4">
-            <h2 class="text-sm font-bold text-slate-900 mb-3 flex items-center"><i class="fa-solid fa-receipt text-indigo-600 mr-2"></i> Recibos Firmados</h2>
-            <div id="lista-recibos-firmados" class="space-y-2"></div>
-        </div>
-
-        <div class="bg-white rounded-xl shadow-lg p-4 mb-4">
-            <h2 class="text-sm font-bold text-slate-900 mb-3 flex items-center"><i class="fa-solid fa-clock text-amber-600 mr-2"></i> Pendientes de Firma</h2>
-            <p class="text-[11px] text-slate-500 mb-2">Estos recibos estarán disponibles cuando los firme:</p>
-            <div id="lista-pendientes" class="space-y-2"></div>
-        </div>
-    </div>
+    <div id="portal" class="max-w-2xl mx-auto hidden"></div>
 
     <script>
         const SUPABASE_URL = 'https://nrfplwpmwplpbskidtqs.supabase.co';
@@ -70,12 +44,108 @@
             }
 
             const emp = tokenData.empleados;
-            document.getElementById('emp-info').innerText = `${emp.nombre} | C.I. ${emp.cedula}`;
-
-            // Actualizar último acceso
             await supabaseClient.from('tokens_portal_empleado').update({ last_access: new Date().toISOString() }).eq('token', token);
 
-            // 1. Documentos visibles (ingreso + firmados)
+            // ⚡ BLOQUEO: Si hay documentos pendientes de firma, no puede ver el expediente
+            const { data: pendientes } = await supabaseClient
+                .from('firmas_recibos')
+                .select('*')
+                .eq('empleado_id', emp.id)
+                .eq('estado', 'pendiente')
+                .order('fecha_emision', { ascending: false });
+
+            if (pendientes && pendientes.length > 0) {
+                mostrarPantallaBloqueo(emp, pendientes);
+                return;
+            }
+
+            await mostrarExpedienteCompleto(emp);
+        }
+
+        function mostrarPantallaBloqueo(emp, pendientes) {
+            const hoy = new Date();
+            const pendientesHtml = pendientes.map(p => {
+                const expirado = p.expira_en && new Date(p.expira_en) < hoy;
+                const tipoLabel = { nomina: 'Nómina', vacaciones: 'Vacaciones', prestaciones: 'Prestaciones', utilidades: 'Utilidades', liquidacion: 'Liquidación' }[p.tipo_documento] || 'Documento';
+                const enlace = `${window.location.origin}/firma.html?token=${p.token}`;
+                
+                if (expirado) {
+                    return `<div class="bg-rose-50 border border-rose-200 p-3 rounded-lg mb-2">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <div class="text-xs font-bold text-slate-900">${tipoLabel} - ${p.periodo_nomina || 'Sin período'}</div>
+                                <div class="text-[10px] text-rose-600 font-semibold">⚠️ Enlace expirado — Contactá a RRHH</div>
+                            </div>
+                            <i class="fa-solid fa-clock text-rose-400"></i>
+                        </div>
+                    </div>`;
+                }
+                return `<div class="bg-amber-50 border border-amber-200 p-3 rounded-lg mb-2">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <div class="text-xs font-bold text-slate-900">${tipoLabel} - ${p.periodo_nomina || 'Sin período'}</div>
+                            <div class="text-[10px] text-amber-700">Emitido: ${new Date(p.fecha_emision).toLocaleString('es-VE')}</div>
+                        </div>
+                        <a href="${enlace}" class="bg-amber-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold">Firmar</a>
+                    </div>
+                </div>`;
+            }).join('');
+
+            document.getElementById('portal').innerHTML = `
+                <div class="bg-white rounded-xl shadow-lg p-6 mb-4">
+                    <div class="text-center mb-4">
+                        <div class="inline-flex bg-rose-100 text-rose-600 p-4 rounded-full mb-3">
+                            <i class="fa-solid fa-lock text-3xl"></i>
+                        </div>
+                        <h1 class="text-lg font-bold text-slate-900">Acceso Bloqueado</h1>
+                        <p class="text-sm text-slate-600 mt-1">Tienes <strong>${pendientes.length}</strong> documento${pendientes.length > 1 ? 's' : ''} pendiente${pendientes.length > 1 ? 's' : ''} de firma.</p>
+                        <p class="text-xs text-slate-500 mt-2">Debes firmarlos para acceder a tu expediente digital completo.</p>
+                    </div>
+                    <div class="border-t pt-4">
+                        <h2 class="text-xs font-bold text-slate-900 uppercase mb-3">Documentos pendientes:</h2>
+                        ${pendientesHtml}
+                    </div>
+                </div>
+                <div class="bg-slate-100 rounded-xl p-4 text-center">
+                    <p class="text-[10px] text-slate-500">${emp.nombre} | C.I. ${emp.cedula}</p>
+                    <p class="text-[9px] text-slate-400 mt-1">Si un enlace expiró, escribí a RRHH para que te generen uno nuevo.</p>
+                </div>
+            `;
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('portal').classList.remove('hidden');
+        }
+
+        async function mostrarExpedienteCompleto(emp) {
+            document.getElementById('portal').innerHTML = `
+                <div class="bg-white rounded-xl shadow-lg p-5 mb-4">
+                    <div class="flex items-center gap-3 mb-2">
+                        <div class="bg-indigo-600 text-white p-3 rounded-lg"><i class="fa-solid fa-folder-open text-xl"></i></div>
+                        <div>
+                            <h1 class="text-lg font-bold text-slate-900">Mi Expediente Digital</h1>
+                            <p class="text-xs text-slate-500">${emp.nombre} | C.I. ${emp.cedula}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-lg p-4 mb-4">
+                    <h2 class="text-sm font-bold text-slate-900 mb-3 flex items-center"><i class="fa-solid fa-file-shield text-emerald-600 mr-2"></i> Documentos de Ingreso</h2>
+                    <div id="lista-docs-ingreso" class="space-y-2"></div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-lg p-4 mb-4">
+                    <h2 class="text-sm font-bold text-slate-900 mb-3 flex items-center"><i class="fa-solid fa-receipt text-indigo-600 mr-2"></i> Recibos Firmados</h2>
+                    <div id="lista-recibos-firmados" class="space-y-2"></div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-lg p-4 mb-4">
+                    <h2 class="text-sm font-bold text-slate-900 mb-3 flex items-center"><i class="fa-solid fa-clock text-amber-600 mr-2"></i> Pendientes de Firma</h2>
+                    <p class="text-[11px] text-slate-500 mb-2">Estos recibos estarán disponibles cuando los firme:</p>
+                    <div id="lista-pendientes" class="space-y-2"></div>
+                </div>
+            `;
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('portal').classList.remove('hidden');
+
             const { data: docs } = await supabaseClient
                 .from('expediente_documentos')
                 .select('*')
@@ -95,30 +165,7 @@
                 ? docsFirmados.map(d => renderDocItem(d)).join('')
                 : '<p class="text-xs text-slate-500 italic">Aún no tiene recibos firmados.</p>';
 
-            // 2. Pendientes de firma
-            const { data: pendientes } = await supabaseClient
-                .from('firmas_recibos')
-                .select('*')
-                .eq('empleado_id', emp.id)
-                .eq('estado', 'pendiente')
-                .order('fecha_emision', { ascending: false });
-
-            document.getElementById('lista-pendientes').innerHTML = pendientes && pendientes.length
-                ? pendientes.map(p => {
-                    const tipoLabel = { nomina: 'Nómina', vacaciones: 'Vacaciones', prestaciones: 'Prestaciones', utilidades: 'Utilidades', liquidacion: 'Liquidación' }[p.tipo_documento] || 'Documento';
-                    const enlace = `${window.location.origin}/firma.html?token=${p.token}`;
-                    return `<div class="flex items-center justify-between border border-amber-200 bg-amber-50 p-2 rounded-lg">
-                        <div>
-                            <div class="text-xs font-bold text-slate-900">${tipoLabel} - ${p.periodo_nomina || 'Sin período'}</div>
-                            <div class="text-[10px] text-slate-500">Emitido: ${new Date(p.fecha_emision).toLocaleDateString('es-VE')}</div>
-                        </div>
-                        <a href="${enlace}" class="bg-amber-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold">Firmar</a>
-                    </div>`;
-                }).join('')
-                : '<p class="text-xs text-slate-500 italic">No hay documentos pendientes de firma.</p>';
-
-            document.getElementById('loading').classList.add('hidden');
-            document.getElementById('portal').classList.remove('hidden');
+            document.getElementById('lista-pendientes').innerHTML = '<p class="text-xs text-emerald-600 font-semibold"><i class="fa-solid fa-check-circle mr-1"></i> No hay documentos pendientes.</p>';
         }
 
         function renderDocItem(d) {
