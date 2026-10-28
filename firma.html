@@ -8,24 +8,39 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.1.7/dist/signature_pad.umd.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { font-family: ui-sans-serif, system-ui, sans-serif; }
+        #firma-canvas { touch-action: none; }
+    </style>
 </head>
-<body class="bg-slate-100 text-slate-800 p-4 font-sans min-h-screen">
+<body class="bg-slate-100 text-slate-800 p-3 font-sans min-h-screen">
 
     <div id="loading" class="text-center mt-10 font-bold text-slate-500">
         <i class="fa-solid fa-spinner fa-spin mr-2"></i> Cargando documento...
     </div>
 
-    <div id="contenido-recibo" class="bg-white p-5 rounded-lg shadow-lg max-w-md mx-auto hidden">
+    <div id="contenido-recibo" class="max-w-4xl mx-auto hidden">
         <div id="recibo-html"></div>
         
-        <div class="mt-6 border-t pt-4">
-            <p class="text-sm font-bold mb-2">Firme aquí con su dedo:</p>
-            <canvas id="firma-canvas" class="border-2 border-dashed border-slate-300 rounded-lg w-full bg-slate-50 touch-none" height="200"></canvas>
+        <div class="bg-white rounded-xl shadow-lg p-5 mt-4 max-w-md mx-auto">
+            <p class="text-sm font-bold mb-2 text-slate-900">
+                <i class="fa-solid fa-signature mr-1"></i> Firme aquí con su dedo:
+            </p>
+            <canvas id="firma-canvas" class="border-2 border-dashed border-slate-300 rounded-lg w-full bg-slate-50" height="200"></canvas>
             
             <div class="flex gap-2 mt-4">
-                <button onclick="limpiarFirma()" class="flex-1 bg-slate-200 text-slate-700 py-2 rounded font-bold">Limpiar</button>
-                <button onclick="enviarFirma()" class="flex-1 bg-emerald-600 text-white py-2 rounded font-bold shadow-lg">Firmar y Enviar</button>
+                <button onclick="limpiarFirma()" class="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-700 py-2.5 rounded-lg font-bold text-sm">
+                    <i class="fa-solid fa-eraser mr-1"></i> Limpiar
+                </button>
+                <button onclick="enviarFirma()" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 rounded-lg font-bold text-sm shadow-lg">
+                    <i class="fa-solid fa-check mr-1"></i> Firmar y Enviar
+                </button>
             </div>
+            
+            <p class="text-[10px] text-slate-500 mt-3 text-center leading-tight">
+                Al firmar, confirma que ha recibido y revisado este documento. Su firma será registrada con trazabilidad completa (fecha/hora, hash de integridad, navegador).
+            </p>
         </div>
     </div>
 
@@ -39,7 +54,15 @@
         const token = urlParams.get('token');
         let firmaPad = null;
         let firmaDataGlobal = null;
-        let nominaDataGlobal = null;
+        let paramsEmpresa = { nombre_empresa: 'EMPRESA', rif_empresa: 'J-00000000-0' };
+
+        // Formato numérico es-VE
+        function fNum(n) {
+            return Number(n || 0).toLocaleString('es-VE', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        }
 
         if (!token) {
             document.getElementById('loading').innerText = 'Enlace inválido.';
@@ -48,6 +71,7 @@
         }
 
         async function iniciarFirma() {
+            // 1. Cargar firma
             const { data: firmaData, error } = await supabaseClient
                 .from('firmas_recibos')
                 .select('*')
@@ -68,7 +92,20 @@
             }
             firmaDataGlobal = firmaData;
 
-            // Cargar los datos del documento según el tipo
+            // 2. Cargar parámetros de la empresa
+            try {
+                const { data: params } = await supabaseClient
+                    .from('parametros_config')
+                    .select('*')
+                    .eq('id', 1)
+                    .maybeSingle();
+                if (params) {
+                    paramsEmpresa.nombre_empresa = params.nombre_empresa || 'EMPRESA';
+                    paramsEmpresa.rif_empresa = params.rif_empresa || 'J-00000000-0';
+                }
+            } catch (e) { console.warn('No se pudieron cargar parámetros:', e); }
+
+            // 3. Cargar documento según tipo
             let tablaOrigen = '';
             switch (firmaData.tipo_documento) {
                 case 'nomina': tablaOrigen = 'nominas'; break;
@@ -89,16 +126,15 @@
                 document.getElementById('loading').innerText = 'No se encontró el documento asociado.';
                 return;
             }
-            nominaDataGlobal = docData;
 
-            // Traer datos del empleado
+            // 4. Cargar empleado
             const { data: empData } = await supabaseClient
                 .from('empleados')
                 .select('*')
                 .eq('id', firmaData.empleado_id)
                 .single();
 
-            // Renderizar según tipo
+            // 5. Renderizar
             renderizarDocumento(firmaData, docData, empData);
 
             document.getElementById('loading').classList.add('hidden');
@@ -109,72 +145,212 @@
         }
 
         function renderizarDocumento(firma, doc, emp) {
-            const fechaEmision = new Date(firma.fecha_emision).toLocaleString('es-VE');
-            const periodo = firma.periodo_nomina || '-';
-            const tipoLabel = {
-                nomina: 'Recibo de Nómina',
-                vacaciones: 'Recibo de Vacaciones',
-                prestaciones: 'Recibo de Prestaciones',
-                utilidades: 'Recibo de Utilidades',
-                liquidacion: 'Recibo de Liquidación Final'
-            }[firma.tipo_documento] || 'Recibo';
+            let htmlRecibo = '';
+            const tipo = firma.tipo_documento;
 
-            // Datos del documento (varían según tipo)
-            const netoUSD = doc.neto_usd || doc.gran_total_usd || doc.monto_definitivo_usd || doc.total_usd || 0;
-            const netoBs = doc.neto_bs || doc.gran_total_bs || doc.monto_definitivo_bs || doc.total_bs || 0;
+            if (tipo === 'nomina') {
+                htmlRecibo = generarHTMLReciboNomina(doc, emp);
+            } else {
+                // Fallback simple para tipos no implementados aún
+                const tipoLabel = {
+                    vacaciones: 'Recibo de Vacaciones',
+                    prestaciones: 'Recibo de Prestaciones',
+                    utilidades: 'Recibo de Utilidades',
+                    liquidacion: 'Recibo de Liquidación Final'
+                }[tipo] || 'Recibo';
 
-            document.getElementById('recibo-html').innerHTML = `
-                <h2 class="text-lg font-bold text-center mb-3 text-black">${tipoLabel}</h2>
-                <div class="text-[11px] space-y-1 border border-black p-2 rounded bg-slate-50">
-                    <p><b>Empleado:</b> ${emp?.nombre || doc.empleado || '-'}</p>
-                    <p><b>Cédula:</b> ${emp?.cedula || '-'}</p>
-                    <p><b>Período:</b> ${periodo}</p>
-                    <p><b>Fecha Emisión:</b> ${fechaEmision}</p>
-                    <p><b>ID Documento:</b> <span class="font-mono text-[9px]">${firma.id.substring(0,8)}</span></p>
-                    <p><b>Versión:</b> ${firma.version_documento}</p>
-                    <hr class="my-1 border-slate-400">
-                    <p class="text-base font-bold text-emerald-700">Neto a Cobrar: Bs. ${Number(netoBs).toLocaleString('es-VE',{minimumFractionDigits:2})} ($${Number(netoUSD).toFixed(2)})</p>
-                </div>
-                <p class="text-[10px] text-slate-500 mt-3 italic">Al firmar, confirma la recepción de este documento. Su firma será registrada con trazabilidad completa (fecha/hora, hash de integridad, navegador).</p>
-            `;
+                htmlRecibo = `
+                    <div class="recibo-card bg-white text-black p-4 rounded-lg shadow-xl border border-slate-300 font-sans max-w-3xl mx-auto w-full">
+                        <div class="border-b-2 border-black pb-2 mb-4">
+                            <h2 class="text-xl font-black uppercase">${paramsEmpresa.nombre_empresa.split('/')[0].trim()}</h2>
+                            <p class="text-xs text-slate-700">${paramsEmpresa.rif_empresa}</p>
+                        </div>
+                        <h3 class="text-center font-bold text-base mb-4">${tipoLabel}</h3>
+                        <table class="w-full text-xs border border-black">
+                            <tr><td class="bg-slate-100 p-2 font-bold border-r border-black w-32">Empleado</td><td class="p-2 font-bold">${emp?.nombre || doc.empleado || '-'}</td></tr>
+                            <tr><td class="bg-slate-100 p-2 font-bold border-r border-black">Cédula</td><td class="p-2">${emp?.cedula || '-'}</td></tr>
+                            <tr><td class="bg-slate-100 p-2 font-bold border-r border-black">Período</td><td class="p-2">${firma.periodo_nomina || '-'}</td></tr>
+                            <tr><td class="bg-slate-100 p-2 font-bold border-r border-black">Neto</td><td class="p-2 font-bold text-emerald-700">Bs. ${fNum(doc.neto_bs || doc.gran_total_bs || doc.monto_definitivo_bs || doc.total_bs)}</td></tr>
+                        </table>
+                    </div>
+                `;
+            }
+
+            document.getElementById('recibo-html').innerHTML = htmlRecibo;
         }
 
-        function limpiarFirma() { if (firmaPad) firmaPad.clear(); }
+        /* ==========================================================
+           RECIBO DE NÓMINA COMPLETO (portado de generarHTMLReciboSolo)
+           ========================================================== */
+        function generarHTMLReciboNomina(r, e) {
+            const t = Number(r.tasa_bcv || 1);
+            const sM = Number(r.salario_minimo_bs || 130);
+            const sm = Number(r.salario_base || 0);
+            const bam = Number(r.bono_alimentacion || 0);
+            const oim = Number(r.otros_ingresos || 0);
+            const sim = sm + bam + oim;
+            const sqb = (sm / 2) * t;
+            const bab = (bam / 2) * t;
+            const oib = (oim / 2) * t;
+            const oab = Number(r.otras_asignaciones || 0) * t;
+
+            const horaBaseUSD = (sm / 30) / 8;
+            const diaBaseUSD = sm / 30;
+            const hedV = Number(r.hed || 0);
+            const hnoctV = Number(r.hnoct || 0);
+            const ferV = Number(r.fer || 0);
+            const montoHEDBs = horaBaseUSD * 1.5 * hedV * t;
+            const montoNoctBs = horaBaseUSD * 0.30 * hnoctV * t;
+            const montoFerBs = diaBaseUSD * 1.5 * ferV * t;
+            const totalRecargosBs = montoHEDBs + montoNoctBs + montoFerBs;
+
+            const tab = sqb + bab + oib + oab + totalRecargosBs;
+
+            let sso = Number(r.ivss_usd || 0) * t;
+            if (sso === 0 && sm > 0) sso = (Math.min(sm * t, 5 * sM) * 12 / 52) * 0.04 * 2;
+            let lph = Number(r.faov_usd || 0) * t;
+            if (lph === 0 && sm > 0) lph = ((sm * t) * 0.01) / 2;
+            let rpe = Number(r.rpe_usd || 0) * t;
+            if (rpe === 0 && sm > 0) rpe = (Math.min(sm * t, 10 * sM) * 12 / 52) * 0.005 * 2;
+
+            const islrPctVal = Number(r.islr_porcentaje || 0);
+            let islrBs = Number(r.islr_usd || 0) * t;
+            if (islrBs === 0 && islrPctVal > 0) {
+                const salBaseDiaUSD = sm / 30;
+                const baseImp = Math.max(0, (salBaseDiaUSD * (15 - Number(r.dias_faltantes || 0))) +
+                    ((horaBaseUSD * 1.5 * hedV) + (horaBaseUSD * 0.30 * hnoctV) + (diaBaseUSD * 1.5 * ferV)));
+                islrBs = baseImp * (islrPctVal / 100) * t;
+            }
+
+            const dfb = ((sim / 30) * Number(r.dias_faltantes || 0)) * t;
+            const hdb = (((sim / 30) / 8) * Number(r.horas_descuento || 0)) * t;
+            const prb = (Number(r.prestamos || 0) + Number(r.adelantos || 0)) * t;
+            const odb = Number(r.otros_descuentos || 0) * t;
+            const tdb = dfb + sso + lph + rpe + islrBs + prb + odb + hdb;
+            const tnb = r.neto_bs ? Number(r.neto_bs) : (tab - tdb);
+
+            const dfv = Number(r.dias_faltantes || 0);
+            const hdv = Number(r.horas_descuento || 0);
+            const odv = Number(r.otros_descuentos || 0);
+            const adv = Number(r.adelantos || 0);
+            const prv = Number(r.prestamos || 0);
+            const oav = Number(r.otras_asignaciones || 0);
+            const diav = sim / 30;
+
+            const salarioBs = ((sm / 30) * (15 - dfv)) * t - (sso + lph + rpe + islrBs);
+            const alimBs = ((bam / 30) * (15 - dfv)) * t;
+            const subsBs = ((oim / 30) * (15 - dfv)) * t + (oav * t) - (((diav / 8) * hdv) * t) - (odv * t) - (adv * t) - (prv * t) + totalRecargosBs;
+
+            const fecha = r.fecha_pago;
+            const [y, m, d] = fecha.split('-');
+            const fO = new Date(y, m - 1, d);
+            const qT = fO.getDate() <= 15 ? '1ERA QUINCENA' : '2DA QUINCENA';
+            const mN = fO.toLocaleString('es-ES', { month: 'long' }).toUpperCase();
+            const tP = `RECIBO DE PAGO ${qT} DE ${mN} ${y}`;
+
+            return `
+            <div class="recibo-card bg-white text-black p-3 rounded-lg shadow-xl border border-slate-300 font-sans max-w-3xl mx-auto w-full">
+                <div>
+                    <div class="flex justify-between items-start mb-1 pb-0.5 border-b border-black">
+                        <div><h2 class="text-xl font-black tracking-widest text-black uppercase">${paramsEmpresa.nombre_empresa.split('/')[0].trim()}</h2></div>
+                        <div class="text-right leading-tight"><h3 class="text-xs font-extrabold text-black uppercase">${paramsEmpresa.nombre_empresa}</h3><p class="text-[10px] text-slate-800 font-semibold">${paramsEmpresa.rif_empresa}</p></div>
+                    </div>
+                    <div class="bg-[#dbece0] text-center font-bold text-[10.5px] py-0.5 border border-black mb-1 uppercase tracking-wider text-black">${tP}</div>
+                    <table class="w-full text-[10px] border border-black mb-1 font-semibold">
+                        <tr><td class="bg-slate-100 px-1 py-0.5 border-r border-b border-black w-28 font-bold text-black">TRABAJADOR</td><td class="px-1 py-0.5 border-r border-b border-black font-bold uppercase text-black">${r.empleado}</td><td class="bg-slate-100 px-1 py-0.5 border-r border-b border-black w-16 font-bold text-black">CARGO</td><td class="px-1 py-0.5 border-b border-black uppercase font-bold text-black">${r.cargo || e?.cargos?.nombre || '-'}</td></tr>
+                        <tr><td class="bg-slate-100 px-1.5 py-0.5 border-r border-b border-black font-bold text-black">CÉDULA</td><td class="px-1.5 py-0.5 border-r border-b border-black text-black">${e?.cedula || r.cedula || '-'}</td><td class="bg-slate-100 px-1.5 py-0.5 border-r border-b border-black font-bold text-black">F. INGRESO</td><td class="px-1.5 py-0.5 border-b border-black text-black">${e?.fecha_ingreso || '-'}</td></tr>
+                        <tr><td class="bg-slate-100 px-1.5 py-0.5 border-r border-black font-bold text-black">SALARIO MENSUAL</td><td colspan="3" class="px-1.5 py-0.5 font-bold text-black">${fNum(sm * t)} Bs. ($${sm.toFixed(2)}) | Tasa: ${t.toFixed(2)} Bs/$</td></tr>
+                    </table>
+                    <table class="w-full text-[10px] border border-black mb-1">
+                        <thead><tr class="bg-[#dbece0] font-bold border-b border-black text-black"><th class="px-1.5 py-0.5 text-left border-r border-black text-black" colspan="2">ASIGNACIÓN</th><th class="px-1.5 py-0.5 text-right w-28 text-black">MONTO (BS)</th></tr></thead>
+                        <tbody class="divide-y divide-slate-300">
+                            <tr><td class="px-1.5 py-0.5 text-black">Salario quincenal (15 d)</td><td class="px-1.5 py-0.5 text-center w-12 text-slate-800">15 d</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(sqb)}</td></tr>
+                            <tr><td class="px-1.5 py-0.5 text-black" colspan="2">Bono de alimentación</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(bab)}</td></tr>
+                            <tr><td class="px-1.5 py-0.5 text-black" colspan="2">Subsidio especial no obligatorio</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(oib + oab)}</td></tr>
+                            ${hedV > 0 ? `<tr><td class="px-1.5 py-0.5 text-black">Horas Extras Diurnas (Recargo 50%)</td><td class="px-1.5 py-0.5 text-center text-slate-800">${hedV} h</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(montoHEDBs)}</td></tr>` : ''}
+                            ${hnoctV > 0 ? `<tr><td class="px-1.5 py-0.5 text-black">Bono Nocturno (Recargo 30%)</td><td class="px-1.5 py-0.5 text-center text-slate-800">${hnoctV} h</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(montoNoctBs)}</td></tr>` : ''}
+                            ${ferV > 0 ? `<tr><td class="px-1.5 py-0.5 text-black">Feriados/Descanso Trabajados (1.5x)</td><td class="px-1.5 py-0.5 text-center text-slate-800">${ferV} d</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(montoFerBs)}</td></tr>` : ''}
+                        </tbody>
+                        <tfoot><tr class="font-bold border-t border-black bg-slate-50 text-black"><td class="px-1.5 py-0.5" colspan="2">TOTAL ASIGNACIONES</td><td class="px-1.5 py-0.5 text-right font-mono font-bold text-black">${fNum(tab)}</td></tr></tfoot>
+                    </table>
+                    <table class="w-full text-[9.5px] border border-black mb-1">
+                        <tbody class="divide-y divide-slate-200">
+                            <tr><td class="px-1.5 py-0.5 text-black">Días no laborados (${r.dias_faltantes || 0} d)</td><td class="px-1.5 py-0.5 text-right font-mono w-28 text-black">${fNum(dfb)}</td></tr>
+                            <tr><td class="px-1.5 py-0.5 text-black">S.S.O. / IVSS (4%)</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(sso)}</td></tr>
+                            <tr><td class="px-1.5 py-0.5 text-black">L.P.H. / FAOV (1%)</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(lph)}</td></tr>
+                            <tr><td class="px-1.5 py-0.5 text-black">Paro Forzoso / RPE (0,5%)</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(rpe)}</td></tr>
+                            ${islrBs > 0 ? `<tr><td class="px-1.5 py-0.5 text-black">I.S.L.R. Retención (${islrPctVal.toFixed(2)}%)</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(islrBs)}</td></tr>` : ''}
+                            <tr><td class="px-1.5 py-0.5 text-black">Préstamos / Adelantos amortizados</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(prb)}</td></tr>
+                            <tr><td class="px-1.5 py-0.5 text-black">Otras deducciones</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(odb)}</td></tr>
+                            <tr><td class="px-1.5 py-0.5 text-black">Horas descontadas (${r.horas_descuento || 0} hrs)</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(hdb)}</td></tr>
+                        </tbody>
+                        <tfoot><tr class="font-bold border-t border-black bg-slate-50 text-black"><td class="px-1.5 py-0.5">TOTAL DEDUCCIONES</td><td class="px-1.5 py-0.5 text-right font-mono font-bold text-black">${fNum(tdb)}</td></tr></tfoot>
+                    </table>
+                </div>
+                <div>
+                    <div class="grid grid-cols-3 gap-1 mb-1 text-[9px]">
+                        <div class="bg-[#e0f2fe] border border-black p-1 text-center text-black"><div class="font-bold uppercase text-[7.5px] leading-tight">Salario</div><div class="font-mono font-bold leading-tight">Bs. ${fNum(salarioBs)}</div></div>
+                        <div class="bg-[#dcfce7] border border-black p-1 text-center text-black"><div class="font-bold uppercase text-[7.5px] leading-tight">Alimentación</div><div class="font-mono font-bold leading-tight">Bs. ${fNum(alimBs)}</div></div>
+                        <div class="bg-[#fef3c7] border border-black p-1 text-center text-black"><div class="font-bold uppercase text-[7.5px] leading-tight">Subsidio</div><div class="font-mono font-bold leading-tight">Bs. ${fNum(subsBs)}</div></div>
+                    </div>
+                    <div class="flex justify-between items-center bg-[#dbece0] border border-black p-1 font-bold text-[10.5px] mb-1 text-black">
+                        <span>TOTAL NETO A COBRAR</span>
+                        <span class="font-mono text-xs text-black">${fNum(tnb)} Bs.</span>
+                    </div>
+                    <div class="border border-black p-1 mb-1 text-[7.5px] text-black leading-tight bg-slate-50"><strong>OBSERVACIÓN:</strong> El subsidio no posee naturaleza salarial, ya que no desprende de la intención retributiva del trabajo prestado sino un beneficio eminentemente social para cubrir parte de sus gastos por bienes y/o servicios básicos en que incurre el trabajador. Por tal motivo se otorga como una ayuda al trabajador sin que sea de carácter obligatorio en futuras ocasiones.</div>
+                    <div class="border-t border-black pt-1">
+                        <h4 class="text-center font-extrabold text-[8.5px] tracking-wider mb-2 text-black">RECIBO CONFORME</h4>
+                        <div class="grid grid-cols-2 gap-4 text-[9px] font-semibold text-black">
+                            <div class="flex items-end"><span class="mr-1">FIRMA:</span><span class="border-b border-black flex-1"></span></div>
+                            <div class="flex items-end"><span class="mr-1">CÉDULA:</span><span class="border-b border-black flex-1 font-bold"></span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        /* ==========================================================
+           FIRMA Y ENVÍO
+           ========================================================== */
+        function limpiarFirma() {
+            if (firmaPad) firmaPad.clear();
+        }
 
         async function enviarFirma() {
             if (!firmaPad || firmaPad.isEmpty()) {
-                alert('Por favor, firme antes de enviar.');
+                alert('Por favor, firme el recibo antes de enviar.');
                 return;
             }
             const btn = document.querySelector('button[onclick="enviarFirma()"]');
-            btn.innerText = 'Procesando...';
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Procesando...';
             btn.disabled = true;
 
             const firmaBase64 = firmaPad.toDataURL('image/png');
-            const element = document.getElementById('contenido-recibo');
-            const botones = element.querySelector('.flex.gap-2');
-            if (botones) botones.style.display = 'none';
+            const element = document.getElementById('recibo-html');
 
-            // Inyectar firma visual en el HTML del PDF
-            const imgFirma = document.createElement('img');
-            imgFirma.src = firmaBase64;
-            imgFirma.style.width = '180px';
-            imgFirma.style.marginTop = '10px';
-            imgFirma.style.borderBottom = '1px solid #000';
-            element.appendChild(imgFirma);
+            // Inyectar la firma visual dentro del recibo ANTES de generar el PDF
+            const bloqueFirma = document.createElement('div');
+            bloqueFirma.style.marginTop = '20px';
+            bloqueFirma.style.paddingTop = '10px';
+            bloqueFirma.style.borderTop = '1px solid #000';
+            bloqueFirma.innerHTML = `
+                <div style="font-size: 9px; font-weight: bold; text-align: center; margin-bottom: 8px;">FIRMA DIGITAL DEL TRABAJADOR</div>
+                <img src="${firmaBase64}" style="width: 180px; display: block; margin: 0 auto; border-bottom: 1px solid #000;">
+                <div style="font-size: 8px; text-align: center; margin-top: 4px; color: #555;">Firmado digitalmente el ${new Date().toLocaleString('es-VE')}</div>
+            `;
+            element.appendChild(bloqueFirma);
 
             const opt = {
                 margin: 10,
                 filename: 'documento_firmado.pdf',
                 image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { scale: 2 },
+                html2canvas: { scale: 2, useCORS: true },
                 jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
             };
 
             const pdfBase64 = await html2pdf().from(element).set(opt).outputPdf('datauristring');
 
-            if (botones) botones.style.display = 'flex';
-            imgFirma.remove();
+            bloqueFirma.remove();
 
             // Calcular hash SHA-256 del PDF
             const pdfBlob = await (await fetch(pdfBase64)).blob();
@@ -182,7 +358,7 @@
             const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
             const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
 
-            // Nombre del archivo: nombre del documento + período
+            // Nombre del archivo
             const tipoLabel = {
                 nomina: 'Nomina',
                 vacaciones: 'Vacaciones',
@@ -192,23 +368,23 @@
             }[firmaDataGlobal.tipo_documento] || 'Documento';
 
             const sanitizedPeriodo = (firmaDataGlobal.periodo_nomina || 'SinPeriodo').replace(/[^a-zA-Z0-9]/g, '_');
-            const fileName = `${firmaDataGlobal.empleado_id}/${tipoLabel}_${sanitizedPeriodo}_${firmaDataGlobal.id.substring(0,6)}.pdf`;
+            const fileName = `${firmaDataGlobal.empleado_id}/${tipoLabel}_${sanitizedPeriodo}_${firmaDataGlobal.id.substring(0, 6)}.pdf`;
 
             // Subir a Storage
             const { error: uploadError } = await supabaseClient.storage
                 .from('expediente')
-                .upload(fileName, pdfBlob);
+                .upload(fileName, pdfBlob, { upsert: true });
 
             if (uploadError) {
                 alert('Error al subir: ' + uploadError.message);
-                btn.innerText = 'Firmar y Enviar';
+                btn.innerHTML = '<i class="fa-solid fa-check mr-1"></i> Firmar y Enviar';
                 btn.disabled = false;
                 return;
             }
 
             const { data: urlData } = supabaseClient.storage.from('expediente').getPublicUrl(fileName);
 
-            // Registrar PDF firmado en expediente_documentos (visible al empleado)
+            // Registrar en expediente_documentos
             await supabaseClient.from('expediente_documentos').insert([{
                 empleado_id: firmaDataGlobal.empleado_id,
                 tipo_documento: firmaDataGlobal.tipo_documento,
@@ -225,19 +401,18 @@
                 url_pdf_firmado: urlData.publicUrl,
                 hash_sha256_pdf: hashHex,
                 fecha_firmado: new Date().toISOString(),
-                ip_firmado: 'desconocida',
                 user_agent_firmado: navigator.userAgent.substring(0, 200)
             }).eq('token', token);
 
             // Pantalla de éxito
             document.getElementById('contenido-recibo').innerHTML = `
-                <div class="text-center py-10">
+                <div class="bg-white rounded-xl shadow-lg p-8 text-center max-w-md mx-auto">
                     <div class="text-emerald-500 text-6xl mb-4"><i class="fa-solid fa-circle-check"></i></div>
-                    <h2 class="text-xl font-bold mb-2">¡Documento Firmado!</h2>
+                    <h2 class="text-xl font-bold mb-2 text-slate-900">¡Documento Firmado!</h2>
                     <p class="text-sm text-slate-600 mb-2">Su firma fue registrada exitosamente.</p>
                     <p class="text-[10px] text-slate-500 mb-4 font-mono">Hash de integridad: ${hashHex.substring(0, 16)}...</p>
-                    <a href="${urlData.publicUrl}" target="_blank" class="bg-sky-600 text-white px-6 py-3 rounded-lg text-sm font-bold inline-block shadow-lg">
-                        <i class="fa-solid fa-download mr-2"></i> Descargar Recibo
+                    <a href="${urlData.publicUrl}" target="_blank" class="bg-sky-600 hover:bg-sky-700 text-white px-6 py-3 rounded-lg text-sm font-bold inline-block shadow-lg">
+                        <i class="fa-solid fa-download mr-2"></i> Descargar Recibo Firmado
                     </a>
                     <p class="text-[10px] text-slate-500 mt-4">También fue guardado automáticamente en su expediente digital.</p>
                 </div>
