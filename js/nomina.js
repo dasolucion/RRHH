@@ -732,37 +732,47 @@ let firmaFechaActual = null;
 async function abrirModalFirmas(fechaPago) {
     firmaFechaActual = fechaPago;
     const regs = appState.nominas.filter(n => n.fecha_pago === fechaPago);
-    
+
     gId('firmas-fecha-titulo').innerText = fechaPago;
-    gId('tabla-firmas-body').innerHTML = '<tr><td colspan="4" class="p-4 text-center text-slate-500">Cargando estados...</td></tr>';
+    gId('tabla-firmas-body').innerHTML = '<tr><td colspan="5" class="p-4 text-center text-slate-500">Cargando estados...</td></tr>';
     openModal('modal-gestion-firmas');
 
-    // Traer todos los tokens de esta fecha
-const { data: firmasExistentes } = await supabaseClient
-    .from('firmas_recibos')
-    .select('*')
-    .eq('tipo_documento', 'nomina')
-    .in('documento_id', regs.map(r => r.id));
+    const { data: firmasExistentes } = await supabaseClient
+        .from('firmas_recibos')
+        .select('*')
+        .eq('tipo_documento', 'nomina')
+        .in('documento_id', regs.map(r => r.id));
 
     const mapaFirmas = {};
     (firmasExistentes || []).forEach(f => { mapaFirmas[String(f.documento_id)] = f; });
 
     gId('tabla-firmas-body').innerHTML = regs.map(r => {
         const firma = mapaFirmas[String(r.id)];
-        let estadoBadge, acciones;
+        let estadoBadge, acciones, tiempoRestante = '-';
 
         if (!firma) {
             estadoBadge = '<span class="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded">Sin enlace</span>';
             acciones = `<button onclick="generarEnlaceIndividual(${r.id}, ${r.empleado_id})" class="bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] px-2.5 py-1 rounded font-bold"><i class="fa-solid fa-link mr-1"></i> Generar</button>`;
         } else if (firma.estado === 'pendiente') {
-            estadoBadge = '<span class="text-[10px] bg-amber-950 text-amber-300 border border-amber-800 px-2 py-0.5 rounded font-bold">Pendiente</span>';
-            acciones = `
-                <button onclick="copiarEnlaceFirma('${firma.token}')" class="bg-slate-700 hover:bg-slate-600 text-white text-[10px] px-2 py-1 rounded" title="Copiar"><i class="fa-solid fa-copy"></i></button>
-                <button onclick="enviarWAEnlaceFirma('${firma.token}', ${r.empleado_id})" class="bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] px-2 py-1 rounded" title="WhatsApp"><i class="fa-brands fa-whatsapp"></i></button>
-                <button onclick="anularEnlaceFirma('${firma.token}')" class="bg-rose-600/20 hover:bg-rose-600/40 text-rose-400 text-[10px] px-2 py-1 rounded" title="Anular"><i class="fa-solid fa-xmark"></i></button>
-            `;
+            const expirado = firma.expira_en && new Date(firma.expira_en) < new Date();
+            if (expirado) {
+                estadoBadge = '<span class="text-[10px] bg-rose-950 text-rose-300 border border-rose-800 px-2 py-0.5 rounded font-bold">Expirado</span>';
+                acciones = `
+                    <button onclick="anularEnlaceFirma('${firma.token}')" class="bg-rose-600/20 hover:bg-rose-600/40 text-rose-400 text-[10px] px-2 py-1 rounded" title="Eliminar"><i class="fa-solid fa-xmark"></i></button>
+                    <button onclick="renovarEnlaceFirma('${firma.token}')" class="bg-amber-600 hover:bg-amber-500 text-white text-[10px] px-2 py-1 rounded font-bold" title="Renovar 30 min"><i class="fa-solid fa-rotate-right mr-1"></i> Renovar</button>
+                `;
+            } else {
+                estadoBadge = '<span class="text-[10px] bg-amber-950 text-amber-300 border border-amber-800 px-2 py-0.5 rounded font-bold">Pendiente</span>';
+                acciones = `
+                    <button onclick="copiarEnlaceFirma('${firma.token}')" class="bg-slate-700 hover:bg-slate-600 text-white text-[10px] px-2 py-1 rounded" title="Copiar"><i class="fa-solid fa-copy"></i></button>
+                    <button onclick="enviarWAEnlaceFirma('${firma.token}', ${r.empleado_id})" class="bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] px-2 py-1 rounded" title="WhatsApp"><i class="fa-brands fa-whatsapp"></i></button>
+                    <button onclick="anularEnlaceFirma('${firma.token}')" class="bg-rose-600/20 hover:bg-rose-600/40 text-rose-400 text-[10px] px-2 py-1 rounded" title="Anular"><i class="fa-solid fa-xmark"></i></button>
+                `;
+                tiempoRestante = `<span data-expira="${firma.expira_en}" class="font-mono">${formatearTiempoRestante(firma.expira_en)}</span>`;
+            }
         } else {
             estadoBadge = '<span class="text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-800 px-2 py-0.5 rounded font-bold"><i class="fa-solid fa-check mr-0.5"></i> Firmado</span>';
+            tiempoRestante = '<span class="text-[10px] text-emerald-400"><i class="fa-solid fa-check"></i></span>';
             acciones = `
                 <a href="${firma.url_pdf_firmado}" target="_blank" class="bg-sky-600 hover:bg-sky-500 text-white text-[10px] px-2 py-1 rounded inline-block" title="Ver PDF"><i class="fa-solid fa-file-pdf"></i></a>
                 <button onclick="anularEnlaceFirma('${firma.token}')" class="bg-slate-700 hover:bg-slate-600 text-white text-[10px] px-2 py-1 rounded" title="Regenerar"><i class="fa-solid fa-rotate"></i></button>
@@ -773,9 +783,21 @@ const { data: firmasExistentes } = await supabaseClient
             <td class="p-2 text-xs font-semibold text-white">${r.empleado}</td>
             <td class="p-2 text-center">${estadoBadge}</td>
             <td class="p-2 text-center text-[10px] text-slate-400 font-mono">${r.neto_bs ? 'Bs. ' + fNum(r.neto_bs) : '-'}</td>
+            <td class="p-2 text-center text-[10px]">${tiempoRestante}</td>
             <td class="p-2 text-right space-x-1">${acciones}</td>
         </tr>`;
     }).join('');
+
+    // Actualizar countdowns cada segundo
+    if (_countdownFirmasInterval) clearInterval(_countdownFirmasInterval);
+    _countdownFirmasInterval = setInterval(() => {
+        document.querySelectorAll('[data-expira]').forEach(el => {
+            const expira = el.getAttribute('data-expira');
+            const restante = formatearTiempoRestante(expira);
+            el.textContent = restante;
+            el.style.color = restante === 'EXPIRADO' ? '#f87171' : (restante.startsWith('0:') ? '#fbbf24' : '');
+        });
+    }, 1000);
 }
 
 function generarUUID() {
@@ -792,18 +814,35 @@ async function generarEnlaceIndividual(nominaId, empleadoId, tipoDoc = 'nomina',
 
     const { error } = await supabaseClient.from('firmas_recibos').insert([{
         token: token,
-        documento_id: nominaId,        // ← AHORA SÍ se guarda
+        documento_id: nominaId,
         empleado_id: empleadoId,
-        tipo_documento: tipoDoc,       // ← 'nomina', 'vacaciones', etc.
-        periodo_nomina: periodo,       // ← ej: "15/10/2026"
+        tipo_documento: tipoDoc,
+        periodo_nomina: periodo,
+        nomina_fecha_pago: firmaFechaActual,   // ← NUEVO: para recargar modal
         estado: 'pendiente',
         fecha_emision: new Date().toISOString()
     }]);
 
-    if (error) return showToast('Error al generar enlace: ' + error.message, 'error');
-    showToast('Enlace generado. Ya podés copiarlo o enviarlo.');
+    if (error) {
+        console.error('Error Supabase:', error);
+        return showToast('Error al generar enlace: ' + error.message, 'error');
+    }
+    showToast('Enlace generado (válido 30 min)');
     await abrirModalFirmas(firmaFechaActual);
 }
+
+// Helper: tiempo restante formateado
+function formatearTiempoRestante(expiraEn) {
+    if (!expiraEn) return 'Sin expiración';
+    const ms = new Date(expiraEn) - new Date();
+    if (ms <= 0) return 'EXPIRADO';
+    const min = Math.floor(ms / 60000);
+    const seg = Math.floor((ms % 60000) / 1000);
+    return `${min}:${String(seg).padStart(2, '0')}`;
+}
+
+// Interval global para actualizar los countdowns
+let _countdownFirmasInterval = null;
 
 function obtenerEnlaceFirma(token) {
     const baseUrl = window.location.origin + window.location.pathname.replace(/index\.html$/, '').replace(/\/$/, '');
@@ -833,22 +872,45 @@ function enviarWAEnlaceFirma(token, empleadoId) {
 }
 
 async function anularEnlaceFirma(token) {
-    // 1. Buscar la firma primero
-    const { data: firma } = await supabaseClient
+    console.log('[Anular] Token recibido:', token);
+    
+    // 1. Buscar la firma
+    const { data: firma, error: errFirma } = await supabaseClient
         .from('firmas_recibos')
         .select('*')
         .eq('token', token)
         .maybeSingle();
 
-    const yaFirmado = firma && firma.estado === 'firmado';
+    if (errFirma) {
+        console.error('[Anular] Error buscando firma:', errFirma);
+        return showToast('Error: ' + errFirma.message, 'error');
+    }
+    if (!firma) {
+        console.warn('[Anular] No se encontró la firma');
+        return showToast('Enlace no encontrado', 'error');
+    }
 
+    const yaFirmado = firma.estado === 'firmado';
     const msg = yaFirmado
         ? '⚠️ Este documento YA fue firmado.\n\nAl anular se eliminará el enlace, el PDF firmado del storage y la entrada del expediente.\n\n¿Continuar?'
         : '¿Anular este enlace? Podrás generar uno nuevo después.';
 
-    if (!confirm(msg)) return;
+    if (!window.confirm(msg)) return;
 
-    // 2. Si estaba firmado, limpiar PDF + expediente
+    // 2. Determinar la fecha de pago (para recargar el modal correcto)
+    let fechaPagoRecarga = firmaFechaActual;
+    if (!fechaPagoRecarga || !appState.nominas.find(n => n.fecha_pago === fechaPagoRecarga)) {
+        // Fallback: buscar en nominas por documento_id
+        const { data: nom } = await supabaseClient
+            .from('nominas')
+            .select('fecha_pago')
+            .eq('id', firma.documento_id)
+            .maybeSingle();
+        fechaPagoRecarga = nom?.fecha_pago || firmaFechaActual;
+    }
+    console.log('[Anular] Fecha para recargar modal:', fechaPagoRecarga);
+
+    // 3. Si estaba firmado, limpiar PDF + expediente
     if (yaFirmado && firma.url_pdf_firmado) {
         try {
             const path = firma.url_pdf_firmado.split('/expediente/')[1];
@@ -860,16 +922,31 @@ async function anularEnlaceFirma(token) {
                 .delete()
                 .eq('empleado_id', firma.empleado_id)
                 .eq('url_archivo', firma.url_pdf_firmado);
-        } catch (e) { console.warn('No se pudo limpiar PDF:', e); }
+            console.log('[Anular] PDF y expediente limpiados');
+        } catch (e) { console.warn('[Anular] No se pudo limpiar PDF:', e); }
     }
 
-    // 3. Borrar la fila del token
-    await supabaseClient.from('firmas_recibos').delete().eq('token', token);
+    // 4. Borrar la fila del token — CON manejo de error visible
+    const { error: delError, count } = await supabaseClient
+        .from('firmas_recibos')
+        .delete()
+        .eq('token', token);
+
+    if (delError) {
+        console.error('[Anular] Error eliminando fila:', delError);
+        return showToast('Error al anular: ' + delError.message, 'error');
+    }
+    console.log('[Anular] Fila eliminada. Count:', count);
 
     showToast(yaFirmado ? 'Enlace + PDF eliminados' : 'Enlace anulado');
-    await abrirModalFirmas(firmaFechaActual);
-}
 
+    // 5. Recargar el modal
+    if (fechaPagoRecarga) {
+        await abrirModalFirmas(fechaPagoRecarga);
+    } else {
+        closeModal('modal-gestion-firmas');
+    }
+}
 async function generarTodosEnlacesFaltantes() {
     const regs = appState.nominas.filter(n => n.fecha_pago === firmaFechaActual);
     const { data: existentes } = await supabaseClient
@@ -922,4 +999,17 @@ async function abrirJustificativoFalta(empId) {
 function formatearPeriodoNomina(fechaPago) {
     if (!fechaPago) return null;
     return fechaPago.split('-').reverse().join('/');
+}
+
+// Renovar un enlace expirado (da 30 min más)
+async function renovarEnlaceFirma(token) {
+    if (!confirm('¿Renovar este enlace por 30 minutos más?')) return;
+    const nuevaExp = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+    const { error } = await supabaseClient
+        .from('firmas_recibos')
+        .update({ expira_en: nuevaExp, estado: 'pendiente' })
+        .eq('token', token);
+    if (error) return showToast('Error: ' + error.message, 'error');
+    showToast('Enlace renovado por 30 minutos');
+    await abrirModalFirmas(firmaFechaActual);
 }
