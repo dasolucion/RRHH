@@ -747,10 +747,11 @@ async function abrirModalFirmas(fechaPago) {
     openModal('modal-gestion-firmas');
 
     // Traer todos los tokens de esta fecha
-    const { data: firmasExistentes } = await supabaseClient
-        .from('firmas_recibos')
-        .select('*')
-        .in('nomina_id', regs.map(r => r.id));
+const { data: firmasExistentes } = await supabaseClient
+    .from('firmas_recibos')
+    .select('*')
+    .eq('tipo_documento', 'nomina')
+    .in('documento_id', regs.map(r => r.id));
 
     const mapaFirmas = {};
     (firmasExistentes || []).forEach(f => { mapaFirmas[String(f.nomina_id)] = f; });
@@ -794,19 +795,22 @@ function generarUUID() {
     });
 }
 
-async function generarEnlaceIndividual(nominaId, empleadoId) {
+async function generarEnlaceIndividual(nominaId, empleadoId, tipoDoc = 'nomina', periodoLabel = null) {
     const token = generarUUID();
+    const periodo = periodoLabel || formatearPeriodoNomina(firmaFechaActual);
+
     const { error } = await supabaseClient.from('firmas_recibos').insert([{
         token: token,
-        nomina_id: nominaId,
+        documento_id: nominaId,        // ← AHORA SÍ se guarda
         empleado_id: empleadoId,
-        estado: 'pendiente'
+        tipo_documento: tipoDoc,       // ← 'nomina', 'vacaciones', etc.
+        periodo_nomina: periodo,       // ← ej: "15/10/2026"
+        estado: 'pendiente',
+        fecha_emision: new Date().toISOString()
     }]);
 
     if (error) return showToast('Error al generar enlace: ' + error.message, 'error');
-    
     showToast('Enlace generado. Ya podés copiarlo o enviarlo.');
-    // Recargar el modal
     await abrirModalFirmas(firmaFechaActual);
 }
 
@@ -838,10 +842,40 @@ function enviarWAEnlaceFirma(token, empleadoId) {
 }
 
 async function anularEnlaceFirma(token) {
-    if (!confirm('¿Estás seguro? Se eliminará el enlace actual y (si ya estaba firmado) se perderá la referencia al PDF. Podrás generar uno nuevo.')) return;
-    
+    // 1. Buscar la firma primero
+    const { data: firma } = await supabaseClient
+        .from('firmas_recibos')
+        .select('*')
+        .eq('token', token)
+        .maybeSingle();
+
+    const yaFirmado = firma && firma.estado === 'firmado';
+
+    const msg = yaFirmado
+        ? '⚠️ Este documento YA fue firmado.\n\nAl anular se eliminará el enlace, el PDF firmado del storage y la entrada del expediente.\n\n¿Continuar?'
+        : '¿Anular este enlace? Podrás generar uno nuevo después.';
+
+    if (!confirm(msg)) return;
+
+    // 2. Si estaba firmado, limpiar PDF + expediente
+    if (yaFirmado && firma.url_pdf_firmado) {
+        try {
+            const path = firma.url_pdf_firmado.split('/expediente/')[1];
+            if (path) {
+                await supabaseClient.storage.from('expediente').remove([decodeURIComponent(path)]);
+            }
+            await supabaseClient
+                .from('expediente_documentos')
+                .delete()
+                .eq('empleado_id', firma.empleado_id)
+                .eq('url_archivo', firma.url_pdf_firmado);
+        } catch (e) { console.warn('No se pudo limpiar PDF:', e); }
+    }
+
+    // 3. Borrar la fila del token
     await supabaseClient.from('firmas_recibos').delete().eq('token', token);
-    showToast('Enlace anulado');
+
+    showToast(yaFirmado ? 'Enlace + PDF eliminados' : 'Enlace anulado');
     await abrirModalFirmas(firmaFechaActual);
 }
 
@@ -849,10 +883,11 @@ async function generarTodosEnlacesFaltantes() {
     const regs = appState.nominas.filter(n => n.fecha_pago === firmaFechaActual);
     const { data: existentes } = await supabaseClient
         .from('firmas_recibos')
-        .select('nomina_id')
-        .in('nomina_id', regs.map(r => r.id));
+        .select('documento_id')
+        .eq('tipo_documento', 'nomina')
+        .in('documento_id', regs.map(r => r.id));
 
-    const existentesSet = new Set((existentes || []).map(e => String(e.nomina_id)));
+    const existentesSet = new Set((existentes || []).map(e => String(e.documento_id)));
     const faltantes = regs.filter(r => !existentesSet.has(String(r.id)));
 
     if (faltantes.length === 0) return showToast('Todos los empleados ya tienen enlace', 'info');
@@ -890,4 +925,10 @@ async function abrirJustificativoFalta(empId) {
     }
     
     showToast('Justificativo registrado. Días faltantes reducidos.');
+}
+
+// Convierte "2026-10-15" → "15/10/2026"
+function formatearPeriodoNomina(fechaPago) {
+    if (!fechaPago) return null;
+    return fechaPago.split('-').reverse().join('/');
 }
