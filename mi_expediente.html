@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi Expediente Digital</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-slate-100 text-slate-800 p-4 font-sans min-h-screen">
+
+    <div id="loading" class="text-center mt-10 font-bold text-slate-500">
+        <i class="fa-solid fa-spinner fa-spin mr-2"></i> Cargando su expediente...
+    </div>
+
+    <div id="portal" class="max-w-2xl mx-auto hidden">
+        <div class="bg-white rounded-xl shadow-lg p-5 mb-4">
+            <div class="flex items-center gap-3 mb-2">
+                <div class="bg-indigo-600 text-white p-3 rounded-lg"><i class="fa-solid fa-folder-open text-xl"></i></div>
+                <div>
+                    <h1 class="text-lg font-bold text-slate-900">Mi Expediente Digital</h1>
+                    <p class="text-xs text-slate-500" id="emp-info">-</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-lg p-4 mb-4">
+            <h2 class="text-sm font-bold text-slate-900 mb-3 flex items-center"><i class="fa-solid fa-file-shield text-emerald-600 mr-2"></i> Documentos de Ingreso</h2>
+            <div id="lista-docs-ingreso" class="space-y-2"></div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-lg p-4 mb-4">
+            <h2 class="text-sm font-bold text-slate-900 mb-3 flex items-center"><i class="fa-solid fa-receipt text-indigo-600 mr-2"></i> Recibos Firmados</h2>
+            <div id="lista-recibos-firmados" class="space-y-2"></div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-lg p-4 mb-4">
+            <h2 class="text-sm font-bold text-slate-900 mb-3 flex items-center"><i class="fa-solid fa-clock text-amber-600 mr-2"></i> Pendientes de Firma</h2>
+            <p class="text-[11px] text-slate-500 mb-2">Estos recibos estarán disponibles cuando los firme:</p>
+            <div id="lista-pendientes" class="space-y-2"></div>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://nrfplwpmwplpbskidtqs.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yZnBsd3Btd3BscGJza2lkdHFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc1OTA4MjIsImV4cCI6MjEwMzE2NjgyMn0.PZXrE9KtAVF2e4RbyM3-m1ClS8R8QaTCctLzZKAAYdQ';
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const token = urlParams.get('t');
+
+        if (!token) {
+            document.getElementById('loading').innerText = 'Enlace inválido.';
+        } else {
+            cargarPortal();
+        }
+
+        async function cargarPortal() {
+            const { data: tokenData } = await supabaseClient
+                .from('tokens_portal_empleado')
+                .select('*, empleados(*)')
+                .eq('token', token)
+                .eq('activo', true)
+                .single();
+
+            if (!tokenData || !tokenData.empleados) {
+                document.getElementById('loading').innerText = 'Enlace inválido o desactivado.';
+                return;
+            }
+
+            const emp = tokenData.empleados;
+            document.getElementById('emp-info').innerText = `${emp.nombre} | C.I. ${emp.cedula}`;
+
+            // Actualizar último acceso
+            await supabaseClient.from('tokens_portal_empleado').update({ last_access: new Date().toISOString() }).eq('token', token);
+
+            // 1. Documentos visibles (ingreso + firmados)
+            const { data: docs } = await supabaseClient
+                .from('expediente_documentos')
+                .select('*')
+                .eq('empleado_id', emp.id)
+                .eq('visible_empleado', true)
+                .order('created_at', { ascending: false });
+
+            const tiposIngreso = ['cedula', 'rif', 'planilla_ingreso', 'referencia', 'ivss'];
+            const docsIngreso = (docs || []).filter(d => tiposIngreso.includes(d.tipo_documento));
+            const docsFirmados = (docs || []).filter(d => !tiposIngreso.includes(d.tipo_documento));
+
+            document.getElementById('lista-docs-ingreso').innerHTML = docsIngreso.length
+                ? docsIngreso.map(d => renderDocItem(d)).join('')
+                : '<p class="text-xs text-slate-500 italic">Sin documentos de ingreso cargados.</p>';
+
+            document.getElementById('lista-recibos-firmados').innerHTML = docsFirmados.length
+                ? docsFirmados.map(d => renderDocItem(d)).join('')
+                : '<p class="text-xs text-slate-500 italic">Aún no tiene recibos firmados.</p>';
+
+            // 2. Pendientes de firma
+            const { data: pendientes } = await supabaseClient
+                .from('firmas_recibos')
+                .select('*')
+                .eq('empleado_id', emp.id)
+                .eq('estado', 'pendiente')
+                .order('fecha_emision', { ascending: false });
+
+            document.getElementById('lista-pendientes').innerHTML = pendientes && pendientes.length
+                ? pendientes.map(p => {
+                    const tipoLabel = { nomina: 'Nómina', vacaciones: 'Vacaciones', prestaciones: 'Prestaciones', utilidades: 'Utilidades', liquidacion: 'Liquidación' }[p.tipo_documento] || 'Documento';
+                    const enlace = `${window.location.origin}/firma.html?token=${p.token}`;
+                    return `<div class="flex items-center justify-between border border-amber-200 bg-amber-50 p-2 rounded-lg">
+                        <div>
+                            <div class="text-xs font-bold text-slate-900">${tipoLabel} - ${p.periodo_nomina || 'Sin período'}</div>
+                            <div class="text-[10px] text-slate-500">Emitido: ${new Date(p.fecha_emision).toLocaleDateString('es-VE')}</div>
+                        </div>
+                        <a href="${enlace}" class="bg-amber-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold">Firmar</a>
+                    </div>`;
+                }).join('')
+                : '<p class="text-xs text-slate-500 italic">No hay documentos pendientes de firma.</p>';
+
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('portal').classList.remove('hidden');
+        }
+
+        function renderDocItem(d) {
+            const fecha = new Date(d.created_at).toLocaleDateString('es-VE');
+            return `<div class="flex items-center justify-between border border-slate-200 p-2 rounded-lg hover:bg-slate-50">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-file-pdf text-rose-500"></i>
+                    <div>
+                        <div class="text-xs font-bold text-slate-900">${d.nombre_descriptivo}</div>
+                        <div class="text-[10px] text-slate-500">${fecha}</div>
+                    </div>
+                </div>
+                <a href="${d.url_archivo}" target="_blank" class="text-sky-600 hover:text-sky-700 text-xs font-bold">
+                    <i class="fa-solid fa-download mr-1"></i> Ver
+                </a>
+            </div>`;
+        }
+    </script>
+</body>
+</html>
