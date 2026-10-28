@@ -25,28 +25,70 @@
         const token = urlParams.get('t');
 
         if (!token) {
-            document.getElementById('loading').innerText = 'Enlace inválido.';
+            document.getElementById('loading').innerText = 'Enlace inválido. No se proporcionó token.';
         } else {
             cargarPortal();
         }
 
         async function cargarPortal() {
-            const { data: tokenData } = await supabaseClient
+            console.log("Token recibido:", token);
+
+            const { data: tokenData, error } = await supabaseClient
                 .from('tokens_portal_empleado')
                 .select('*, empleados(*)')
                 .eq('token', token)
-                .eq('activo', true)
-                .single();
+                .maybeSingle();
 
-            if (!tokenData || !tokenData.empleados) {
-                document.getElementById('loading').innerText = 'Enlace inválido o desactivado.';
+            console.log("Respuesta de Supabase (TokenData):", tokenData);
+            console.log("Error de Supabase:", error);
+
+            if (error) {
+                document.getElementById('loading').innerHTML = `
+                    <div class="bg-white p-6 rounded-lg text-center max-w-md mx-auto">
+                        <i class="fa-solid fa-triangle-exclamation text-rose-500 text-4xl mb-3"></i>
+                        <h2 class="font-bold text-lg">Error de conexión</h2>
+                        <p class="text-sm text-slate-600">${error.message}</p>
+                    </div>
+                `;
+                return;
+            }
+
+            if (!tokenData) {
+                document.getElementById('loading').innerHTML = `
+                    <div class="bg-white p-6 rounded-lg text-center max-w-md mx-auto">
+                        <i class="fa-solid fa-link-slash text-rose-500 text-4xl mb-3"></i>
+                        <h2 class="font-bold text-lg">Enlace inválido o desactivado</h2>
+                        <p class="text-sm text-slate-600">Este enlace no existe en la base de datos. Pídele a RRHH que lo genere de nuevo.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            if (!tokenData.activo) {
+                document.getElementById('loading').innerHTML = `
+                    <div class="bg-white p-6 rounded-lg text-center max-w-md mx-auto">
+                        <i class="fa-solid fa-ban text-amber-500 text-4xl mb-3"></i>
+                        <h2 class="font-bold text-lg">Enlace desactivado</h2>
+                        <p class="text-sm text-slate-600">Este portal ha sido desactivado por Recursos Humanos.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            if (!tokenData.empleados) {
+                document.getElementById('loading').innerHTML = `
+                    <div class="bg-white p-6 rounded-lg text-center max-w-md mx-auto">
+                        <i class="fa-solid fa-user-xmark text-rose-500 text-4xl mb-3"></i>
+                        <h2 class="font-bold text-lg">Empleado no encontrado</h2>
+                        <p class="text-sm text-slate-600">El enlace está vinculado a un empleado que ya no existe en el sistema.</p>
+                    </div>
+                `;
                 return;
             }
 
             const emp = tokenData.empleados;
             await supabaseClient.from('tokens_portal_empleado').update({ last_access: new Date().toISOString() }).eq('token', token);
 
-            // ⚡ BLOQUEO: Si hay documentos pendientes de firma, no puede ver el expediente
             const { data: pendientes } = await supabaseClient
                 .from('firmas_recibos')
                 .select('*')
@@ -108,7 +150,6 @@
                 </div>
                 <div class="bg-slate-100 rounded-xl p-4 text-center">
                     <p class="text-[10px] text-slate-500">${emp.nombre} | C.I. ${emp.cedula}</p>
-                    <p class="text-[9px] text-slate-400 mt-1">Si un enlace expiró, escribí a RRHH para que te generen uno nuevo.</p>
                 </div>
             `;
             document.getElementById('loading').classList.add('hidden');
@@ -126,21 +167,13 @@
                         </div>
                     </div>
                 </div>
-
                 <div class="bg-white rounded-xl shadow-lg p-4 mb-4">
                     <h2 class="text-sm font-bold text-slate-900 mb-3 flex items-center"><i class="fa-solid fa-file-shield text-emerald-600 mr-2"></i> Documentos de Ingreso</h2>
                     <div id="lista-docs-ingreso" class="space-y-2"></div>
                 </div>
-
                 <div class="bg-white rounded-xl shadow-lg p-4 mb-4">
                     <h2 class="text-sm font-bold text-slate-900 mb-3 flex items-center"><i class="fa-solid fa-receipt text-indigo-600 mr-2"></i> Recibos Firmados</h2>
                     <div id="lista-recibos-firmados" class="space-y-2"></div>
-                </div>
-
-                <div class="bg-white rounded-xl shadow-lg p-4 mb-4">
-                    <h2 class="text-sm font-bold text-slate-900 mb-3 flex items-center"><i class="fa-solid fa-clock text-amber-600 mr-2"></i> Pendientes de Firma</h2>
-                    <p class="text-[11px] text-slate-500 mb-2">Estos recibos estarán disponibles cuando los firme:</p>
-                    <div id="lista-pendientes" class="space-y-2"></div>
                 </div>
             `;
             document.getElementById('loading').classList.add('hidden');
@@ -159,13 +192,11 @@
 
             document.getElementById('lista-docs-ingreso').innerHTML = docsIngreso.length
                 ? docsIngreso.map(d => renderDocItem(d)).join('')
-                : '<p class="text-xs text-slate-500 italic">Sin documentos de ingreso cargados.</p>';
+                : '<p class="text-xs text-slate-500 italic">Sin documentos cargados.</p>';
 
             document.getElementById('lista-recibos-firmados').innerHTML = docsFirmados.length
                 ? docsFirmados.map(d => renderDocItem(d)).join('')
                 : '<p class="text-xs text-slate-500 italic">Aún no tiene recibos firmados.</p>';
-
-            document.getElementById('lista-pendientes').innerHTML = '<p class="text-xs text-emerald-600 font-semibold"><i class="fa-solid fa-check-circle mr-1"></i> No hay documentos pendientes.</p>';
         }
 
         function renderDocItem(d) {
