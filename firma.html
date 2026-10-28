@@ -39,7 +39,7 @@
             </div>
             
             <p class="text-[10px] text-slate-500 mt-3 text-center leading-tight">
-                Al firmar, confirma que ha recibido y revisado este documento. Su firma será registrada con trazabilidad completa (fecha/hora, hash de integridad, navegador).
+                Al firmar, confirma que ha recibido y revisado este documento.
             </p>
         </div>
     </div>
@@ -54,6 +54,7 @@
         let firmaPad = null;
         let firmaDataGlobal = null;
         let empDataGlobal = null;
+        let docDataGlobal = null;
         let paramsEmpresa = { nombre_empresa: 'EMPRESA', rif_empresa: 'J-00000000-0' };
 
         function fNum(n) {
@@ -82,7 +83,7 @@
                     <div class="bg-white rounded-xl shadow-lg p-8 max-w-md mx-auto text-center">
                         <div class="text-rose-500 text-6xl mb-4"><i class="fa-solid fa-clock"></i></div>
                         <h2 class="text-xl font-bold mb-2 text-slate-900">Enlace expirado</h2>
-                        <p class="text-sm text-slate-600 mb-4">Este enlace venció (30 min). Contactá a RRHH.</p>
+                        <p class="text-sm text-slate-600 mb-4">Este enlace venció. Contactá a RRHH.</p>
                     </div>
                 `;
                 return;
@@ -102,8 +103,9 @@
             const { data: empData } = await supabaseClient.from('empleados').select('*').eq('id', firmaData.empleado_id).single();
 
             empDataGlobal = empData;
-            renderizarDocumento(firmaData, docData, empData);
+            docDataGlobal = docData;
 
+            document.getElementById('recibo-html').innerHTML = generarHTMLReciboPantalla(docData, empData);
             document.getElementById('loading').classList.add('hidden');
             document.getElementById('contenido-recibo').classList.remove('hidden');
 
@@ -111,11 +113,8 @@
             firmaPad = new SignaturePad(canvas, { backgroundColor: 'rgba(255,255,255,0)' });
         }
 
-        function renderizarDocumento(firma, doc, emp) {
-            document.getElementById('recibo-html').innerHTML = generarHTMLReciboNomina(doc, emp);
-        }
-
-        function generarHTMLReciboNomina(r, e) {
+        // --- RECIBO PARA PANTALLA (Mantiene Tailwind) ---
+        function generarHTMLReciboPantalla(r, e) {
             const t = Number(r.tasa_bcv || 1);
             const sM = Number(r.salario_minimo_bs || 130);
             const sm = Number(r.salario_base || 0);
@@ -133,8 +132,8 @@
             const islrPctVal = Number(r.islr_porcentaje || 0);
             let islrBs = Number(r.islr_usd || 0) * t;
 
-            const dfb = ((sm + bam + oim) / 30 * Number(r.dias_faltantes || 0)) * t;
-            const hdb = (((sm + bam + oim) / 30) / 8 * Number(r.horas_descuento || 0)) * t;
+            const dfb = ((Number(r.salario_base) + Number(r.bono_alimentacion) + Number(r.otros_ingresos)) / 30 * Number(r.dias_faltantes || 0)) * t;
+            const hdb = ((((Number(r.salario_base) + Number(r.bono_alimentacion) + Number(r.otros_ingresos)) / 30) / 8) * Number(r.horas_descuento || 0)) * t;
             const prb = (Number(r.prestamos || 0) + Number(r.adelantos || 0)) * t;
             const odb = Number(r.otros_descuentos || 0) * t;
             const tdb = dfb + sso + lph + rpe + islrBs + prb + odb + hdb;
@@ -148,83 +147,185 @@
             const tP = `RECIBO DE PAGO ${qT} DE ${mN} ${y}`;
 
             return `
-            <div class="recibo-card bg-white text-black p-4 rounded-lg shadow-xl border border-slate-300 font-sans w-full">
-                <div>
-                    <div class="flex justify-between items-start mb-1 pb-0.5 border-b border-black">
-                        <div><h2 class="text-xl font-black tracking-widest text-black uppercase">${paramsEmpresa.nombre_empresa.split('/')[0].trim()}</h2></div>
-                        <div class="text-right leading-tight"><h3 class="text-xs font-extrabold text-black uppercase">${paramsEmpresa.nombre_empresa}</h3><p class="text-[10px] text-slate-800 font-semibold">${paramsEmpresa.rif_empresa}</p></div>
-                    </div>
-                    <div class="bg-[#dbece0] text-center font-bold text-[10.5px] py-0.5 border border-black mb-1 uppercase tracking-wider text-black">${tP}</div>
-                    
-                    <table class="w-full text-[10px] border border-black mb-1 font-semibold table-fixed">
-                        <tr>
-                            <td class="bg-slate-100 px-1 py-0.5 border-r border-b border-black w-28 font-bold text-black">TRABAJADOR</td>
-                            <td class="px-1 py-0.5 border-r border-b border-black font-bold uppercase text-black break-words">${r.empleado}</td>
-                            <td class="bg-slate-100 px-1 py-0.5 border-r border-b border-black w-16 font-bold text-black">CARGO</td>
-                            <td class="px-1 py-0.5 border-b border-black uppercase font-bold text-black break-words">${r.cargo || e?.cargos?.nombre || '-'}</td>
-                        </tr>
-                        <tr>
-                            <td class="bg-slate-100 px-1.5 py-0.5 border-r border-b border-black font-bold text-black">CÉDULA</td>
-                            <td class="px-1.5 py-0.5 border-r border-b border-black text-black">${e?.cedula || r.cedula || '-'}</td>
-                            <td class="bg-slate-100 px-1.5 py-0.5 border-r border-b border-black font-bold text-black">F. INGRESO</td>
-                            <td class="px-1.5 py-0.5 border-b border-black text-black">${e?.fecha_ingreso || '-'}</td>
-                        </tr>
-                        <tr>
-                            <td class="bg-slate-100 px-1.5 py-0.5 border-r border-black font-bold text-black">SALARIO MENSUAL</td>
-                            <td colspan="3" class="px-1.5 py-0.5 font-bold text-black">${fNum(sm * t)} Bs. ($${sm.toFixed(2)}) | Tasa: ${t.toFixed(2)} Bs/$</td>
-                        </tr>
-                    </table>
-
-                    <table class="w-full text-[10px] border border-black mb-1 table-fixed">
-                        <thead>
-                            <tr class="bg-[#dbece0] font-bold border-b border-black text-black">
-                                <th class="px-1.5 py-0.5 text-left border-r border-black text-black" colspan="2">ASIGNACIÓN</th>
-                                <th class="px-1.5 py-0.5 text-right w-32 text-black">MONTO (BS)</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-300">
-                            <tr><td class="px-1.5 py-0.5 text-black">Salario quincenal (15 d)</td><td class="px-1.5 py-0.5 text-center w-12 text-slate-800">15 d</td><td class="px-1.5 py-0.5 text-right font-mono text-black whitespace-nowrap">${fNum(sqb)}</td></tr>
-                            <tr><td class="px-1.5 py-0.5 text-black" colspan="2">Bono de alimentación</td><td class="px-1.5 py-0.5 text-right font-mono text-black whitespace-nowrap">${fNum(bab)}</td></tr>
-                            <tr><td class="px-1.5 py-0.5 text-black" colspan="2">Subsidio especial no obligatorio</td><td class="px-1.5 py-0.5 text-right font-mono text-black whitespace-nowrap">${fNum(oib + oab)}</td></tr>
-                        </tbody>
-                        <tfoot>
-                            <tr class="font-bold border-t border-black bg-slate-50 text-black">
-                                <td class="px-1.5 py-0.5" colspan="2">TOTAL ASIGNACIONES</td>
-                                <td class="px-1.5 py-0.5 text-right font-mono font-bold text-black whitespace-nowrap">${fNum(tab)}</td>
-                            </tr>
-                        </tfoot>
-                    </table>
-
-                    <table class="w-full text-[9.5px] border border-black mb-1 table-fixed">
-                        <tbody class="divide-y divide-slate-200">
-                            <tr><td class="px-1.5 py-0.5 text-black">Días no laborados (${r.dias_faltantes || 0} d)</td><td class="px-1.5 py-0.5 text-right font-mono w-32 text-black whitespace-nowrap">${fNum(dfb)}</td></tr>
-                            <tr><td class="px-1.5 py-0.5 text-black">S.S.O. / IVSS (4%)</td><td class="px-1.5 py-0.5 text-right font-mono text-black whitespace-nowrap">${fNum(sso)}</td></tr>
-                            <tr><td class="px-1.5 py-0.5 text-black">L.P.H. / FAOV (1%)</td><td class="px-1.5 py-0.5 text-right font-mono text-black whitespace-nowrap">${fNum(lph)}</td></tr>
-                            <tr><td class="px-1.5 py-0.5 text-black">Paro Forzoso / RPE (0,5%)</td><td class="px-1.5 py-0.5 text-right font-mono text-black whitespace-nowrap">${fNum(rpe)}</td></tr>
-                            ${islrBs > 0 ? `<tr><td class="px-1.5 py-0.5 text-black">I.S.L.R. Retención (${islrPctVal.toFixed(2)}%)</td><td class="px-1.5 py-0.5 text-right font-mono text-black whitespace-nowrap">${fNum(islrBs)}</td></tr>` : ''}
-                            <tr><td class="px-1.5 py-0.5 text-black">Préstamos / Adelantos amortizados</td><td class="px-1.5 py-0.5 text-right font-mono text-black whitespace-nowrap">${fNum(prb)}</td></tr>
-                            <tr><td class="px-1.5 py-0.5 text-black">Otras deducciones</td><td class="px-1.5 py-0.5 text-right font-mono text-black whitespace-nowrap">${fNum(odb)}</td></tr>
-                        </tbody>
-                        <tfoot>
-                            <tr class="font-bold border-t border-black bg-slate-50 text-black">
-                                <td class="px-1.5 py-0.5">TOTAL DEDUCCIONES</td>
-                                <td class="px-1.5 py-0.5 text-right font-mono font-bold text-black whitespace-nowrap">${fNum(tdb)}</td>
-                            </tr>
-                        </tfoot>
-                    </table>
+            <div class="bg-white text-black p-3 rounded-lg shadow-xl border border-slate-300 font-sans max-w-3xl mx-auto w-full">
+                <div class="flex justify-between items-start mb-1 pb-0.5 border-b border-black">
+                    <div><h2 class="text-xl font-black tracking-widest text-black uppercase">${paramsEmpresa.nombre_empresa.split('/')[0].trim()}</h2></div>
+                    <div class="text-right leading-tight"><h3 class="text-xs font-extrabold text-black uppercase">${paramsEmpresa.nombre_empresa}</h3><p class="text-[10px] text-slate-800 font-semibold">${paramsEmpresa.rif_empresa}</p></div>
                 </div>
-                <div>
-                    <div class="flex justify-between items-center bg-[#dbece0] border border-black p-1 font-bold text-[10.5px] mb-1 text-black">
-                        <span>TOTAL NETO A COBRAR</span>
-                        <span class="font-mono text-xs text-black whitespace-nowrap">${fNum(tnb)} Bs.</span>
+                <div class="bg-[#dbece0] text-center font-bold text-[10.5px] py-0.5 border border-black mb-1 uppercase tracking-wider text-black">${tP}</div>
+                <table class="w-full text-[10px] border border-black mb-1 font-semibold">
+                    <tr><td class="bg-slate-100 px-1 py-0.5 border-r border-b border-black w-28 font-bold text-black">TRABAJADOR</td><td class="px-1 py-0.5 border-r border-b border-black font-bold uppercase text-black">${r.empleado}</td><td class="bg-slate-100 px-1 py-0.5 border-r border-b border-black w-16 font-bold text-black">CARGO</td><td class="px-1 py-0.5 border-b border-black uppercase font-bold text-black">${r.cargo || e?.cargos?.nombre || '-'}</td></tr>
+                    <tr><td class="bg-slate-100 px-1.5 py-0.5 border-r border-b border-black font-bold text-black">CÉDULA</td><td class="px-1.5 py-0.5 border-r border-b border-black text-black">${e?.cedula || r.cedula || '-'}</td><td class="bg-slate-100 px-1.5 py-0.5 border-r border-b border-black font-bold text-black">F. INGRESO</td><td class="px-1.5 py-0.5 border-b border-black text-black">${e?.fecha_ingreso || '-'}</td></tr>
+                    <tr><td class="bg-slate-100 px-1.5 py-0.5 border-r border-black font-bold text-black">SALARIO MENSUAL</td><td colspan="3" class="px-1.5 py-0.5 font-bold text-black">${fNum(sm * t)} Bs. ($${sm.toFixed(2)}) | Tasa: ${t.toFixed(2)} Bs/$</td></tr>
+                </table>
+                <table class="w-full text-[10px] border border-black mb-1">
+                    <thead><tr class="bg-[#dbece0] font-bold border-b border-black text-black"><th class="px-1.5 py-0.5 text-left border-r border-black text-black" colspan="2">ASIGNACIÓN</th><th class="px-1.5 py-0.5 text-right w-32 text-black">MONTO (BS)</th></tr></thead>
+                    <tbody class="divide-y divide-slate-300">
+                        <tr><td class="px-1.5 py-0.5 text-black">Salario quincenal (15 d)</td><td class="px-1.5 py-0.5 text-center w-12 text-slate-800">15 d</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(sqb)}</td></tr>
+                        <tr><td class="px-1.5 py-0.5 text-black" colspan="2">Bono de alimentación</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(bab)}</td></tr>
+                        <tr><td class="px-1.5 py-0.5 text-black" colspan="2">Subsidio especial no obligatorio</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(oib + oab)}</td></tr>
+                    </tbody>
+                    <tfoot><tr class="font-bold border-t border-black bg-slate-50 text-black"><td class="px-1.5 py-0.5" colspan="2">TOTAL ASIGNACIONES</td><td class="px-1.5 py-0.5 text-right font-mono font-bold text-black">${fNum(tab)}</td></tr></tfoot>
+                </table>
+                <table class="w-full text-[9.5px] border border-black mb-1">
+                    <tbody class="divide-y divide-slate-200">
+                        <tr><td class="px-1.5 py-0.5 text-black">Días no laborados (${r.dias_faltantes || 0} d)</td><td class="px-1.5 py-0.5 text-right font-mono w-32 text-black">${fNum(dfb)}</td></tr>
+                        <tr><td class="px-1.5 py-0.5 text-black">S.S.O. / IVSS (4%)</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(sso)}</td></tr>
+                        <tr><td class="px-1.5 py-0.5 text-black">L.P.H. / FAOV (1%)</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(lph)}</td></tr>
+                        <tr><td class="px-1.5 py-0.5 text-black">Paro Forzoso / RPE (0,5%)</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(rpe)}</td></tr>
+                        ${islrBs > 0 ? `<tr><td class="px-1.5 py-0.5 text-black">I.S.L.R. Retención (${islrPctVal.toFixed(2)}%)</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(islrBs)}</td></tr>` : ''}
+                        <tr><td class="px-1.5 py-0.5 text-black">Préstamos / Adelantos amortizados</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(prb)}</td></tr>
+                        <tr><td class="px-1.5 py-0.5 text-black">Otras deducciones</td><td class="px-1.5 py-0.5 text-right font-mono text-black">${fNum(odb)}</td></tr>
+                    </tbody>
+                    <tfoot><tr class="font-bold border-t border-black bg-slate-50 text-black"><td class="px-1.5 py-0.5">TOTAL DEDUCCIONES</td><td class="px-1.5 py-0.5 text-right font-mono font-bold text-black">${fNum(tdb)}</td></tr></tfoot>
+                </table>
+                <div class="flex justify-between items-center bg-[#dbece0] border border-black p-1 font-bold text-[10.5px] mb-1 text-black">
+                    <span>TOTAL NETO A COBRAR</span>
+                    <span class="font-mono text-xs text-black">${fNum(tnb)} Bs.</span>
+                </div>
+                <div class="border border-black p-1 mb-1 text-[7.5px] text-black leading-tight bg-slate-50"><strong>OBSERVACIÓN:</strong> El subsidio no posee naturaleza salarial...</div>
+            </div>`;
+        }
+
+        // --- RECIBO PARA EL PDF (HTML puro, sin Tailwind, para que no se corte) ---
+        function generarHTMLParaPDF(r, e, firmaBase64) {
+            const t = Number(r.tasa_bcv || 1);
+            const sM = Number(r.salario_minimo_bs || 130);
+            const sm = Number(r.salario_base || 0);
+            const bam = Number(r.bono_alimentacion || 0);
+            const oim = Number(r.otros_ingresos || 0);
+            const sqb = (sm / 2) * t;
+            const bab = (bam / 2) * t;
+            const oib = (oim / 2) * t;
+            const oab = Number(r.otras_asignaciones || 0) * t;
+            const tab = sqb + bab + oib + oab;
+
+            let sso = Number(r.ivss_usd || 0) * t;
+            let lph = Number(r.faov_usd || 0) * t;
+            let rpe = Number(r.rpe_usd || 0) * t;
+            const islrPctVal = Number(r.islr_porcentaje || 0);
+            let islrBs = Number(r.islr_usd || 0) * t;
+
+            const dfb = ((Number(r.salario_base) + Number(r.bono_alimentacion) + Number(r.otros_ingresos)) / 30 * Number(r.dias_faltantes || 0)) * t;
+            const hdb = ((((Number(r.salario_base) + Number(r.bono_alimentacion) + Number(r.otros_ingresos)) / 30) / 8) * Number(r.horas_descuento || 0)) * t;
+            const prb = (Number(r.prestamos || 0) + Number(r.adelantos || 0)) * t;
+            const odb = Number(r.otros_descuentos || 0) * t;
+            const tdb = dfb + sso + lph + rpe + islrBs + prb + odb + hdb;
+            const tnb = r.neto_bs ? Number(r.neto_bs) : (tab - tdb);
+
+            const fecha = r.fecha_pago;
+            const [y, m, d] = fecha.split('-');
+            const fO = new Date(y, m - 1, d);
+            const qT = fO.getDate() <= 15 ? '1ERA QUINCENA' : '2DA QUINCENA';
+            const mN = fO.toLocaleString('es-ES', { month: 'long' }).toUpperCase();
+            const tP = `RECIBO DE PAGO ${qT} DE ${mN} ${y}`;
+
+            // Estilos base
+            const thStyle = "background-color: #dbece0; border: 1px solid #000; padding: 4px; font-weight: bold; font-size: 11px; text-align: left;";
+            const tdStyle = "border: 1px solid #000; padding: 4px; font-size: 11px;";
+            const tdStyleRight = "border: 1px solid #000; padding: 4px; font-size: 11px; text-align: right; font-family: monospace;";
+
+            return `
+            <div style="width: 750px; background: #fff; font-family: Arial, sans-serif; color: #000; padding: 20px; box-sizing: border-box;">
+                <!-- Encabezado -->
+                <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 8px;">
+                    <div>
+                        <h1 style="font-size: 22px; font-weight: 900; margin: 0; text-transform: uppercase;">${paramsEmpresa.nombre_empresa.split('/')[0].trim()}</h1>
                     </div>
-                    <div class="border border-black p-1 mb-1 text-[7.5px] text-black leading-tight bg-slate-50"><strong>OBSERVACIÓN:</strong> El subsidio no posee naturaleza salarial, ya que no desprende de la intención retributiva del trabajo prestado sino un beneficio eminentemente social...</div>
-                    <div class="border-t border-black pt-1">
-                        <h4 class="text-center font-extrabold text-[8.5px] tracking-wider mb-2 text-black">RECIBO CONFORME</h4>
-                        <div class="grid grid-cols-2 gap-4 text-[9px] font-semibold text-black">
-                            <div class="flex items-end"><span class="mr-1">FIRMA:</span><span class="border-b border-black flex-1"></span></div>
-                            <div class="flex items-end"><span class="mr-1">CÉDULA:</span><span class="border-b border-black flex-1 font-bold"></span></div>
-                        </div>
+                    <div style="text-align: right;">
+                        <div style="font-size: 12px; font-weight: bold;">${paramsEmpresa.nombre_empresa}</div>
+                        <div style="font-size: 11px;">${paramsEmpresa.rif_empresa}</div>
+                    </div>
+                </div>
+
+                <!-- Título -->
+                <div style="background-color: #dbece0; text-align: center; font-weight: bold; font-size: 12px; padding: 4px; border: 1px solid #000; margin-bottom: 8px;">
+                    ${tP}
+                </div>
+
+                <!-- Datos Empleado -->
+                <table style="width: 100%; border-collapse: collapse; margin-bottom: 8px;">
+                    <tr>
+                        <td style="${thStyle} width: 20%; background-color: #f1f5f9;">TRABAJADOR</td>
+                        <td style="${tdStyle} width: 40%; font-weight: bold;">${r.empleado}</td>
+                        <td style="${thStyle} width: 10%; background-color: #f1f5f9;">CARGO</td>
+                        <td style="${tdStyle} width: 30%;">${r.cargo || e?.cargos?.nombre || '-'}</td>
+                    </tr>
+                    <tr>
+                        <td style="${thStyle} background-color: #f1f5f9;">CÉDULA</td>
+                        <td style="${tdStyle}">${e?.cedula || r.cedula || '-'}</td>
+                        <td style="${thStyle} background-color: #f1f5f9;">F. INGRESO</td>
+                        <td style="${tdStyle}">${e?.fecha_ingreso || '-'}</td>
+                    </tr>
+                    <tr>
+                        <td style="${thStyle} background-color: #f1f5f9;">SALARIO MENSUAL</td>
+                        <td colspan="3" style="${tdStyle} font-weight: bold;">${fNum(sm * t)} Bs. ($${sm.toFixed(2)}) | Tasa: ${t.toFixed(2)} Bs/$</td>
+                    </tr>
+                </table>
+
+                <!-- Asignaciones -->
+                <table style="width: 100%; border-collapse: collapse; margin-bottom: 8px;">
+                    <thead>
+                        <tr>
+                            <th style="${thStyle} text-align: left;" colspan="2">ASIGNACIÓN</th>
+                            <th style="${thStyle} text-align: right; width: 30%;">MONTO (BS)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td style="${tdStyle}">Salario quincenal (15 d)</td><td style="${tdStyle} text-align: center;">15 d</td><td style="${tdStyleRight}">${fNum(sqb)}</td></tr>
+                        <tr><td style="${tdStyle}" colspan="2">Bono de alimentación</td><td style="${tdStyleRight}">${fNum(bab)}</td></tr>
+                        <tr><td style="${tdStyle}" colspan="2">Subsidio especial no obligatorio</td><td style="${tdStyleRight}">${fNum(oib + oab)}</td></tr>
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td style="${thStyle} text-align: right;" colspan="2">TOTAL ASIGNACIONES</td>
+                            <td style="${tdStyleRight} font-weight: bold;">${fNum(tab)}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+
+                <!-- Deducciones -->
+                <table style="width: 100%; border-collapse: collapse; margin-bottom: 8px;">
+                    <tbody>
+                        <tr><td style="${tdStyle}">Días no laborados (${r.dias_faltantes || 0} d)</td><td style="${tdStyleRight} width: 30%;">${fNum(dfb)}</td></tr>
+                        <tr><td style="${tdStyle}">S.S.O. / IVSS (4%)</td><td style="${tdStyleRight}">${fNum(sso)}</td></tr>
+                        <tr><td style="${tdStyle}">L.P.H. / FAOV (1%)</td><td style="${tdStyleRight}">${fNum(lph)}</td></tr>
+                        <tr><td style="${tdStyle}">Paro Forzoso / RPE (0,5%)</td><td style="${tdStyleRight}">${fNum(rpe)}</td></tr>
+                        ${islrBs > 0 ? `<tr><td style="${tdStyle}">I.S.L.R. Retención (${islrPctVal.toFixed(2)}%)</td><td style="${tdStyleRight}">${fNum(islrBs)}</td></tr>` : ''}
+                        <tr><td style="${tdStyle}">Préstamos / Adelantos amortizados</td><td style="${tdStyleRight}">${fNum(prb)}</td></tr>
+                        <tr><td style="${tdStyle}">Otras deducciones</td><td style="${tdStyleRight}">${fNum(odb)}</td></tr>
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td style="${thStyle} text-align: right;">TOTAL DEDUCCIONES</td>
+                            <td style="${tdStyleRight} font-weight: bold;">${fNum(tdb)}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+
+                <!-- Neto -->
+                <div style="display: flex; justify-content: space-between; align-items: center; background-color: #dbece0; border: 1px solid #000; padding: 6px; font-weight: bold; font-size: 13px; margin-bottom: 8px;">
+                    <span>TOTAL NETO A COBRAR</span>
+                    <span style="font-family: monospace; font-size: 14px;">${fNum(tnb)} Bs.</span>
+                </div>
+
+                <!-- Observación -->
+                <div style="border: 1px solid #000; padding: 6px; font-size: 9px; background-color: #f8fafc; margin-bottom: 15px; text-align: justify;">
+                    <strong>OBSERVACIÓN:</strong> El subsidio no posee naturaleza salarial, ya que no desprende de la intención retributiva del trabajo prestado sino un beneficio eminentemente social para cubrir parte de sus gastos por bienes y/o servicios básicos en que incurre el trabajador. Por tal motivo se otorga como una ayuda al trabajador sin que sea de carácter obligatorio en futuras ocasiones.
+                </div>
+
+                <!-- Firmas -->
+                <div style="display: flex; justify-content: space-around; align-items: flex-end; margin-top: 40px;">
+                    <div style="text-align: center; width: 45%;">
+                        <div style="border-bottom: 1px solid #000; height: 30px; margin-bottom: 5px;"></div>
+                        <div style="font-size: 11px; font-weight: bold;">FIRMA DEL EMPLEADOR</div>
+                    </div>
+                    <div style="text-align: center; width: 45%;">
+                        <img src="${firmaBase64}" style="height: 50px; display: block; margin: 0 auto; object-fit: contain;">
+                        <div style="border-bottom: 1px solid #000; height: 1px; margin-top: 2px; margin-bottom: 5px;"></div>
+                        <div style="font-size: 11px; font-weight: bold;">${e?.nombre || 'Trabajador'}</div>
+                        <div style="font-size: 10px;">C.I. ${e?.cedula || '-'}</div>
+                        <div style="font-size: 9px; color: #555; margin-top: 4px;">Firmado digitalmente el ${new Date().toLocaleString('es-VE')}</div>
                     </div>
                 </div>
             </div>`;
@@ -244,77 +345,28 @@
             btn.disabled = true;
 
             const firmaBase64 = firmaPad.toDataURL('image/png');
-            const elementOriginal = document.getElementById('recibo-html');
 
-            // 1. Clonar y establecer un ancho fijo amplio para evitar cortes
-            const clone = elementOriginal.cloneNode(true);
-            clone.style.cssText = `
-                width: 1000px !important; 
-                min-width: 1000px !important;
-                background: #ffffff !important;
-                padding: 20px !important;
-                box-sizing: border-box !important;
-                font-family: ui-sans-serif, system-ui, -apple-system, sans-serif !important;
-                color: #000000 !important;
-            `;
+            // 1. Generar HTML puro (sin Tailwind) para el PDF
+            const htmlPDF = generarHTMLParaPDF(docDataGlobal, empDataGlobal, firmaBase64);
 
-            // 2. Bloque de firma
-            const bloqueFirma = document.createElement('div');
-            bloqueFirma.style.cssText = `margin-top: 15px; padding-top: 10px; border-top: 1px dashed #000; width: 100%;`;
-            bloqueFirma.innerHTML = `
-                <div style="font-size: 11px; font-weight: bold; text-align: center; margin-bottom: 8px; color: #000;">FIRMA DIGITAL DEL TRABAJADOR</div>
-                <div style="display: flex; justify-content: center;">
-                    <img id="img-firma-pdf" src="${firmaBase64}" style="width: 300px; display: block;">
-                </div>
-                <div style="border-bottom: 1px solid #000; width: 350px; margin: 2px auto 0 auto;"></div>
-                <div style="font-size: 10px; text-align: center; margin-top: 6px; line-height: 1.5; color: #000;">
-                    <div><strong>${empDataGlobal?.nombre || 'Trabajador'}</strong></div>
-                    <div>C.I. ${empDataGlobal?.cedula || '-'}</div>
-                    <div style="color: #666; margin-top: 3px; font-size: 9px;">Firmado digitalmente el ${new Date().toLocaleString('es-VE')}</div>
-                </div>
-            `;
-            clone.appendChild(bloqueFirma);
-
-            // 3. Contenedor invisible
+            // 2. Colocar en un contenedor oculto
             const wrapper = document.createElement('div');
-            wrapper.style.cssText = `
-                position: absolute !important;
-                top: 0 !important;
-                left: -9999px !important;
-                width: 1000px !important;
-                background: #ffffff !important;
-                z-index: -1 !important;
-            `;
-            wrapper.appendChild(clone);
+            wrapper.style.cssText = `position: absolute; top: 0; left: -9999px;`;
+            wrapper.innerHTML = htmlPDF;
             document.body.appendChild(wrapper);
 
-            // 4. Esperar fuentes e imagen
-            try { await document.fonts.ready; } catch (e) {}
-            await new Promise((resolve) => {
-                const img = clone.querySelector('#img-firma-pdf');
-                if (!img || img.complete) return resolve();
-                img.onload = resolve;
-                setTimeout(resolve, 1500);
-            });
-            await new Promise(r => setTimeout(r, 500));
-
-            // 5. Generar PDF (Ajustando la escala para que quepa perfecto en A4)
+            // 3. Generar PDF
             const opt = {
-                margin: [10, 5, 10, 5], // Márgenes superior, derecho, inferior, izquierdo (mm)
+                margin: 10,
                 filename: `recibo_${(firmaDataGlobal.periodo_nomina || 'documento').replace(/\//g, '-')}.pdf`,
                 image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { 
-                    scale: 2, 
-                    useCORS: true, 
-                    backgroundColor: '#ffffff',
-                    windowWidth: 1000 // Forza el renderizado a 1000px de ancho
-                },
+                html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
                 jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
             };
 
             let pdfBase64;
             try {
-                pdfBase64 = await html2pdf().from(clone).set(opt).outputPdf('datauristring');
+                pdfBase64 = await html2pdf().from(wrapper.firstElementChild).set(opt).outputPdf('datauristring');
             } catch (e) {
                 console.error(e);
                 alert('Error generando PDF');
@@ -326,7 +378,7 @@
 
             document.body.removeChild(wrapper);
 
-            // 6. Subir y guardar
+            // 4. Subir y guardar
             const pdfBlob = await (await fetch(pdfBase64)).blob();
             const arrayBuffer = await pdfBlob.arrayBuffer();
             const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
