@@ -1013,3 +1013,19 @@ async function renovarEnlaceFirma(token) {
     showToast('Enlace renovado por 30 minutos');
     await abrirModalFirmas(firmaFechaActual);
 }
+
+/* Cierra el modal de firmas limpiando el interval */
+function cerrarModalFirmas() {
+    try {
+        if (typeof _countdownFirmasInterval !== 'undefined' && _countdownFirmasInterval) {
+            clearInterval(_countdownFirmasInterval);
+            _countdownFirmasInterval = null;
+        }
+    } catch (e) { console.warn('Error limpiando countdown:', e); }
+
+    const el = gId('modal-gestion-firmas');
+    if (el) {
+        el.classList.add('hidden');
+        el.classList.remove('flex');
+    }
+}
