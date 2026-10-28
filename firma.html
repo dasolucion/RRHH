@@ -45,7 +45,6 @@
     </div>
 
     <script>
-        // ⚠️ REEMPLAZAR con tus credenciales
         const SUPABASE_URL = 'https://nrfplwpmwplpbskidtqs.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yZnBsd3Btd3BscGJza2lkdHFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc1OTA4MjIsImV4cCI6MjEwMzE2NjgyMn0.PZXrE9KtAVF2e4RbyM3-m1ClS8R8QaTCctLzZKAAYdQ';
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -56,7 +55,6 @@
         let firmaDataGlobal = null;
         let paramsEmpresa = { nombre_empresa: 'EMPRESA', rif_empresa: 'J-00000000-0' };
 
-        // Formato numérico es-VE
         function fNum(n) {
             return Number(n || 0).toLocaleString('es-VE', {
                 minimumFractionDigits: 2,
@@ -71,7 +69,6 @@
         }
 
         async function iniciarFirma() {
-            // 1. Cargar firma
             const { data: firmaData, error } = await supabaseClient
                 .from('firmas_recibos')
                 .select('*')
@@ -86,13 +83,21 @@
                 document.getElementById('loading').innerText = 'Este documento ya fue firmado.';
                 return;
             }
+            
+            // ⚡ VALIDACIÓN DE EXPIRACIÓN (30 MIN)
             if (firmaData.expira_en && new Date(firmaData.expira_en) < new Date()) {
-                document.getElementById('loading').innerText = 'Este enlace ha expirado. Contacte a RRHH.';
+                document.getElementById('loading').innerHTML = `
+                    <div class="bg-white rounded-xl shadow-lg p-8 max-w-md mx-auto text-center">
+                        <div class="text-rose-500 text-6xl mb-4"><i class="fa-solid fa-clock"></i></div>
+                        <h2 class="text-xl font-bold mb-2 text-slate-900">Enlace expirado</h2>
+                        <p class="text-sm text-slate-600 mb-4">Este enlace de firma venció. Los enlaces son válidos por 30 minutos para garantizar la seguridad del proceso.</p>
+                        <p class="text-xs text-slate-500">Contactá a RRHH para que te generen un nuevo enlace.</p>
+                    </div>
+                `;
                 return;
             }
             firmaDataGlobal = firmaData;
 
-            // 2. Cargar parámetros de la empresa
             try {
                 const { data: params } = await supabaseClient
                     .from('parametros_config')
@@ -105,7 +110,6 @@
                 }
             } catch (e) { console.warn('No se pudieron cargar parámetros:', e); }
 
-            // 3. Cargar documento según tipo
             let tablaOrigen = '';
             switch (firmaData.tipo_documento) {
                 case 'nomina': tablaOrigen = 'nominas'; break;
@@ -127,14 +131,12 @@
                 return;
             }
 
-            // 4. Cargar empleado
             const { data: empData } = await supabaseClient
                 .from('empleados')
                 .select('*')
                 .eq('id', firmaData.empleado_id)
                 .single();
 
-            // 5. Renderizar
             renderizarDocumento(firmaData, docData, empData);
 
             document.getElementById('loading').classList.add('hidden');
@@ -151,7 +153,6 @@
             if (tipo === 'nomina') {
                 htmlRecibo = generarHTMLReciboNomina(doc, emp);
             } else {
-                // Fallback simple para tipos no implementados aún
                 const tipoLabel = {
                     vacaciones: 'Recibo de Vacaciones',
                     prestaciones: 'Recibo de Prestaciones',
@@ -179,9 +180,6 @@
             document.getElementById('recibo-html').innerHTML = htmlRecibo;
         }
 
-        /* ==========================================================
-           RECIBO DE NÓMINA COMPLETO (portado de generarHTMLReciboSolo)
-           ========================================================== */
         function generarHTMLReciboNomina(r, e) {
             const t = Number(r.tasa_bcv || 1);
             const sM = Number(r.salario_minimo_bs || 130);
@@ -309,9 +307,6 @@
             </div>`;
         }
 
-        /* ==========================================================
-           FIRMA Y ENVÍO
-           ========================================================== */
         function limpiarFirma() {
             if (firmaPad) firmaPad.clear();
         }
@@ -328,7 +323,6 @@
             const firmaBase64 = firmaPad.toDataURL('image/png');
             const element = document.getElementById('recibo-html');
 
-            // Inyectar la firma visual dentro del recibo ANTES de generar el PDF
             const bloqueFirma = document.createElement('div');
             bloqueFirma.style.marginTop = '20px';
             bloqueFirma.style.paddingTop = '10px';
@@ -352,13 +346,11 @@
 
             bloqueFirma.remove();
 
-            // Calcular hash SHA-256 del PDF
             const pdfBlob = await (await fetch(pdfBase64)).blob();
             const arrayBuffer = await pdfBlob.arrayBuffer();
             const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
             const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
 
-            // Nombre del archivo
             const tipoLabel = {
                 nomina: 'Nomina',
                 vacaciones: 'Vacaciones',
@@ -370,7 +362,6 @@
             const sanitizedPeriodo = (firmaDataGlobal.periodo_nomina || 'SinPeriodo').replace(/[^a-zA-Z0-9]/g, '_');
             const fileName = `${firmaDataGlobal.empleado_id}/${tipoLabel}_${sanitizedPeriodo}_${firmaDataGlobal.id.substring(0, 6)}.pdf`;
 
-            // Subir a Storage
             const { error: uploadError } = await supabaseClient.storage
                 .from('expediente')
                 .upload(fileName, pdfBlob, { upsert: true });
@@ -384,7 +375,6 @@
 
             const { data: urlData } = supabaseClient.storage.from('expediente').getPublicUrl(fileName);
 
-            // Registrar en expediente_documentos
             await supabaseClient.from('expediente_documentos').insert([{
                 empleado_id: firmaDataGlobal.empleado_id,
                 tipo_documento: firmaDataGlobal.tipo_documento,
@@ -395,7 +385,6 @@
                 subido_por: 'empleado'
             }]);
 
-            // Actualizar estado de la firma
             await supabaseClient.from('firmas_recibos').update({
                 estado: 'firmado',
                 url_pdf_firmado: urlData.publicUrl,
@@ -404,7 +393,6 @@
                 user_agent_firmado: navigator.userAgent.substring(0, 200)
             }).eq('token', token);
 
-            // Pantalla de éxito
             document.getElementById('contenido-recibo').innerHTML = `
                 <div class="bg-white rounded-xl shadow-lg p-8 text-center max-w-md mx-auto">
                     <div class="text-emerald-500 text-6xl mb-4"><i class="fa-solid fa-circle-check"></i></div>
