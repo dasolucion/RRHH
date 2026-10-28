@@ -66,10 +66,10 @@ async function cargarArchivosExpediente(empId) {
                 <div class="flex items-center gap-2">
                     <i class="fa-solid ${tipo.icon} text-${tipo.color}-400"></i>
                     <div>
-                        <!-- TÍTULO (Lista desplegable) -->
-                        <div class="text-xs font-bold text-white">${tipo.label}</div>
-                        <!-- SUBTÍTULO (Lo que el usuario escribió) -->
-                        <div class="text-[9px] text-slate-400">${doc.nombre_descriptivo}</div>
+                        <!-- TÍTULO: El nombre que se guardó (Ej: Cédula de Identidad o Nomina 15/10/2026) -->
+                        <div class="text-xs font-bold text-white">${doc.nombre_descriptivo}</div>
+                        <!-- SUBTÍTULO: El tipo de documento -->
+                        <div class="text-[9px] text-slate-400">${tipo.label}</div>
                     </div>
                 </div>
             </td>
@@ -83,7 +83,6 @@ async function cargarArchivosExpediente(empId) {
         </tr>`;
     }).join('');
 }
-
 async function subirDocumentoExpediente() {
     if (!empleadoExpedienteActual) return;
     
