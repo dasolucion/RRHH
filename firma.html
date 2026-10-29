@@ -183,7 +183,7 @@
             const cedulaTxt = firmaTemporalBase64 ? `<span class="font-bold text-[10px]">${e.cedula}</span>` : '';
 
             return `
-            <div class="recibo-card bg-white text-black p-3 font-sans w-full border-2 border-black">
+            <div class="recibo-card bg-white text-black p-4 font-sans w-full">
                 <div>
                     <div class="flex justify-between items-start mb-1 pb-0.5 border-b-2 border-black">
                         <div><h2 class="text-xl font-black tracking-widest text-black uppercase">${paramsEmpresa.nombre_empresa.split('/')[0].trim()}</h2></div>
@@ -267,7 +267,7 @@
                 <strong>NOTA INFORMATIVA DE CONTROL:</strong> Consta en el expediente del trabajador que se le han otorgado <strong>${v.diasOtorgadosPrevios} días</strong> previamente dentro de este mismo período vacacional. (Dichos días no alteran ni descuentan el cálculo económico del presente disfrute).
             </div>` : '';
 
-            return `<div class="recibo-card bg-white text-black p-4 font-sans w-full border-2 border-black">
+            return `<div class="recibo-card bg-white text-black p-4 font-sans w-full">
                 <div class="flex justify-between items-start mb-2 pb-1 border-b-2 border-black"><div><h2 class="text-xl font-black tracking-widest text-black uppercase">${paramsEmpresa.nombre_empresa.split('/')[0].trim()}</h2></div><div class="text-right"><h3 class="text-xs font-extrabold text-black uppercase">${paramsEmpresa.nombre_empresa}</h3><p class="text-[9px] text-slate-800 font-semibold">${paramsEmpresa.rif_empresa}</p></div></div>
                 <div class="bg-[#dbece0] text-center font-bold text-[10px] py-1 border border-black mb-2 uppercase tracking-wider text-black">LIQUIDACIÓN DE VACACIONES (${v.periodo})</div>
                 
@@ -334,7 +334,7 @@
 
             const esParcial = Number(r.porcentaje_pagado) < 100;
 
-            return `<div class="recibo-card bg-white text-black p-4 font-sans w-full border-2 border-black">
+            return `<div class="recibo-card bg-white text-black p-4 font-sans w-full">
                 <div class="flex justify-between items-start mb-2 pb-1 border-b-2 border-black"><div><h2 class="text-xl font-black tracking-widest text-black uppercase">${paramsEmpresa.nombre_empresa.split('/')[0].trim()}</h2></div><div class="text-right"><h3 class="text-xs font-extrabold text-black uppercase">${paramsEmpresa.nombre_empresa}</h3><p class="text-[9px] text-slate-800 font-semibold">${paramsEmpresa.rif_empresa}</p></div></div>
                 <div class="bg-[#fde0e0] text-center font-bold text-[10px] py-1 border border-black mb-2 uppercase tracking-wider text-black">
                     RECIBO DE PAGO DE UTILIDADES (PERÍODO ${r.periodo}) ${esParcial ? `— PAGO PARCIAL: ${Number(r.porcentaje_pagado).toFixed(2)}%` : ''}
@@ -391,7 +391,7 @@
         function generarHTMLReciboAntiguedad(a, e) {
             const firmaImg = firmaTemporalBase64 ? `<img src="${firmaTemporalBase64}" style="height: 50px; display: block; margin: 0 auto;">` : '';
 
-            return `<div class="recibo-card bg-white text-black p-4 font-sans w-full border-2 border-black">
+            return `<<div class="recibo-card bg-white text-black p-4 font-sans w-full">
                 <div class="flex justify-between items-start mb-2 pb-1 border-b-2 border-black"><div><h2 class="text-xl font-black tracking-widest text-black uppercase">${paramsEmpresa.nombre_empresa.split('/')[0].trim()}</h2></div><div class="text-right"><h3 class="text-xs font-extrabold text-black uppercase">${paramsEmpresa.nombre_empresa}</h3><p class="text-[9px] text-slate-800 font-semibold">${paramsEmpresa.rif_empresa}</p></div></div>
                 <div class="bg-[#cffafe] text-center font-bold text-[10px] py-1 border border-black mb-2 uppercase tracking-wider text-black">ESTADO DE CUENTA Y GARANTÍA DE PRESTACIONES SOCIALES (LOTTT ART. 142 & 143)</div>
                 
@@ -440,7 +440,7 @@
         function generarHTMLReciboLiquidacion(p, e) {
             const firmaImg = firmaTemporalBase64 ? `<img src="${firmaTemporalBase64}" style="height: 50px; display: block; margin: 0 auto;">` : '';
 
-            return `<div class="recibo-card bg-white text-black p-4 font-sans w-full border-2 border-black">
+            return `<div class="recibo-card bg-white text-black p-4 font-sans w-full">
                 <div class="flex justify-between items-start mb-2 pb-1 border-b-2 border-black"><div><h2 class="text-xl font-black tracking-widest text-black uppercase">${paramsEmpresa.nombre_empresa.split('/')[0].trim()}</h2></div><div class="text-right"><h3 class="text-xs font-extrabold text-black uppercase">${paramsEmpresa.nombre_empresa}</h3><p class="text-[9px] text-slate-800 font-semibold">${paramsEmpresa.rif_empresa}</p></div></div>
                 <div class="bg-[#fef3c7] text-center font-bold text-[10px] py-1 border border-black mb-2 uppercase tracking-wider text-black">RECIBO DE FINIQUITO Y LIQUIDACIÓN DEFINITIVA</div>
                 
