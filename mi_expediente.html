@@ -100,14 +100,17 @@ function mostrarPantallaBloqueo(emp, pendientes) {
     const pendientesHtml = pendientes.map(p => {
         const tipoLabel = { nomina: 'Nómina', vacaciones: 'Vacaciones', prestaciones: 'Prestaciones', utilidades: 'Utilidades', liquidacion: 'Liquidación' }[p.tipo_documento] || 'Documento';
         
-        // ⚡ CORRECCIÓN: Obtener la URL base actual para el enlace
+        // ⚡ Usamos la nueva función aquí:
+        const periodoFormateado = formatearPeriodoVisual(p.periodo_nomina);
+        
         const baseUrl = window.location.href.split('?')[0].replace('mi_expediente.html', '');
-        const enlace = `${baseUrl}firma.html?token=${p.token}`;
+        const enlace = `${baseUrl}firma.html?token=${p.token}&portal=${token}`;
         
         return `<div class="bg-amber-50 border border-amber-200 p-3 rounded-lg mb-2">
             <div class="flex justify-between items-center">
                 <div>
-                    <div class="text-xs font-bold text-slate-900">${tipoLabel} - ${p.periodo_nomina || 'Sin período'}</div>
+                    <!-- Título con la fecha corregida -->
+                    <div class="text-xs font-bold text-slate-900">${tipoLabel} - ${periodoFormateado}</div>
                     <div class="text-[10px] text-amber-700">Emitido: ${new Date(p.fecha_emision).toLocaleString('es-VE')}</div>
                 </div>
                 <a href="${enlace}" class="bg-amber-600 hover:bg-amber-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition">Firmar</a>
@@ -204,6 +207,22 @@ function renderDocItem(d) {
             <i class="fa-solid fa-download mr-1"></i> Ver
         </a>
     </div>`;
-}    </script>
+}    
+        
+    function formatearPeriodoVisual(periodo) {
+    if (!periodo) return 'Sin período';
+    if (!periodo.includes('/')) return periodo;
+    
+    const [d, m, y] = periodo.split('/');
+    const numDia = parseInt(d);
+    let diaQuincena = '15';
+    if (numDia > 15) {
+        const ultimoDia = new Date(parseInt(y), parseInt(m), 0).getDate();
+        diaQuincena = ultimoDia.toString().padStart(2, '0');
+    }
+    return `${diaQuincena}/${m}/${y}`;
+}
+    
+    </script>
 </body>
 </html>
