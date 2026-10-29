@@ -82,16 +82,7 @@
                 document.getElementById('loading').innerText = 'Este documento ya fue firmado.';
                 return;
             }
-            if (firmaData.expira_en && new Date(firmaData.expira_en) < new Date()) {
-                document.getElementById('loading').innerHTML = `
-                    <div class="bg-white rounded-xl shadow-lg p-8 max-w-md mx-auto text-center">
-                        <div class="text-rose-500 text-6xl mb-4"><i class="fa-solid fa-clock"></i></div>
-                        <h2 class="text-xl font-bold mb-2 text-slate-900">Enlace expirado</h2>
-                        <p class="text-sm text-slate-600 mb-4">Este enlace venció (30 min). Contactá a RRHH.</p>
-                    </div>
-                `;
-                return;
-            }
+
             firmaDataGlobal = firmaData;
 
             try {
