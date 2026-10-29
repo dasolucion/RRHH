@@ -1053,12 +1053,14 @@ function cerrarModalFirmas() {
    ============================================================ */
 
 async function abrirModalFirmaGenerico(tipo, docs) {
-    // docs es un array de objetos: { id, empleado, empleado_id, neto_bs, periodo }
     if (!docs || docs.length === 0) return showToast('No hay documentos para firmar', 'error');
 
     gId('firmas-fecha-titulo').innerText = docs[0]?.periodo || 'Documentos';
     gId('tabla-firmas-body').innerHTML = '<tr><td colspan="5" class="p-4 text-center text-slate-500">Cargando estados...</td></tr>';
     openModal('modal-gestion-firmas');
+
+    // Guardamos temporalmente los docs en una variable global para que las funciones puedan consultarla
+    window._docsFirmaActuales = docs;
 
     const { data: firmasExistentes } = await supabaseClient
         .from('firmas_recibos')
@@ -1073,21 +1075,24 @@ async function abrirModalFirmaGenerico(tipo, docs) {
         const firma = mapaFirmas[String(r.id)];
         let estadoBadge, acciones;
 
+        // Validación de seguridad por si el empleado_id viene nulo
+        const safeEmpId = r.empleado_id || 'null'; 
+
         if (!firma) {
             estadoBadge = '<span class="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded">Sin enlace</span>';
-            acciones = `<button onclick="generarEnlaceGenerico('${tipo}', ${r.id}, ${r.empleado_id}, '${r.periodo}')" class="bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] px-2.5 py-1 rounded font-bold"><i class="fa-solid fa-link mr-1"></i> Generar</button>`;
+            acciones = `<button onclick="generarEnlaceGenerico('${tipo}', '${r.id}')" class="bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] px-2.5 py-1 rounded font-bold"><i class="fa-solid fa-link mr-1"></i> Generar</button>`;
         } else if (firma.estado === 'pendiente') {
             estadoBadge = '<span class="text-[10px] bg-amber-950 text-amber-300 border border-amber-800 px-2 py-0.5 rounded font-bold">Pendiente</span>';
             acciones = `
-                <button onclick="copiarEnlaceFirma('${firma.token}')" class="bg-slate-700 hover:bg-slate-600 text-white text-[10px] px-2 py-1 rounded"><i class="fa-solid fa-copy"></i></button>
-                <button onclick="enviarWAEnlaceGenerico('${firma.token}', ${r.empleado_id}, '${tipo}', '${r.periodo}')" class="bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] px-2 py-1 rounded"><i class="fa-brands fa-whatsapp"></i></button>
-                <button onclick="anularEnlaceFirma('${firma.token}')" class="bg-rose-600/20 hover:bg-rose-600/40 text-rose-400 text-[10px] px-2 py-1 rounded"><i class="fa-solid fa-xmark"></i></button>
+                <button onclick="copiarEnlaceFirma('${firma.token}')" class="bg-slate-700 hover:bg-slate-600 text-white text-[10px] px-2 py-1 rounded" title="Copiar"><i class="fa-solid fa-copy"></i></button>
+                <button onclick="enviarWAEnlaceGenerico('${firma.token}', ${safeEmpId}, '${tipo}')" class="bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] px-2 py-1 rounded" title="WhatsApp"><i class="fa-brands fa-whatsapp"></i></button>
+                <button onclick="anularEnlaceFirma('${firma.token}')" class="bg-rose-600/20 hover:bg-rose-600/40 text-rose-400 text-[10px] px-2 py-1 rounded" title="Anular"><i class="fa-solid fa-xmark"></i></button>
             `;
         } else {
             estadoBadge = '<span class="text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-800 px-2 py-0.5 rounded font-bold"><i class="fa-solid fa-check"></i> Firmado</span>';
             acciones = `
-                <a href="${firma.url_pdf_firmado}" target="_blank" class="bg-sky-600 hover:bg-sky-500 text-white text-[10px] px-2 py-1 rounded inline-block"><i class="fa-solid fa-file-pdf"></i></a>
-                <button onclick="anularEnlaceFirma('${firma.token}')" class="bg-slate-700 hover:bg-slate-600 text-white text-[10px] px-2 py-1 rounded"><i class="fa-solid fa-rotate"></i></button>
+                <a href="${firma.url_pdf_firmado}" target="_blank" class="bg-sky-600 hover:bg-sky-500 text-white text-[10px] px-2 py-1 rounded inline-block" title="Ver PDF"><i class="fa-solid fa-file-pdf"></i></a>
+                <button onclick="anularEnlaceFirma('${firma.token}')" class="bg-slate-700 hover:bg-slate-600 text-white text-[10px] px-2 py-1 rounded" title="Regenerar"><i class="fa-solid fa-rotate"></i></button>
             `;
         }
 
@@ -1100,39 +1105,53 @@ async function abrirModalFirmaGenerico(tipo, docs) {
         </tr>`;
     }).join('');
 }
+async function generarEnlaceGenerico(tipo, docId) {
+    // Buscamos el documento en la memoria para obtener los datos reales de forma segura
+    const docInfo = window._docsFirmaActuales.find(d => String(d.id) === String(docId));
+    if (!docInfo) return showToast('Error: Documento no encontrado en memoria', 'error');
 
-async function generarEnlaceGenerico(tipo, docId, empId, periodo) {
     const token = generarUUID();
     const { error } = await supabaseClient.from('firmas_recibos').insert([{
         token: token,
         documento_id: docId,
-        empleado_id: empId,
+        empleado_id: docInfo.empleado_id,
         tipo_documento: tipo,
-        periodo_nomina: periodo,
+        periodo_nomina: docInfo.periodo,
         estado: 'pendiente',
         fecha_emision: new Date().toISOString()
     }]);
 
-    if (error) return showToast('Error: ' + error.message, 'error');
-    showToast('Enlace generado');
+    if (error) {
+        console.error(error);
+        return showToast('Error al generar: ' + error.message, 'error');
+    }
     
-    // Recargar el modal (creando un array con el solo documento actual)
-    const emp = appState.empleados.find(e => String(e.id) === String(empId));
-    abrirModalFirmaGenerico(tipo, [{ id: docId, empleado: emp?.nombre || 'Empleado', empleado_id: empId, neto_bs: 0, periodo: periodo }]);
+    showToast('Enlace generado correctamente');
+    
+    // Recargamos el modal pasando el mismo tipo y los docs
+    abrirModalFirmaGenerico(tipo, window._docsFirmaActuales);
 }
 
-function enviarWAEnlaceGenerico(token, empId, tipo, periodo) {
+function enviarWAEnlaceGenerico(token, empId, tipo) {
+    if (empId === 'null' || !empId) return showToast('Empleado no tiene ID válido', 'error');
+
     const emp = appState.empleados.find(e => String(e.id) === String(empId));
-    if (!emp || !emp.telefono) return showToast('Empleado sin teléfono', 'error');
+    if (!emp || !emp.telefono) return showToast('Empleado sin teléfono registrado', 'error');
+    
+    // Buscamos el período desde la memoria para el mensaje
+    const docInfo = window._docsFirmaActuales.find(d => d.token === token) || window._docsFirmaActuales[0];
+    const periodoStr = docInfo ? docInfo.periodo : '';
+
     let tel = emp.telefono.replace(/\D/g, '');
-    if (tel.startsWith('0')) tel = '58' + tel.substring(1); else if (tel.length === 10) tel = '58' + tel;
+    if (tel.startsWith('0')) tel = '58' + tel.substring(1); 
+    else if (tel.length === 10) tel = '58' + tel;
 
     const baseUrl = window.location.origin + window.location.pathname.replace(/index\.html$/, '').replace(/\/$/, '');
     const enlace = `${baseUrl}/firma.html?token=${token}`;
-    const msj = `Hola ${emp.nombre}, tu recibo de ${tipo} (${periodo}) está listo para firma digital. Ingresá aquí:\n\n${enlace}`;
+    const msj = `Hola ${emp.nombre}, tu recibo de ${tipo} (${periodoStr}) está listo para firma digital. Ingresá aquí:\n\n${enlace}`;
+    
     window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msj)}`, '_blank');
 }
-
 function abrirModalFirmaUtilidades(periodo, fecha) {
     const regs = appState.utilidades.filter(u => u.periodo === periodo && u.fecha_pago === fecha);
     const docs = regs.map(u => ({
@@ -1152,8 +1171,6 @@ function abrirModalFirmaUtilidades(periodo, fecha) {
 function abrirFirmaVacacion(id) {
     const v = appState.vacaciones.find(x => String(x.id) === String(id));
     if (!v) return showToast('No se encontró el registro', 'error');
-    
-    // Validar el ID del empleado
     const empId = v.empleado_id || (v.detalle_calculo?.empleado?.id);
     
     abrirModalFirmaGenerico('vacaciones', [{ 
@@ -1168,7 +1185,6 @@ function abrirFirmaVacacion(id) {
 function abrirFirmaPrestacion(id) {
     const a = appState.antiguedad.find(x => String(x.id) === String(id));
     if (!a) return showToast('No se encontró el registro', 'error');
-    
     const empId = a.empleado_id || (a.detalle_calculo?.empleado?.id);
     
     abrirModalFirmaGenerico('prestaciones', [{ 
@@ -1183,7 +1199,6 @@ function abrirFirmaPrestacion(id) {
 function abrirFirmaLiquidacion(id) {
     const p = appState.prestaciones.find(x => String(x.id) === String(id));
     if (!p) return showToast('No se encontró el registro', 'error');
-    
     const empId = p.empleado_id || (p.detalle_calculo?.empleado?.id);
     
     abrirModalFirmaGenerico('liquidacion', [{ 
