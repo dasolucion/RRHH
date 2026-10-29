@@ -255,6 +255,7 @@ function renderHistoricoUtilidades() {
             <td class="p-3.5 text-right space-x-1">
                 <button onclick="verDetalleUtilidades('${g.p}', '${g.f}')" class="bg-sky-600/20 hover:bg-sky-600/40 text-sky-400 border border-sky-500/30 text-xs px-2.5 py-1 rounded-lg font-medium inline-flex items-center space-x-1 transition"><i class="fa-solid fa-list text-[11px]"></i><span>Resumen</span></button>
                 <button onclick="verRecibosUtilidadesHistorico('${g.p}', '${g.f}')" class="bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-400 border border-emerald-500/30 text-xs px-2.5 py-1 rounded-lg font-medium inline-flex items-center space-x-1 transition"><i class="fa-solid fa-receipt text-[11px]"></i><span>Recibos</span></button>
+                <button onclick="abrirModalFirmaUtilidades('${g.p}', '${g.f}')" class="bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-400 border border-indigo-500/30 text-xs px-2.5 py-1 rounded-lg font-medium inline-flex items-center space-x-1 transition"><i class="fa-solid fa-signature"></i><span>Firmas</span></button>
                 ${isMaster ? `<button onclick="eliminarUtilidadesProcesadas('${g.p}', '${g.f}')" class="bg-rose-600/20 hover:bg-rose-600/40 text-rose-400 border border-rose-500/30 text-xs px-2.5 py-1 rounded-lg font-medium inline-flex items-center space-x-1 transition"><i class="fa-solid fa-trash text-[11px]"></i></button>` : ''}
             </td>
         </tr>`;
@@ -421,4 +422,15 @@ function verDetalleUtilidades(p, f) {
 function imprimirDesgloseUtilidades() {
     gId('print-container').innerHTML = `<div class="p-4">${gId('area-impresion-utilidades').innerHTML}</div>`;
     window.print();
+}
+function abrirModalFirmaUtilidades(periodo, fecha) {
+    const regs = appState.utilidades.filter(u => u.periodo === periodo && u.fecha_pago === fecha);
+    const docs = regs.map(u => ({
+        id: u.id,
+        empleado: u.empleado,
+        empleado_id: u.empleado_id,
+        neto_bs: u.gran_total_bs || u.total_bs,
+        periodo: `${periodo} (${fecha})`
+    }));
+    abrirModalFirmaGenerico('utilidades', docs);
 }
