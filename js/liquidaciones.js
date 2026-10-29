@@ -150,7 +150,7 @@ function renderHistoricoPrestaciones() {
             <td class="p-3.5 font-bold text-emerald-400 font-mono">Bs. ${fNum(p.total_bs)}</td>
             <td class="p-3.5 text-right space-x-1 sm:space-x-2">
                 <button onclick="verReciboPrestacionesHistorico(${p.id})" class="bg-amber-600/20 hover:bg-amber-600/40 text-amber-400 border border-amber-500/30 text-xs px-2.5 py-1 rounded-lg font-medium inline-flex items-center space-x-1 transition"><i class="fa-solid fa-receipt text-[11px]"></i><span>Ver Recibo</span></button>
-                <button onclick="abrirModalFirmaGenerico('liquidacion', [{ id: '${p.id}', empleado: '${p.empleado}', empleado_id: ${p.empleado_id}, neto_bs: ${p.total_bs || 0}, periodo: 'Egreso ${p.fecha_calculo}' }])" class="bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-400 border border-indigo-500/30 text-xs px-2.5 py-1 rounded-lg font-medium inline-flex items-center space-x-1 transition"><i class="fa-solid fa-signature"></i><span>Firmar</span></button>
+               <button onclick="abrirFirmaLiquidacion('${p.id}')" class="bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-400 border border-indigo-500/30 text-xs px-2.5 py-1 rounded-lg font-medium inline-flex items-center space-x-1 transition" title="Firmar"><i class="fa-solid fa-signature"></i></button>
                 ${isMaster ? `<button onclick="eliminarPrestacionesProcesadas(${p.id})" class="bg-rose-600/20 hover:bg-rose-600/40 text-rose-400 border border-rose-500/30 text-xs px-2.5 py-1 rounded-lg font-medium inline-flex items-center space-x-1 transition"><i class="fa-solid fa-trash text-[11px]"></i></button>` : ''}
             </td>
         </tr>`;
