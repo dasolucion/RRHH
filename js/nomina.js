@@ -998,8 +998,26 @@ async function abrirJustificativoFalta(empId) {
 // Convierte "2026-10-15" → "15/10/2026"
 function formatearPeriodoNomina(fechaPago) {
     if (!fechaPago) return null;
-    return fechaPago.split('-').reverse().join('/');
+    
+    // Si ya viene en formato DD/MM/YYYY (por si acaso)
+    if (fechaPago.includes('/')) return fechaPago;
+    
+    // Si viene en formato YYYY-MM-DD
+    const [year, month, day] = fechaPago.split('-');
+    if (!year || !month || !day) return fechaPago;
+    
+    const numDia = parseInt(day);
+    let diaQuincena = '15';
+    
+    // Si es mayor a 15, calculamos el último día del mes
+    if (numDia > 15) {
+        const ultimoDia = new Date(parseInt(year), parseInt(month), 0).getDate();
+        diaQuincena = ultimoDia.toString().padStart(2, '0');
+    }
+    
+    return `${diaQuincena}/${month}/${year}`;
 }
+
 
 // Renovar un enlace expirado (da 30 min más)
 async function renovarEnlaceFirma(token) {
