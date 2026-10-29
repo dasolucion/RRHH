@@ -258,7 +258,7 @@ const bloqueFirmaHtml = firmaBase64
             if (firmaPad) firmaPad.clear();
         }
 
-        async function enviarFirma() {
+           async function enviarFirma() {
             if (!firmaPad || firmaPad.isEmpty()) {
                 alert('Por favor, firme el recibo antes de enviar.');
                 return;
@@ -270,7 +270,7 @@ const bloqueFirmaHtml = firmaBase64
             const firmaBase64 = firmaPad.toDataURL('image/png');
             const htmlPDF = generarHTMLRecibo(docDataGlobal, empDataGlobal, firmaBase64);
 
-                // 1. Preparar contenedor invisible
+            // 1. Preparar contenedor invisible
             const overlay = document.getElementById('pdf-overlay');
             const content = document.getElementById('pdf-overlay-content');
             
@@ -291,11 +291,31 @@ const bloqueFirmaHtml = firmaBase64
             }
             await new Promise(r => setTimeout(r, 300));
 
-            // 3. Formatear nombre
-            const fecha = docDataGlobal.fecha_pago;
-            const [y, m, d] = fecha.split('-');
-            const nombreDescriptivo = `Nomina ${d}/${m}/${y}`;
-            const nombreArchivo = `Nomina ${d}-${m}-${y}.pdf`;
+            // 3. Formatear nombre del archivo y descripción
+            // Evaluamos si el período guardado necesita ser formateado a quincena
+            let periodoNomina = firmaDataGlobal.periodo_nomina || docDataGlobal.fecha_pago;
+            
+            if (periodoNomina) {
+                let parts = periodoNomina.includes('/') ? periodoNomina.split('/') : periodoNomina.split('-').reverse();
+                if (periodoNomina.includes('-')) {
+                    const [y, m, d] = periodoNomina.split('-');
+                    parts = [d, m, y];
+                }
+                const [d, m, y] = parts;
+                const numDia = parseInt(d);
+                let diaQuincena = '15';
+                if (numDia > 15) {
+                    const ultimoDia = new Date(parseInt(y), parseInt(m), 0).getDate();
+                    diaQuincena = ultimoDia.toString().padStart(2, '0');
+                }
+                periodoNomina = `${diaQuincena}/${m}/${y}`;
+            } else {
+                periodoNomina = 'SinPeriodo';
+            }
+
+            // Ahora el nombre será "Nomina 15/10/2026"
+            const nombreDescriptivo = `Nomina ${periodoNomina}`;
+            const nombreArchivo = `Nomina ${periodoNomina.replace(/\//g, '-')}.pdf`;
 
             // 4. Generar PDF (Capturando SOLO el recibo interno)
             const reciboElement = content.querySelector('.recibo-card');
@@ -308,7 +328,7 @@ const bloqueFirmaHtml = firmaBase64
                     scale: 2, 
                     useCORS: true, 
                     backgroundColor: '#ffffff',
-                    scrollX: 10,
+                    scrollX: 0,
                     scrollY: 0
                 },
                 jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
@@ -316,7 +336,7 @@ const bloqueFirmaHtml = firmaBase64
 
             let pdfBase64;
             try {
-                // ⚡ Aquí pasamos "reciboElement" en lugar del contenedor padre
+                // Pasamos "reciboElement" en lugar del contenedor padre
                 pdfBase64 = await html2pdf().from(reciboElement).set(opt).outputPdf('datauristring');
             } catch (e) {
                 console.error(e);
@@ -366,12 +386,28 @@ const bloqueFirmaHtml = firmaBase64
                 user_agent_firmado: navigator.userAgent.substring(0, 200)
             }).eq('token', token);
 
+            // 7. Configurar botón de "Volver al expediente" si es que venía de ahí
+            const portalToken = urlParams.get('portal');
+            const baseUrl = window.location.href.split('?')[0].replace('firma.html', '');
+            
+            const botonVolver = portalToken 
+                ? `<a href="${baseUrl}mi_expediente.html?t=${portalToken}" class="mt-3 bg-slate-800 hover:bg-slate-700 text-white px-6 py-3 rounded-lg text-sm font-bold inline-block shadow-lg transition">
+                     <i class="fa-solid fa-arrow-left mr-2"></i> Volver a mi expediente
+                   </a>`
+                : '';
+
+            // 8. Mostrar pantalla de éxito
             document.getElementById('contenido-recibo').innerHTML = `
-                <div class="bg-white rounded-xl shadow-lg p-8 text-center max-w-md mx-auto">
+                <div class="bg-white rounded-xl shadow-lg p-8 text-center max-w-md mx-auto flex flex-col items-center">
                     <div class="text-emerald-500 text-6xl mb-4"><i class="fa-solid fa-circle-check"></i></div>
                     <h2 class="text-xl font-bold mb-2 text-slate-900">¡Documento Firmado!</h2>
                     <p class="text-[10px] text-slate-500 mb-4 font-mono">Hash: ${hashHex.substring(0, 16)}...</p>
-                    <a href="${urlData.publicUrl}" target="_blank" class="bg-sky-600 text-white px-6 py-3 rounded-lg text-sm font-bold inline-block shadow-lg">Descargar Recibo</a>
+                    
+                    <a href="${urlData.publicUrl}" target="_blank" class="bg-sky-600 hover:bg-sky-700 text-white px-6 py-3 rounded-lg text-sm font-bold inline-block shadow-lg">
+                        <i class="fa-solid fa-download mr-2"></i> Descargar Recibo
+                    </a>
+                    
+                    ${botonVolver}
                 </div>
             `;
         }
