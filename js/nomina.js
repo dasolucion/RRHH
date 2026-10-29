@@ -1144,3 +1144,67 @@ function abrirModalFirmaUtilidades(periodo, fecha) {
     }));
     abrirModalFirmaGenerico('utilidades', docs);
 }
+
+/* ============================================================
+   FUNCIONES DE ENLACE PARA OTROS MÓDULOS
+   ============================================================ */
+
+function abrirFirmaVacacion(id) {
+    const v = appState.vacaciones.find(x => String(x.id) === String(id));
+    if (!v) return showToast('No se encontró el registro', 'error');
+    
+    // Validar el ID del empleado
+    const empId = v.empleado_id || (v.detalle_calculo?.empleado?.id);
+    
+    abrirModalFirmaGenerico('vacaciones', [{ 
+        id: v.id, 
+        empleado: v.empleado, 
+        empleado_id: empId, 
+        neto_bs: v.gran_total_bs || 0, 
+        periodo: `Vacaciones ${v.periodo}` 
+    }]);
+}
+
+function abrirFirmaPrestacion(id) {
+    const a = appState.antiguedad.find(x => String(x.id) === String(id));
+    if (!a) return showToast('No se encontró el registro', 'error');
+    
+    const empId = a.empleado_id || (a.detalle_calculo?.empleado?.id);
+    
+    abrirModalFirmaGenerico('prestaciones', [{ 
+        id: a.id, 
+        empleado: a.empleado, 
+        empleado_id: empId, 
+        neto_bs: a.monto_definitivo_bs || 0, 
+        periodo: `Corte ${a.fecha_corte}` 
+    }]);
+}
+
+function abrirFirmaLiquidacion(id) {
+    const p = appState.prestaciones.find(x => String(x.id) === String(id));
+    if (!p) return showToast('No se encontró el registro', 'error');
+    
+    const empId = p.empleado_id || (p.detalle_calculo?.empleado?.id);
+    
+    abrirModalFirmaGenerico('liquidacion', [{ 
+        id: p.id, 
+        empleado: p.empleado, 
+        empleado_id: empId, 
+        neto_bs: p.total_bs || 0, 
+        periodo: `Egreso ${p.fecha_calculo}` 
+    }]);
+}
+
+function abrirFirmaUtilidades(periodo, fecha) {
+    const regs = appState.utilidades.filter(u => String(u.periodo) === String(periodo) && String(u.fecha_pago) === String(fecha));
+    
+    const docs = regs.map(u => ({
+        id: u.id,
+        empleado: u.empleado,
+        empleado_id: u.empleado_id,
+        neto_bs: u.gran_total_bs || u.total_bs,
+        periodo: `${periodo}`
+    }));
+    
+    abrirModalFirmaGenerico('utilidades', docs);
+}
