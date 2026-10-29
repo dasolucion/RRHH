@@ -66,10 +66,10 @@ async function cargarArchivosExpediente(empId) {
                 <div class="flex items-center gap-2">
                     <i class="fa-solid ${tipo.icon} text-${tipo.color}-400"></i>
                     <div>
-                        <!-- TÍTULO: El nombre que se guardó (Ej: Cédula o Nomina 15/10/2026) -->
-                        <div class="text-xs font-bold text-white">${doc.nombre_descriptivo}</div>
-                        <!-- SUBTÍTULO: El tipo de documento -->
-                        <div class="text-[9px] text-slate-400">${tipo.label}</div>
+                        <!-- TÍTULO GRANDE (Tipo de documento: Nómina, Cédula, etc.) -->
+                        <div class="text-xs font-bold text-white">${tipo.label}</div>
+                        <!-- SUBTÍTULO PEQUEÑO (Lo que tú escribiste) -->
+                        <div class="text-[9px] text-slate-400">${doc.nombre_descriptivo}</div>
                     </div>
                 </div>
             </td>
