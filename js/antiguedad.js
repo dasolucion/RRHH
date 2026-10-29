@@ -447,6 +447,7 @@ function renderHistoricoAntiguedad() {
             <td class="p-3.5 font-bold text-emerald-400 font-mono">$${Number(a.monto_definitivo_usd || 0).toFixed(2)}</td>
             <td class="p-3.5 text-right space-x-1 sm:space-x-2">
                 <button onclick="verReciboAntiguedadHistorico('${a.id}')" class="bg-cyan-600/20 hover:bg-cyan-600/40 text-cyan-400 border border-cyan-500/30 text-xs px-2.5 py-1 rounded-lg font-medium inline-flex items-center space-x-1 transition"><i class="fa-solid fa-receipt text-[11px]"></i><span>Estado</span></button>
+                <button onclick="abrirModalFirmaGenerico('prestaciones', [{ id: '${a.id}', empleado: '${a.empleado}', empleado_id: ${a.empleado_id}, neto_bs: ${a.monto_definitivo_bs || 0}, periodo: 'Corte ${a.fecha_corte}' }])" class="bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-400 border border-indigo-500/30 text-xs px-2.5 py-1 rounded-lg font-medium inline-flex items-center space-x-1 transition"><i class="fa-solid fa-signature"></i><span>Firmar</span></button>
                 ${isMaster ? `<button onclick="eliminarAntiguedadProcesada('${a.id}')" class="bg-rose-600/20 hover:bg-rose-600/40 text-rose-400 border border-rose-500/30 text-xs px-2.5 py-1 rounded-lg font-medium inline-flex items-center space-x-1 transition"><i class="fa-solid fa-trash text-[11px]"></i></button>` : ''}
             </td>
         </tr>`;
