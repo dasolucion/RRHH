@@ -198,7 +198,7 @@ function renderHistoricoVacaciones() {
             <td class="p-3.5 font-bold text-emerald-400">Bs. ${fNum(totBs)}</td>
             <td class="p-3.5 text-right space-x-1 sm:space-x-2">
                 <button onclick="verReciboVacacionHistorico('${v.id}')" class="bg-teal-600/20 hover:bg-teal-600/40 text-teal-400 border border-teal-500/30 text-xs px-2.5 py-1 rounded-lg font-medium inline-flex items-center space-x-1 transition"><i class="fa-solid fa-receipt text-[11px]"></i><span>Ver Recibo</span></button>
-                <button onclick="abrirModalFirmaGenerico('vacaciones', [{ id: '${v.id}', empleado: '${v.empleado}', empleado_id: ${v.empleado_id}, neto_bs: ${v.gran_total_bs || 0}, periodo: '${v.periodo}' }])" class="bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-400 border border-indigo-500/30 text-xs px-2.5 py-1 rounded-lg font-medium inline-flex items-center space-x-1 transition"><i class="fa-solid fa-signature"></i><span>Firmar</span></button>
+               <button onclick="abrirFirmaVacacion('${v.id}')" class="bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-400 border border-indigo-500/30 text-xs px-2.5 py-1 rounded-lg font-medium inline-flex items-center space-x-1 transition" title="Firmar"><i class="fa-solid fa-signature"></i></button>
                 ${isMaster ? `<button onclick="eliminarVacacionProcesada('${v.id}')" class="bg-rose-600/20 hover:bg-rose-600/40 text-rose-400 border border-rose-500/30 text-xs px-2.5 py-1 rounded-lg font-medium inline-flex items-center space-x-1 transition"><i class="fa-solid fa-trash text-[11px]"></i></button>` : ''}
             </td>
         </tr>`;
