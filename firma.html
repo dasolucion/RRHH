@@ -43,6 +43,11 @@
         </div>
     </div>
 
+    <!-- Capa invisible para renderizar el PDF perfectamente -->
+    <div id="pdf-overlay" class="fixed inset-0 bg-white z-[99999] hidden overflow-y-auto justify-center pt-10">
+        <div id="pdf-overlay-content" style="width: 750px; background: #fff;"></div>
+    </div>
+
     <script>
         const SUPABASE_URL = 'https://nrfplwpmwplpbskidtqs.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yZnBsd3Btd3BscGJza2lkdHFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc1OTA4MjIsImV4cCI6MjEwMzE2NjgyMn0.PZXrE9KtAVF2e4RbyM3-m1ClS8R8QaTCctLzZKAAYdQ';
@@ -274,23 +279,15 @@
             const firmaBase64 = firmaPad.toDataURL('image/png');
             const htmlPDF = generarHTMLRecibo(docDataGlobal, empDataGlobal, firmaBase64);
 
-            // 1. Contenedor temporal para renderizar el PDF (invisible pero dibujado)
-            const wrapper = document.createElement('div');
-            wrapper.style.cssText = `
-                position: absolute; top: 0; left: 0; width: 100%; z-index: -9999; opacity: 0.01; pointer-events: none;
-                display: flex; justify-content: center;
-            `;
+            // 1. Usar la capa visible para renderizar (evita recortes)
+            const overlay = document.getElementById('pdf-overlay');
+            const content = document.getElementById('pdf-overlay-content');
             
-            // 2. Ancho de 790px (estándar A4 a 96dpi) para evitar cortes laterales
-            const inner = document.createElement('div');
-            inner.style.cssText = `width: 790px; background: #fff; padding: 10px; box-sizing: border-box;`;
-            inner.innerHTML = htmlPDF;
-            
-            wrapper.appendChild(inner);
-            document.body.appendChild(wrapper);
+            content.innerHTML = htmlPDF;
+            overlay.style.display = 'flex'; // Mostrar capa
 
-            // 3. Esperar a que la imagen de la firma cargue
-            const img = inner.querySelector('img');
+            // 2. Esperar a que la imagen de la firma cargue
+            const img = content.querySelector('img');
             if (img) {
                 await new Promise((resolve) => {
                     if (img.complete) resolve();
@@ -301,24 +298,25 @@
                     }
                 });
             }
-            await new Promise(r => setTimeout(r, 400)); // Delay para renderizado
+            await new Promise(r => setTimeout(r, 300));
 
-            // 4. Formatear nombre (Nomina 15/10/2026)
+            // 3. Formatear nombre (Nomina 15/10/2026)
             const fecha = docDataGlobal.fecha_pago;
             const [y, m, d] = fecha.split('-');
-            const nombreDescriptivo = `Nomina ${d}/${m}/${y}`; // Título para la BD
-            const nombreArchivo = `Nomina ${d}-${m}-${y}.pdf`; // Nombre del archivo físico
+            const nombreDescriptivo = `Nomina ${d}/${m}/${y}`;
+            const nombreArchivo = `Nomina ${d}-${m}-${y}.pdf`;
 
-            // 5. Generar PDF
+            // 4. Generar PDF
             const opt = {
-                margin: 5,
+                margin: 10, // Margen de la hoja A4
                 filename: nombreArchivo,
                 image: { type: 'jpeg', quality: 0.98 },
                 html2canvas: { 
                     scale: 2, 
                     useCORS: true, 
                     backgroundColor: '#ffffff',
-                    windowWidth: 800, // Forzar ancho de renderizado
+                    windowWidth: 800, // Forzar ancho
+                    scrollX: 0,
                     scrollY: 0
                 },
                 jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
@@ -326,17 +324,19 @@
 
             let pdfBase64;
             try {
-                pdfBase64 = await html2pdf().from(inner).set(opt).outputPdf('datauristring');
+                pdfBase64 = await html2pdf().from(content).set(opt).outputPdf('datauristring');
             } catch (e) {
                 console.error(e);
                 alert('Error generando PDF');
-                document.body.removeChild(wrapper);
+                overlay.style.display = 'none';
                 btn.innerHTML = 'Reintentar';
                 btn.disabled = false;
                 return;
             }
 
-            document.body.removeChild(wrapper);
+            // 5. Ocultar capa y limpiar
+            overlay.style.display = 'none';
+            content.innerHTML = '';
 
             // 6. Guardar en Supabase
             const pdfBlob = await (await fetch(pdfBase64)).blob();
@@ -355,7 +355,6 @@
 
             const { data: urlData } = supabaseClient.storage.from('expediente').getPublicUrl(storagePath);
 
-            // Insertar con el nombre "Nomina 15/10/2026"
             await supabaseClient.from('expediente_documentos').insert([{
                 empleado_id: firmaDataGlobal.empleado_id,
                 tipo_documento: firmaDataGlobal.tipo_documento,
