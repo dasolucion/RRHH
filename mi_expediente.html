@@ -96,58 +96,47 @@
             await mostrarExpedienteCompleto(emp);
         }
 
-        function mostrarPantallaBloqueo(emp, pendientes) {
-            const hoy = new Date();
-            const pendientesHtml = pendientes.map(p => {
-                const expirado = p.expira_en && new Date(p.expira_en) < hoy;
-                const tipoLabel = { nomina: 'Nómina', vacaciones: 'Vacaciones', prestaciones: 'Prestaciones', utilidades: 'Utilidades', liquidacion: 'Liquidación' }[p.tipo_documento] || 'Documento';
-                const enlace = `${window.location.origin}/firma.html?token=${p.token}`;
-
-                if (expirado) {
-                    return `<div class="bg-rose-50 border border-rose-200 p-3 rounded-lg mb-2">
-                        <div class="flex justify-between items-center">
-                            <div>
-                                <div class="text-xs font-bold text-slate-900">${tipoLabel} - ${p.periodo_nomina || 'Sin período'}</div>
-                                <div class="text-[10px] text-rose-600 font-semibold">⚠️ Enlace expirado — Contactá a RRHH</div>
-                            </div>
-                            <i class="fa-solid fa-clock text-rose-400"></i>
-                        </div>
-                    </div>`;
-                }
-                return `<div class="bg-amber-50 border border-amber-200 p-3 rounded-lg mb-2">
-                    <div class="flex justify-between items-center">
-                        <div>
-                            <div class="text-xs font-bold text-slate-900">${tipoLabel} - ${p.periodo_nomina || 'Sin período'}</div>
-                            <div class="text-[10px] text-amber-700">Emitido: ${new Date(p.fecha_emision).toLocaleString('es-VE')}</div>
-                        </div>
-                        <a href="${enlace}" class="bg-amber-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold">Firmar</a>
-                    </div>
-                </div>`;
-            }).join('');
-
-            document.getElementById('portal').innerHTML = `
-                <div class="bg-white rounded-xl shadow-lg p-6 mb-4">
-                    <div class="text-center mb-4">
-                        <div class="inline-flex bg-rose-100 text-rose-600 p-4 rounded-full mb-3">
-                            <i class="fa-solid fa-lock text-3xl"></i>
-                        </div>
-                        <h1 class="text-lg font-bold text-slate-900">Acceso Bloqueado</h1>
-                        <p class="text-sm text-slate-600 mt-1">Tienes <strong>${pendientes.length}</strong> documento${pendientes.length > 1 ? 's' : ''} pendiente${pendientes.length > 1 ? 's' : ''} de firma.</p>
-                        <p class="text-xs text-slate-500 mt-2">Debes firmarlos para acceder a tu expediente digital completo.</p>
-                    </div>
-                    <div class="border-t pt-4">
-                        <h2 class="text-xs font-bold text-slate-900 uppercase mb-3">Documentos pendientes:</h2>
-                        ${pendientesHtml}
-                    </div>
+function mostrarPantallaBloqueo(emp, pendientes) {
+    const pendientesHtml = pendientes.map(p => {
+        const tipoLabel = { nomina: 'Nómina', vacaciones: 'Vacaciones', prestaciones: 'Prestaciones', utilidades: 'Utilidades', liquidacion: 'Liquidación' }[p.tipo_documento] || 'Documento';
+        
+        // ⚡ CORRECCIÓN: Obtener la URL base actual para el enlace
+        const baseUrl = window.location.href.split('?')[0].replace('mi_expediente.html', '');
+        const enlace = `${baseUrl}firma.html?token=${p.token}`;
+        
+        return `<div class="bg-amber-50 border border-amber-200 p-3 rounded-lg mb-2">
+            <div class="flex justify-between items-center">
+                <div>
+                    <div class="text-xs font-bold text-slate-900">${tipoLabel} - ${p.periodo_nomina || 'Sin período'}</div>
+                    <div class="text-[10px] text-amber-700">Emitido: ${new Date(p.fecha_emision).toLocaleString('es-VE')}</div>
                 </div>
-                <div class="bg-slate-100 rounded-xl p-4 text-center">
-                    <p class="text-[10px] text-slate-500">${emp.nombre} | C.I. ${emp.cedula}</p>
-                </div>
-            `;
-            document.getElementById('loading').classList.add('hidden');
-            document.getElementById('portal').classList.remove('hidden');
-        }
+                <a href="${enlace}" class="bg-amber-600 hover:bg-amber-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition">Firmar</a>
+            </div>
+        </div>`;
+    }).join('');
 
+    document.getElementById('portal').innerHTML = `
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-4">
+            <div class="text-center mb-4">
+                <div class="inline-flex bg-rose-100 text-rose-600 p-4 rounded-full mb-3">
+                    <i class="fa-solid fa-lock text-3xl"></i>
+                </div>
+                <h1 class="text-lg font-bold text-slate-900">Acceso Bloqueado</h1>
+                <p class="text-sm text-slate-600 mt-1">Tienes <strong>${pendientes.length}</strong> documento${pendientes.length > 1 ? 's' : ''} pendiente${pendientes.length > 1 ? 's' : ''} de firma.</p>
+                <p class="text-xs text-slate-500 mt-2">Debes firmarlos para acceder a tu expediente digital completo.</p>
+            </div>
+            <div class="border-t pt-4">
+                <h2 class="text-xs font-bold text-slate-900 uppercase mb-3">Documentos pendientes:</h2>
+                ${pendientesHtml}
+            </div>
+        </div>
+        <div class="bg-slate-100 rounded-xl p-4 text-center">
+            <p class="text-[10px] text-slate-500">${emp.nombre} | C.I. ${emp.cedula}</p>
+        </div>
+    `;
+    document.getElementById('loading').classList.add('hidden');
+    document.getElementById('portal').classList.remove('hidden');
+}
         async function mostrarExpedienteCompleto(emp) {
             document.getElementById('portal').innerHTML = `
                 <div class="bg-white rounded-xl shadow-lg p-5 mb-4">
