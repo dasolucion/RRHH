@@ -184,13 +184,13 @@
             const mN = fO.toLocaleString('es-ES', { month: 'long' }).toUpperCase();
             const tP = `RECIBO DE PAGO ${qT} DE ${mN} ${y}`;
 
-            const bloqueFirmaHtml = firmaBase64 
-                ? `<img src="${firmaBase64}" style="height: 30px; display: block; margin: 0 auto; object-fit: contain;">`
-                : '';
+const bloqueFirmaHtml = firmaBase64 
+    ? `<img src="${firmaBase64}" style="height: 60px; display: block; margin: 0 auto; object-fit: contain;">`
+    : '';
             const cedulaHtml = firmaBase64 ? `<span class="font-bold text-[10px]">${e.cedula}</span>` : '';
 
             return `
-                      <div class="recibo-card bg-white text-black p-3 rounded-lg shadow-xl border border-slate-300 font-sans w-full">
+                     <div class="recibo-card bg-white text-black p-4 font-sans w-full">
                 <div>
                     <div class="flex justify-between items-start mb-1 pb-0.5 border-b border-black">
                         <div><h2 class="text-xl font-black tracking-widest text-black uppercase">${paramsEmpresa.nombre_empresa.split('/')[0].trim()}</h2></div>
