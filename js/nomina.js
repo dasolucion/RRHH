@@ -100,7 +100,6 @@ function renderTablaNominaEditable() {
     }
 
     tbody.innerHTML = emps.map(e => {
-        const si = Number(e.sueldo) + Number(e.bono_alimentacion) + Number(e.otros_ingresos);
         const saldoPres = Number(e.saldo_prestamo) || 0;
         const prestamoSugeridoDef = saldoPres > 0 ? saldoPres.toFixed(2) : "0.00";
         const bEmp = borrador?.filas?.[e.id] || {};
@@ -126,30 +125,29 @@ function renderTablaNominaEditable() {
 
         return `<tr id="fila-emp-${e.id}" class="hover:bg-slate-900/50 transition">
             <td class="p-3" style="min-width: 170px;"><div class="font-bold text-white">${e.nombre}</div><div class="text-[10px] text-slate-400">${e.cedula}</div></td>
-            <td class="p-3 font-semibold text-sky-400" style="min-width: 95px;">$${si.toFixed(2)}</td>
-            <td class="p-3 text-center" style="min-width: 70px;"><input type="number" id="df-${e.id}" value="${dfVal}" min="0" autocomplete="off" oninput="actualizarFilaYTotales(${e.id}); autoguardarBorradorNomina();" style="width: 50px;" class="bg-slate-950 border border-slate-800 rounded text-center p-1 text-xs text-white focus:border-emerald-500 outline-none"></td>
-            <td class="p-3 text-center" data-feature="nomina.recargos_lottt" style="min-width: 65px;"><input type="number" id="hed-${e.id}" value="${hedVal}" min="0" autocomplete="off" oninput="actualizarFilaYTotales(${e.id}); autoguardarBorradorNomina();" style="width: 50px;" class="bg-slate-950 border border-indigo-900/50 rounded text-center p-1 text-xs text-indigo-300 focus:border-indigo-500 outline-none"></td>
-            <td class="p-3 text-center" data-feature="nomina.recargos_lottt" style="min-width: 65px;"><input type="number" id="hnoct-${e.id}" value="${hnoctVal}" min="0" autocomplete="off" oninput="actualizarFilaYTotales(${e.id}); autoguardarBorradorNomina();" style="width: 50px;" class="bg-slate-950 border border-indigo-900/50 rounded text-center p-1 text-xs text-indigo-300 focus:border-indigo-500 outline-none"></td>
-            <td class="p-3 text-center" data-feature="nomina.recargos_lottt" style="min-width: 65px;"><input type="number" id="fer-${e.id}" value="${ferVal}" min="0" autocomplete="off" oninput="actualizarFilaYTotales(${e.id}); autoguardarBorradorNomina();" style="width: 50px;" class="bg-slate-950 border border-indigo-900/50 rounded text-center p-1 text-xs text-indigo-300 focus:border-indigo-500 outline-none"></td>
-            <td class="p-3" style="min-width: 95px;"><input type="number" step="0.01" id="oa-${e.id}" value="${oaVal}" autocomplete="off" oninput="actualizarFilaYTotales(${e.id}); autoguardarBorradorNomina();" style="width: 75px;" class="bg-slate-950 border border-slate-800 rounded p-1 text-xs text-white focus:border-emerald-500 outline-none"></td>
-            <td class="p-3 text-center" style="min-width: 70px;"><input type="number" id="hd-${e.id}" value="${hdVal}" min="0" autocomplete="off" oninput="actualizarFilaYTotales(${e.id}); autoguardarBorradorNomina();" style="width: 50px;" class="bg-slate-950 border border-slate-800 rounded text-center p-1 text-xs text-white focus:border-emerald-500 outline-none"></td>
-            <td class="p-3" style="min-width: 95px;"><input type="number" step="0.01" id="od-${e.id}" value="${odVal}" autocomplete="off" oninput="actualizarFilaYTotales(${e.id}); autoguardarBorradorNomina();" style="width: 75px;" class="bg-slate-950 border border-slate-800 rounded p-1 text-xs text-white focus:border-emerald-500 outline-none"></td>
-            <td class="p-3" data-feature="nomina.adelantos" style="min-width: 95px;"><input type="number" step="0.01" id="ad-${e.id}" value="${adVal}" autocomplete="off" oninput="actualizarFilaYTotales(${e.id}); autoguardarBorradorNomina();" style="width: 75px;" class="bg-slate-950 border border-slate-800 rounded p-1 text-xs text-white focus:border-emerald-500 outline-none"></td>
-            <td class="p-3" data-feature="nomina.prestamos" style="min-width: 95px;"><input type="number" step="0.01" id="pr-${e.id}" value="${prVal}" autocomplete="off" oninput="actualizarFilaYTotales(${e.id}); autoguardarBorradorNomina();" style="width: 75px;" class="bg-slate-950 border border-slate-800 rounded p-1 text-xs text-white focus:border-emerald-500 outline-none"></td>
-            <td class="p-3 text-center" data-feature="nomina.islr" style="min-width: 70px;"><input type="number" step="0.01" id="islr-${e.id}" value="${islrVal}" min="0" max="100" autocomplete="off" oninput="actualizarFilaYTotales(${e.id}); autoguardarBorradorNomina();" style="width: 55px;" class="bg-slate-950 border border-amber-900/50 rounded text-center p-1 text-xs text-amber-300 focus:border-amber-500 outline-none"></td>
+            <td class="p-3 text-center" style="min-width: 70px;"><input type="number" id="df-${e.id}" value="${dfVal}" min="0" oninput="actualizarFilaYTotales(${e.id}); autoguardarBorradorNomina();" style="width: 50px;" class="bg-slate-950 border border-slate-800 rounded text-center p-1 text-xs text-white outline-none"></td>
+            <td class="p-3 text-center" style="min-width: 65px;"><input type="number" id="hed-${e.id}" value="${hedVal}" min="0" oninput="actualizarFilaYTotales(${e.id}); autoguardarBorradorNomina();" style="width: 50px;" class="bg-slate-950 border border-indigo-900/50 rounded text-center p-1 text-xs text-indigo-300 outline-none"></td>
+            <td class="p-3 text-center" style="min-width: 65px;"><input type="number" id="hnoct-${e.id}" value="${hnoctVal}" min="0" oninput="actualizarFilaYTotales(${e.id}); autoguardarBorradorNomina();" style="width: 50px;" class="bg-slate-950 border border-indigo-900/50 rounded text-center p-1 text-xs text-indigo-300 outline-none"></td>
+            <td class="p-3 text-center" style="min-width: 65px;"><input type="number" id="fer-${e.id}" value="${ferVal}" min="0" oninput="actualizarFilaYTotales(${e.id}); autoguardarBorradorNomina();" style="width: 50px;" class="bg-slate-950 border border-indigo-900/50 rounded text-center p-1 text-xs text-indigo-300 outline-none"></td>
+            <td class="p-3" style="min-width: 95px;"><input type="number" step="0.01" id="oa-${e.id}" value="${oaVal}" oninput="actualizarFilaYTotales(${e.id}); autoguardarBorradorNomina();" style="width: 75px;" class="bg-slate-950 border border-slate-800 rounded p-1 text-xs text-white outline-none"></td>
+            <td class="p-3 text-center" style="min-width: 70px;"><input type="number" id="hd-${e.id}" value="${hdVal}" min="0" oninput="actualizarFilaYTotales(${e.id}); autoguardarBorradorNomina();" style="width: 50px;" class="bg-slate-950 border border-slate-800 rounded text-center p-1 text-xs text-white outline-none"></td>
+            <td class="p-3" style="min-width: 95px;"><input type="number" step="0.01" id="od-${e.id}" value="${odVal}" oninput="actualizarFilaYTotales(${e.id}); autoguardarBorradorNomina();" style="width: 75px;" class="bg-slate-950 border border-slate-800 rounded p-1 text-xs text-white outline-none"></td>
+            <td class="p-3" style="min-width: 95px;"><input type="number" step="0.01" id="ad-${e.id}" value="${adVal}" oninput="actualizarFilaYTotales(${e.id}); autoguardarBorradorNomina();" style="width: 75px;" class="bg-slate-950 border border-slate-800 rounded p-1 text-xs text-white outline-none"></td>
+            <td class="p-3" style="min-width: 95px;"><input type="number" step="0.01" id="pr-${e.id}" value="${prVal}" oninput="actualizarFilaYTotales(${e.id}); autoguardarBorradorNomina();" style="width: 75px;" class="bg-slate-950 border border-slate-800 rounded p-1 text-xs text-white outline-none"></td>
+            <td class="p-3 text-center" style="min-width: 70px;"><input type="number" step="0.01" id="islr-${e.id}" value="${islrVal}" min="0" max="100" oninput="actualizarFilaYTotales(${e.id}); autoguardarBorradorNomina();" style="width: 55px;" class="bg-slate-950 border border-amber-900/50 rounded text-center p-1 text-xs text-amber-300 outline-none"></td>
             <td class="p-3 text-amber-400 font-medium" style="min-width: 95px;" id="ley-${e.id}">Bs. 0.00</td>
-            <td class="p-3 font-bold text-emerald-400" style="min-width: 85px;" id="neto-usd-${e.id}">$0.00</td>
-            <td class="p-3 font-bold text-emerald-400" style="min-width: 100px;" id="neto-bs-${e.id}">Bs. 0.00</td>
+            <td class="p-3 font-bold text-emerald-400" style="min-width: 100px;" id="salario-bs-${e.id}">Bs. 0.00</td>
+            <td class="p-3 font-bold text-emerald-400" style="min-width: 100px;" id="alim-bs-${e.id}">Bs. 0.00</td>
+            <td class="p-3 font-bold text-emerald-400" style="min-width: 100px;" id="subs-bs-${e.id}">Bs. 0.00</td>
         </tr>`;
     }).join('');
 
     recalcularTodaLaNomina();
-    if (typeof aplicarFeatureFlagsDOM === 'function') aplicarFeatureFlagsDOM();
 }
 
 function calcularNominaFila(id) {
     const e = appState.empleados.find(x => String(x.id) === String(id));
-    if (!e) return { u: 0, b: 0 };
+    if (!e) return;
 
     const t = parseFloat(gId('nom-tasa-bcv').value) || 36.5;
     const sM = parseFloat(gId('nom-salario-minimo').value) || 130;
@@ -170,10 +168,10 @@ function calcularNominaFila(id) {
     const horaBase = (sb / 30) / 8;
     const diaBase = sb / 30;
 
-    const hed = (typeof getFeatureFlag === 'function' && getFeatureFlag('nomina.recargos_lottt')) ? parseFloat(gId(`hed-${id}`)?.value || 0) : 0;
-    const hnoct = (typeof getFeatureFlag === 'function' && getFeatureFlag('nomina.recargos_lottt')) ? parseFloat(gId(`hnoct-${id}`)?.value || 0) : 0;
-    const fer = (typeof getFeatureFlag === 'function' && getFeatureFlag('nomina.recargos_lottt')) ? parseFloat(gId(`fer-${id}`)?.value || 0) : 0;
-    const islrPct = (typeof getFeatureFlag === 'function' && getFeatureFlag('nomina.islr')) ? parseFloat(gId(`islr-${id}`)?.value || 0) : 0;
+    const hed = parseFloat(gId(`hed-${id}`)?.value || 0);
+    const hnoct = parseFloat(gId(`hnoct-${id}`)?.value || 0);
+    const fer = parseFloat(gId(`fer-${id}`)?.value || 0);
+    const islrPct = parseFloat(gId(`islr-${id}`)?.value || 0);
 
     const montoHED = horaBase * 1.5 * hed;
     const montoNoct = horaBase * 0.30 * hnoct;
@@ -190,21 +188,21 @@ function calcularNominaFila(id) {
     const baseSalarialImponibleUSD = Math.max(0, (salarioBaseDia * (15 - df)) + totalRecargosUSD);
     const islrUSD = baseSalarialImponibleUSD * (islrPct / 100);
 
-    const totalAsignacionesUSD = base - (dia * df) + totalRecargosUSD + oa;
-    const netoU = totalAsignacionesUSD - ((dia / 8) * hd) - od - ad - pr - leyU - islrUSD;
-    const netoB = netoU * t;
+    // Nuevos cálculos para el desglose
+    const bam = Number(e.bono_alimentacion) || 0;
+    const oim = Number(e.otros_ingresos) || 0;
+    const salarioBs = ((sb / 30) * (15 - df)) * t - (ivss + rpe + faov + (islrUSD * t));
+    const alimBs = ((bam / 30) * (15 - df)) * t;
+    const subsBs = ((oim / 30) * (15 - df)) * t + (oa * t) - (((dia / 8) * hd) * t) - (od * t) - (ad * t) - (pr * t) + totalRecargosUSD * t;
 
     const elLey = gId(`ley-${id}`);
     if (elLey) elLey.innerText = `Bs. ${(ivss + rpe + faov + (islrUSD * t)).toFixed(2)}`;
+    if (gId(`salario-bs-${id}`)) gId(`salario-bs-${id}`).innerText = `Bs. ${salarioBs.toFixed(2)}`;
+    if (gId(`alim-bs-${id}`)) gId(`alim-bs-${id}`).innerText = `Bs. ${alimBs.toFixed(2)}`;
+    if (gId(`subs-bs-${id}`)) gId(`subs-bs-${id}`).innerText = `Bs. ${subsBs.toFixed(2)}`;
 
-    const elNetoU = gId(`neto-usd-${id}`);
-    if (elNetoU) elNetoU.innerText = `$${netoU.toFixed(2)}`;
-
-    const elNetoB = gId(`neto-bs-${id}`);
-    if (elNetoB) elNetoB.innerText = `Bs. ${netoB.toFixed(2)}`;
-
-    nominaTotalesCache[id] = { u: netoU, b: netoB };
-    return nominaTotalesCache[id];
+    // Guardamos para los totales
+    nominaTotalesCache[id] = { salarioBs, alimBs, subsBs };
 }
 
 function actualizarFilaYTotales(id) {
@@ -218,12 +216,18 @@ function recalcularTodaLaNomina() {
 }
 
 function sumarTotalesNomina() {
-    let tu = 0, tb = 0;
+    let ts = 0, ta = 0, tsub = 0;
     appState.empleados.filter(e => e.activo).forEach(e => {
-        if (nominaTotalesCache[e.id]) { tu += nominaTotalesCache[e.id].u; tb += nominaTotalesCache[e.id].b; }
+        if (nominaTotalesCache[e.id]) { 
+            ts += nominaTotalesCache[e.id].salarioBs; 
+            ta += nominaTotalesCache[e.id].alimBs; 
+            tsub += nominaTotalesCache[e.id].subsBs; 
+        }
     });
-    if (gId('nom-total-usd')) gId('nom-total-usd').value = `$${tu.toFixed(2)}`;
-    if (gId('nom-total-bs')) gId('nom-total-bs').value = `Bs. ${tb.toFixed(2)}`;
+    // Nota: Puedes usar estos totales si deseas mostrarlos en algún lado, 
+    // por ahora actualizamos el botón superior global.
+    if (gId('nom-total-usd')) gId('nom-total-usd').value = `$${((ts + ta + tsub) / (parseFloat(gId('nom-tasa-bcv').value) || 1)).toFixed(2)}`;
+    if (gId('nom-total-bs')) gId('nom-total-bs').value = `Bs. ${(ts + ta + tsub).toFixed(2)}`;
 }
 
 /* ---------------- PROCESAR NÓMINA GLOBAL ---------------- */
@@ -349,6 +353,7 @@ function renderHistoricoNominas() {
                 <button onclick="abrirModalFirmas('${f}')" class="bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-400 border border-indigo-500/30 text-xs px-2.5 py-1 rounded-lg font-medium inline-flex items-center transition"><i class="fa-solid fa-signature mr-1"></i> Firmas</button>
                 <button onclick="generarTXTAlimentacion('${f}')" class="bg-teal-600/20 hover:bg-teal-600/40 text-teal-400 border border-teal-500/30 text-xs px-2.5 py-1 rounded-lg font-medium inline-flex items-center transition"><i class="fa-solid fa-file-lines mr-1"></i> TXT Alimentación</button>
                 <button onclick="generarTXTSubsidio('${f}')" class="bg-purple-600/20 hover:bg-purple-600/40 text-purple-400 border border-purple-500/30 text-xs px-2.5 py-1 rounded-lg font-medium inline-flex items-center transition"><i class="fa-solid fa-file-lines mr-1"></i> TXT Subsidio</button>
+                <button onclick="abrirModalEditarNomina('${f}')" class="bg-amber-600/20 hover:bg-amber-600/40 text-amber-400 border border-amber-500/30 text-xs px-2.5 py-1 rounded-lg font-medium inline-flex items-center transition"><i class="fa-solid fa-pen mr-1"></i> Editar</button>
                 ${isMaster ? `<button onclick="eliminarNominaProcesada('${f}')" class="bg-rose-600/20 hover:bg-rose-600/40 text-rose-400 border border-rose-500/30 text-xs px-2.5 py-1 rounded-lg font-medium inline-flex items-center transition"><i class="fa-solid fa-trash mr-1"></i> Eliminar</button>` : ''}
             </td>
         </tr>
@@ -1222,4 +1227,130 @@ function abrirFirmaUtilidades(periodo, fecha) {
     }));
     
     abrirModalFirmaGenerico('utilidades', docs);
+}
+/* ============================================================
+   EDICIÓN DE NÓMINAS PROCESADAS
+   ============================================================ */
+
+let _nominasEditando = [];
+
+function abrirModalEditarNomina(fecha) {
+    const regs = appState.nominas.filter(n => n.fecha_pago === fecha);
+    if (regs.length === 0) return showToast('No hay registros para editar', 'error');
+
+    gId('edit-nom-fecha').innerText = fecha;
+    _nominasEditando = regs.map(r => ({ ...r })); // Copia para no modificar el estado hasta guardar
+
+    gId('tabla-editar-nomina-body').innerHTML = _nominasEditando.map((r, idx) => `
+        <tr id="edit-row-${idx}" class="hover:bg-slate-800/40">
+            <td class="p-2 font-bold text-white text-xs">${r.empleado}</td>
+            <td class="p-2 text-center"><input type="number" id="edit-df-${idx}" value="${r.dias_faltantes || 0}" class="w-14 bg-slate-950 border border-slate-700 rounded p-1 text-xs text-white text-center" oninput="recalcularFilaEdit(${idx})"></td>
+            <td class="p-2 text-center"><input type="number" id="edit-hed-${idx}" value="${r.hed || 0}" class="w-12 bg-slate-950 border border-slate-700 rounded p-1 text-xs text-indigo-300 text-center" oninput="recalcularFilaEdit(${idx})"></td>
+            <td class="p-2 text-center"><input type="number" id="edit-hnoct-${idx}" value="${r.hnoct || 0}" class="w-12 bg-slate-950 border border-slate-700 rounded p-1 text-xs text-indigo-300 text-center" oninput="recalcularFilaEdit(${idx})"></td>
+            <td class="p-2 text-center"><input type="number" id="edit-fer-${idx}" value="${r.fer || 0}" class="w-12 bg-slate-950 border border-slate-700 rounded p-1 text-xs text-indigo-300 text-center" oninput="recalcularFilaEdit(${idx})"></td>
+            <td class="p-2"><input type="number" step="0.01" id="edit-oa-${idx}" value="${r.otras_asignaciones || 0}" class="w-16 bg-slate-950 border border-slate-700 rounded p-1 text-xs text-white" oninput="recalcularFilaEdit(${idx})"></td>
+            <td class="p-2 text-center"><input type="number" id="edit-hd-${idx}" value="${r.horas_descuento || 0}" class="w-12 bg-slate-950 border border-slate-700 rounded p-1 text-xs text-white text-center" oninput="recalcularFilaEdit(${idx})"></td>
+            <td class="p-2"><input type="number" step="0.01" id="edit-od-${idx}" value="${r.otros_descuentos || 0}" class="w-16 bg-slate-950 border border-slate-700 rounded p-1 text-xs text-white" oninput="recalcularFilaEdit(${idx})"></td>
+            <td class="p-2"><input type="number" step="0.01" id="edit-ad-${idx}" value="${r.adelantos || 0}" class="w-16 bg-slate-950 border border-slate-700 rounded p-1 text-xs text-white" oninput="recalcularFilaEdit(${idx})"></td>
+            <td class="p-2"><input type="number" step="0.01" id="edit-pr-${idx}" value="${r.prestamos || 0}" class="w-16 bg-slate-950 border border-slate-700 rounded p-1 text-xs text-white" oninput="recalcularFilaEdit(${idx})"></td>
+            <td class="p-2 text-center"><input type="number" step="0.01" id="edit-islr-${idx}" value="${r.islr_porcentaje || 0}" class="w-12 bg-slate-950 border border-slate-700 rounded p-1 text-xs text-amber-300 text-center" oninput="recalcularFilaEdit(${idx})"></td>
+            <td class="p-2 text-amber-400 font-medium" id="edit-ley-${idx}">Bs. ${(Number(r.ivss_usd) + Number(r.rpe_usd) + Number(r.faov_usd) + Number(r.islr_usd)).toFixed(2)}</td>
+            <td class="p-2 font-bold text-emerald-400" id="edit-neto-usd-${idx}">$${Number(r.neto_usd).toFixed(2)}</td>
+            <td class="p-2 font-bold text-emerald-400" id="edit-neto-bs-${idx}">Bs. ${Number(r.neto_bs).toFixed(2)}</td>
+        </tr>
+    `).join('');
+
+    openModal('modal-editar-nomina');
+}
+
+function recalcularFilaEdit(idx) {
+    const r = _nominasEditando[idx];
+    const t = Number(r.tasa_bcv) || 1;
+    const sM = Number(r.salario_minimo_bs) || 130;
+    const sb = Number(r.salario_base) || 0;
+    const bam = Number(r.bono_alimentacion) || 0;
+    const oim = Number(r.otros_ingresos) || 0;
+    const sim = sb + bam + oim;
+    const dia = sim / 30;
+    const base = dia * 15;
+
+    const df = parseFloat(gId(`edit-df-${idx}`).value) || 0;
+    const hed = parseFloat(gId(`edit-hed-${idx}`).value) || 0;
+    const hnoct = parseFloat(gId(`edit-hnoct-${idx}`).value) || 0;
+    const fer = parseFloat(gId(`edit-fer-${idx}`).value) || 0;
+    const oa = parseFloat(gId(`edit-oa-${idx}`).value) || 0;
+    const hd = parseFloat(gId(`edit-hd-${idx}`).value) || 0;
+    const od = parseFloat(gId(`edit-od-${idx}`).value) || 0;
+    const ad = parseFloat(gId(`edit-ad-${idx}`).value) || 0;
+    const pr = parseFloat(gId(`edit-pr-${idx}`).value) || 0;
+    const islrPct = parseFloat(gId(`edit-islr-${idx}`).value) || 0;
+
+    const horaBase = (sb / 30) / 8;
+    const diaBase = sb / 30;
+    const montoHED = horaBase * 1.5 * hed;
+    const montoNoct = horaBase * 0.30 * hnoct;
+    const montoFer = diaBase * 1.5 * fer;
+    const totalRecargosUSD = montoHED + montoNoct + montoFer;
+
+    const sbBs = sb * t;
+    const ivss = (Math.min(sbBs, 5 * sM) * 12 / 52) * 0.04 * 2;
+    const rpe = (Math.min(sbBs, 10 * sM) * 12 / 52) * 0.005 * 2;
+    const faov = (sbBs * 0.01) / 2;
+    const leyU = (ivss + rpe + faov) / t;
+
+    const baseSalarialImponibleUSD = Math.max(0, ((sb / 30) * (15 - df)) + totalRecargosUSD);
+    const islrUSD = baseSalarialImponibleUSD * (islrPct / 100);
+
+    const netoU = base - (dia * df) + oa + totalRecargosUSD - ((dia / 8) * hd) - od - ad - pr - leyU - islrUSD;
+    const netoB = netoU * t;
+
+    gId(`edit-ley-${idx}`).innerText = `Bs. ${(ivss + rpe + faov + (islrUSD * t)).toFixed(2)}`;
+    gId(`edit-neto-usd-${idx}`).innerText = `$${netoU.toFixed(2)}`;
+    gId(`edit-neto-bs-${idx}`).innerText = `Bs. ${netoB.toFixed(2)}`;
+
+    // Guardar valores calculados en el objeto temporal
+    r._new_df = df; r._new_hed = hed; r._new_hnoct = hnoct; r._new_fer = fer;
+    r._new_oa = oa; r._new_hd = hd; r._new_od = od; r._new_ad = ad; r._new_pr = pr; r._new_islr = islrPct;
+    r._new_netoU = netoU; r._new_netoB = netoB; r._new_leyU = leyU; r._new_islrUSD = islrUSD;
+    r._new_ivss = ivss / t; r._new_rpe = rpe / t; r._new_faov = faov / t; r._new_recargos = totalRecargosUSD;
+}
+
+async function guardarEdicionNomina() {
+    if (!confirm('¿Guardar los ajustes realizados a esta nómina? Se actualizarán los saldos de préstamos si hubo cambios.')) return;
+
+    const empUpdates = [];
+    let cambios = 0;
+
+    for (const r of _nominasEditando) {
+        if (r._new_df === undefined) continue; // Si no se tocó la fila, saltar
+
+        const prDiff = r._new_pr - Number(r.prestamos);
+        
+        const updateData = {
+            dias_faltantes: r._new_df, hed: r._new_hed, hnoct: r._new_hnoct, fer: r._new_fer,
+            otras_asignaciones: r._new_oa, horas_descuento: r._new_hd, otros_descuentos: r._new_od,
+            adelantos: r._new_ad, prestamos: r._new_pr, islr_porcentaje: r._new_islr,
+            recargos_lottt_usd: r._new_recargos, islr_usd: r._new_islrUSD, islr_bs: r._new_islrUSD * r.tasa_bcv,
+            ivss_usd: r._new_ivss, rpe_usd: r._new_rpe, faov_usd: r._new_faov, descuentos_ley_usd: r._new_leyU,
+            neto_usd: r._new_netoU, neto_bs: r._new_netoB
+        };
+        
+        await supabaseClient.from('nominas').update(updateData).eq('id', r.id);
+
+        if (prDiff !== 0) {
+            const emp = appState.empleados.find(e => String(e.id) === String(r.empleado_id));
+            if (emp) {
+                const nuevoSaldo = Math.max(0, (Number(emp.saldo_prestamo) || 0) - prDiff);
+                emp.saldo_prestamo = nuevoSaldo;
+                empUpdates.push(supabaseClient.from('empleados').update({ saldo_prestamo: nuevoSaldo }).eq('id', emp.id));
+            }
+        }
+        cambios++;
+    }
+
+    if (empUpdates.length > 0) await Promise.all(empUpdates);
+    
+    closeModal('modal-editar-nomina');
+    showToast(`Nómina editada correctamente (${cambios} registros actualizados)`);
+    if (typeof fetchAllData === 'function') fetchAllData();
 }
