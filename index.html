@@ -724,21 +724,26 @@
 
             <!-- PARÁMETROS -->
             <div id="tab-parametros-content" class="tab-content hidden space-y-6">
-               <section class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl flex flex-col space-y-6">
+                <section class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl flex flex-col space-y-6">
+                    <!-- Header -->
                     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-800 pb-3">
-                        <div><h3 class="font-bold text-sm text-white flex items-center"><i class="fa-solid fa-sliders text-blue-400 mr-2 text-base"></i> Parámetros de la Empresa y Cálculos</h3>
-                        <p class="text-[11px] text-slate-400">Datos corporativos para recibos y tabla de tasas mensuales (Intereses BCV y Cambiaria)</p></div>
+                        <div>
+                            <h3 class="font-bold text-sm text-white flex items-center"><i class="fa-solid fa-sliders text-blue-400 mr-2 text-base"></i> Parámetros de la Empresa y Cálculos</h3>
+                            <p class="text-[11px] text-slate-400">Datos corporativos para recibos y tabla de tasas mensuales (Intereses BCV y Cambiaria)</p>
+                        </div>
                         <div class="flex flex-wrap items-center gap-2">
                             <label class="bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-400 border border-emerald-500/30 text-xs px-3.5 py-2 rounded-lg font-bold flex items-center space-x-1.5 transition shadow cursor-pointer" title="Carga el archivo Excel 1_3_18.xlsx descargado del portal del BCV"><i class="fa-solid fa-file-excel"></i><span>Importar 1_3_18.xlsx (BCV)</span><input type="file" id="input-bcv-excel" accept=".xlsx, .xls" class="hidden" onchange="importarExcelBCV(event)"></label>
                             <button id="btn-sync-tasas-mes" onclick="sincronizarTasasCierreMesBCV()" class="bg-sky-600/20 hover:bg-sky-600/40 text-sky-400 border border-sky-500/30 text-xs px-3.5 py-2 rounded-lg font-bold flex items-center space-x-1.5 transition shadow"><i class="fa-solid fa-cloud-arrow-down"></i><span>Sincronizar Cierres BCV</span></button>
                             <button onclick="guardarParametrosGenerales()" class="bg-blue-600 hover:bg-blue-500 text-white text-xs px-4 py-2 rounded-lg font-bold flex items-center space-x-1.5 shadow"><i class="fa-solid fa-save"></i><span>Guardar Cambios</span></button>
                         </div>
                     </div>
+
+                    <!-- Datos Empresa -->
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 bg-slate-950 p-4 rounded-xl border border-slate-800">
                         <div><label class="text-[11px] font-semibold text-slate-400 block mb-1">Nombre de la Empresa (Recibos)</label><input type="text" id="param-empresa-nombre" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-blue-500"></div>
                         <div><label class="text-[11px] font-semibold text-slate-400 block mb-1">RIF de la Empresa</label><input type="text" id="param-empresa-rif" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-blue-500"></div>
                         <div><label class="text-[11px] font-semibold text-slate-400 block mb-1">Días Utilidades Base</label><input type="number" id="param-dias-utilidades" value="30" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-blue-500"></div>
-                        <div><label class="text-[11px] font-semibold text-slate-400 block mb-1">Valor U.T. Vigente (SENIAT Bs.)</label><input type="number" step="0.01" id="param-valor-ut" value="43.00" class="w-full bg-slate-900 border border-amber-500/40 rounded-lg p-2 text-xs text-amber-300 font-bold font-mono outline-none focus:border-amber-500">
+                        <div><label class="text-[11px] font-semibold text-slate-400 block mb-1">Valor U.T. Vigente (SENIAT Bs.)</label><input type="number" step="0.01" id="param-valor-ut" value="43.00" class="w-full bg-slate-900 border border-amber-500/40 rounded-lg p-2 text-xs text-amber-300 font-bold font-mono outline-none focus:border-amber-500"></div>
                         <div>
                             <label class="text-[11px] font-semibold text-slate-400 block mb-1">Riesgo IVSS (Aporte Empresa)</label>
                             <select id="param-riesgo-ivss" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-blue-500">
@@ -752,19 +757,21 @@
                             <label for="param-aplica-lpp" class="ml-2 text-xs text-slate-300 font-medium">Aplicar Ley Protección Pensiones (9% SENIAT)</label>
                         </div>
                     </div>
+
+                    <!-- Sección Tasas (Ahora ocupa todo el ancho) -->
                     <div class="space-y-3">
-                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                            <h4 class="text-xs font-bold text-blue-400 uppercase tracking-wider flex items-center"><i class="fa-solid fa-calendar-days mr-1.5"></i> Tasas Mensuales BCV (Columna E - 1_3_18.xlsx) y Cierre Dólar Oficial</h4>
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-slate-800/50 pb-2">
+                            <h4 class="text-xs font-bold text-blue-400 uppercase tracking-wider flex items-center"><i class="fa-solid fa-calendar-days mr-1.5"></i> Tasas Mensuales BCV (Columna E) y Cierre Dólar</h4>
                             <div class="flex items-center space-x-2"><span class="text-[11px] text-slate-400">LOTTT Art. 143 (Tasa Promedio / 12)</span>
                             <button onclick="guardarTasasMensualesPermanente()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] px-3 py-1 rounded font-bold transition flex items-center space-x-1"><i class="fa-solid fa-floppy-disk"></i><span>Guardar Tasas</span></button></div>
                         </div>
                         <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 bg-slate-950 p-3.5 rounded-xl border border-slate-800">
                             <div><label class="text-[11px] text-slate-400 block mb-1">Mes (Año-Mes)</label><input type="month" id="tasa-mes-input" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none"></div>
                             <div><label class="text-[11px] text-slate-400 block mb-1">Tasa Promedio BCV (% Anual)</label><input type="number" step="0.01" id="tasa-prom-anual-input" placeholder="Ej: 47.56" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none"></div>
-<div><label class="text-[11px] text-slate-400 block mb-1">Tasa Dólar Cierre (Bs/$)</label><input type="number" step="0.01" id="tasa-dolar-mes-input" placeholder="Ej: 36.50" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none"></div>
+                            <div><label class="text-[11px] text-slate-400 block mb-1">Tasa Dólar Cierre (Bs/$)</label><input type="number" step="0.01" id="tasa-dolar-mes-input" placeholder="Ej: 36.50" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none"></div>
                             <div class="flex items-end"><button onclick="agregarTasaMensual()" class="w-full bg-blue-600 hover:bg-blue-500 text-white text-xs px-3 py-2.5 rounded-lg font-bold flex items-center justify-center space-x-1 transition"><i class="fa-solid fa-plus"></i><span>Registrar Tasa</span></button></div>
                         </div>
-                        <div class="overflow-x-auto overflow-y-auto max-h-[65vh] custom-scrollbar border border-slate-800 rounded-xl">
+                        <div class="overflow-x-auto overflow-y-auto max-h-[40vh] custom-scrollbar border border-slate-800 rounded-xl">
                             <table class="w-full text-left text-xs whitespace-nowrap">
                                 <thead class="bg-slate-950 text-slate-400 uppercase text-[10px] tracking-wider sticky top-0 z-20 shadow-[0_1px_0_0_#1e293b]">
                                     <tr><th class="p-3">Mes</th><th class="p-3">Tasa Promedio BCV (% Anual)</th><th class="p-3">Tasa Mensual (%) [Promedio/12]</th><th class="p-3">Tasa Dólar Cierre (Bs/$)</th><th class="p-3 text-right">Acciones</th></tr>
@@ -773,7 +780,9 @@
                             </table>
                         </div>
                     </div>
-                    <div id="panel-superadmin-features" class="border border-indigo-900/60 bg-slate-950 p-5 rounded-xl space-y-4 shadow-xl">
+
+                    <!-- Feature Flags (Ahora va abajo de las tasas, con más espacio) -->
+                    <div id="panel-superadmin-features" class="border border-indigo-900/60 bg-slate-950 p-5 rounded-xl space-y-4 shadow-xl mt-4">
                         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-indigo-950 pb-3">
                             <div>
                                 <h4 class="text-xs font-bold text-indigo-400 uppercase tracking-wider flex items-center">
@@ -785,11 +794,10 @@
                                 <i class="fa-solid fa-floppy-disk"></i><span>Aplicar Cambios a la Empresa</span>
                             </button>
                         </div>
-                        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4" id="contenedor-features-checkboxes"></div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6" id="contenedor-features-checkboxes"></div>
                     </div>
                 </section>
             </div>
-        </main>
 
         <!-- MODAL DESGLOSE NOMINA -->
         <div id="modal-detalle-nomina" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
