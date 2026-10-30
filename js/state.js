@@ -11,10 +11,12 @@ let appState = {
     utilidades: [], antiguedad: [], prestaciones: [], historicoSalarios: [],
     anticipos: [],
     tasasMensuales: [], usuarios: [], usuarioActual: null, mesesEditablesActuales: [],
+    rolesPermisos: [], // <-- NUEVO: matriz de permisos desde Supabase
     parametros: {
         nombre_empresa: 'BOCANADA CAFÉ / GRUPO PRALUM, C.A.',
         rif_empresa: 'J-50088879-1',
-        dias_utilidades: 30
+        dias_utilidades: 30,
+        valor_ut: 43.00 // <-- NUEVO DEFAULT
     },
     calculoVacacionesActual: null,
     calculoUtilidadesActual: [],
@@ -120,18 +122,18 @@ function cargarCacheLocal() {
             const parsed = JSON.parse(tm);
             if (Array.isArray(parsed) && parsed.length > 0) {
                 appState.tasasMensuales = parsed.map(t => {
-                    const prom = Number(t.tasa_promedio !== undefined ? t.tasa_promedio : (t.tasa_anual || 47.56));
+                    const prom = Number(t.tasa_promedio !== undefined ? t.tasa_promedio : (t.tasa_anual || 0));
                     const men = Number(t.tasa_mensual !== undefined ? t.tasa_mensual : (prom / 12));
-                    return { mes: t.mes, tasa_promedio: prom, tasa_anual: prom, tasa_mensual: men, tasa_dolar: Number(t.tasa_dolar || 36.50) };
+                    return { mes: t.mes, tasa_promedio: prom, tasa_anual: prom, tasa_mensual: men, tasa_dolar: Number(t.tasa_dolar || 0) };
                 });
             } else {
-                appState.tasasMensuales = [...TASAS_BCV_COLUMNA_E_DEFAULT];
+                appState.tasasMensuales = [];
             }
         } catch (e) {
-            appState.tasasMensuales = [...TASAS_BCV_COLUMNA_E_DEFAULT];
+            appState.tasasMensuales = [];
         }
     } else {
-        appState.tasasMensuales = [...TASAS_BCV_COLUMNA_E_DEFAULT];
+        appState.tasasMensuales = [];
         localStorage.setItem('nomina_tasas_mensuales', JSON.stringify(appState.tasasMensuales));
     }
 
@@ -157,6 +159,41 @@ function cargarCacheLocal() {
     if (fc) {
         try { appState.features = JSON.parse(fc); } catch (e) {}
     }
+
+    // Cargar matriz de permisos desde Supabase (no bloqueante)
+    cargarRolesPermisos().catch(console.warn);
+}
+
+// ============================================================
+// ROLES Y PERMISOS — Carga y verificación
+// ============================================================
+
+async function cargarRolesPermisos() {
+    try {
+        const { data, error } = await supabaseClient.from('roles_permisos').select('*');
+        if (error) throw error;
+        appState.rolesPermisos = data || [];
+    } catch (e) {
+        console.warn('No se pudo cargar roles_permisos:', e.message);
+        appState.rolesPermisos = [];
+    }
+}
+
+function tienePermiso(modulo, accion) {
+    const rol = appState.usuarioActual?.rol;
+    if (!rol) return false;
+    if (rol === 'master') return true; // Master siempre tiene todo
+    const perm = appState.rolesPermisos.find(p => p.rol === rol && p.modulo === modulo);
+    if (!perm) return false;
+    const map = {
+        ver: 'puede_ver',
+        crear: 'puede_crear',
+        editar: 'puede_editar',
+        borrar: 'puede_borrar',
+        imprimir: 'puede_imprimir',
+        firmar: 'puede_firmar'
+    };
+    return perm[map[accion]] === true;
 }
 
 // ============================================================
@@ -167,7 +204,7 @@ function aplicarParametrosEnVista() {
     if (gId('param-empresa-nombre')) gId('param-empresa-nombre').value = appState.parametros.nombre_empresa;
     if (gId('param-empresa-rif')) gId('param-empresa-rif').value = appState.parametros.rif_empresa;
     if (gId('param-dias-utilidades')) gId('param-dias-utilidades').value = appState.parametros.dias_utilidades;
-    if (gId('param-valor-ut')) gId('param-valor-ut').value = Number(appState.parametros.valor_ut || 9.00).toFixed(2);
+    if (gId('param-valor-ut')) gId('param-valor-ut').value = Number(appState.parametros.valor_ut || 43.00).toFixed(2);
     if (gId('param-riesgo-ivss')) gId('param-riesgo-ivss').value = String(appState.parametros.riesgo_ivss || 9);
     if (gId('param-aplica-lpp')) gId('param-aplica-lpp').checked = appState.parametros.aplica_lpp !== false;
 
@@ -189,7 +226,7 @@ async function guardarParametrosGenerales() {
     appState.parametros.nombre_empresa = gId('param-empresa-nombre').value || 'EMPRESA';
     appState.parametros.rif_empresa = gId('param-empresa-rif').value || 'J-00000000-0';
     appState.parametros.dias_utilidades = parseInt(gId('param-dias-utilidades').value) || 30;
-    appState.parametros.valor_ut = parseFloat(gId('param-valor-ut').value) || 9.00;
+    appState.parametros.valor_ut = parseFloat(gId('param-valor-ut').value) || 43.00;
     appState.parametros.riesgo_ivss = parseFloat(gId('param-riesgo-ivss').value) || 9;
     appState.parametros.aplica_lpp = gId('param-aplica-lpp').checked;
 
