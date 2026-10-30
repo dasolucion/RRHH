@@ -3,6 +3,7 @@
    CRUD completo: Empleados, Departamentos, Cargos.
    Gestión de Documentos Laborales (Constancias/Amonestaciones).
    Gestión de Formulario AR-I (SENIAT) y Enlaces.
+   Gestión de Enlaces del Portal del Empleado (Expediente).
    ============================================================ */
 
 /* ---------------- RENDER DE TABLAS ---------------- */
@@ -55,7 +56,8 @@ function renderEmpleados() {
             <td class="p-3.5 text-emerald-400">$${Number(e.bono_alimentacion).toFixed(2)}</td>
             <td class="p-3.5 text-sky-400" data-feature="empleados.subsidio">$${Number(e.otros_ingresos).toFixed(2)}</td>
             <td class="p-3.5 text-center font-mono text-xs ${e.device_user_id ? 'text-amber-400 font-bold' : 'text-slate-600'}" data-feature="empleados.dahua">${e.device_user_id || '—'}</td>
-            <td class="p-3.5 text-center min-w-[150px] space-x-1.5 whitespace-nowrap">
+            <td class="p-3.5 text-center min-w-[190px] space-x-1.5 whitespace-nowrap">
+                <button onclick="generarEnlacePortal(${e.id})" class="text-indigo-400 hover:text-indigo-300 p-1.5 transition" title="Portal del Empleado (Enviar Enlace)"><i class="fa-solid fa-user-shield"></i></button>
                 <button data-feature="empleados.ari" onclick="abrirModalGestionARI(${e.id})" class="text-amber-400 hover:text-amber-300 p-1.5 transition" title="Gestionar Formulario AR-I (I.S.L.R.)"><i class="fa-solid fa-receipt"></i></button>
                 <button data-feature="documentos.constancias" onclick="abrirModalDocumentoLaboral(${e.id})" class="text-teal-400 hover:text-teal-300 p-1.5 transition" title="Emitir Constancia o Amonestación"><i class="fa-solid fa-file-contract"></i></button>
                 <button onclick="editarEmpleado(${e.id})" class="text-sky-400 hover:text-sky-300 p-1.5 transition" title="Editar"><i class="fa-solid fa-pen"></i></button>
@@ -212,6 +214,53 @@ async function eliminarCargo(id) {
     catch (e) {}
     appState.cargos = appState.cargos.filter(x => String(x.id) !== String(id));
     if (typeof fetchAllData === 'function') fetchAllData();
+}
+
+/* ============================================================
+   PORTAL DEL EMPLEADO (GENERACIÓN DE ENLACE ÚNICO)
+   ============================================================ */
+
+async function generarEnlacePortal(empId) {
+    const emp = appState.empleados.find(e => String(e.id) === String(empId));
+    if (!emp) return;
+    
+    // 1. Buscar si ya tiene un token activo
+    let { data: tokenData } = await supabaseClient
+        .from('tokens_portal_empleado')
+        .select('*')
+        .eq('empleado_id', empId)
+        .eq('activo', true)
+        .maybeSingle();
+    
+    // 2. Si no tiene, crear uno nuevo
+    if (!tokenData) {
+        const { data: nuevo, error } = await supabaseClient
+            .from('tokens_portal_empleado')
+            .insert([{ empleado_id: empId }])
+            .select()
+            .single();
+            
+        if (error) return showToast('Error al crear el enlace: ' + error.message, 'error');
+        tokenData = nuevo;
+    }
+    
+    // 3. Construir la URL base
+    const baseUrl = window.location.origin + window.location.pathname.replace(/index\.html$/, '').replace(/\/$/, '');
+    const enlace = `${baseUrl}/mi_expediente.html?t=${tokenData.token}`;
+    
+    // 4. Copiar al portapapeles
+    await navigator.clipboard.writeText(enlace).catch(() => {});
+    showToast('Enlace del portal copiado al portapapeles.');
+    
+    // 5. Ofrecer envío por WhatsApp
+    if (emp.telefono && confirm('Enlace copiado.\n\n¿Deseas enviarlo por WhatsApp ahora?')) {
+        let tel = emp.telefono.replace(/\D/g, '');
+        if (tel.startsWith('0')) tel = '58' + tel.substring(1);
+        else if (tel.length === 10) tel = '58' + tel;
+        
+        const msj = `Hola ${emp.nombre}, este es tu acceso personal a tu expediente digital (recibos, vacaciones, prestaciones y más):\n\n${enlace}\n\nGuardá este enlace. Es personal e intransferible.`;
+        window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msj)}`, '_blank');
+    }
 }
 
 /* ============================================================
