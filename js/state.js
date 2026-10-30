@@ -11,17 +11,86 @@ let appState = {
     utilidades: [], antiguedad: [], prestaciones: [], historicoSalarios: [],
     anticipos: [],
     tasasMensuales: [], usuarios: [], usuarioActual: null, mesesEditablesActuales: [],
-    rolesPermisos: [], // <-- NUEVO: matriz de permisos desde Supabase
+    rolesPermisos: [], // Matriz de permisos desde Supabase
     parametros: {
         nombre_empresa: 'BOCANADA CAFÉ / GRUPO PRALUM, C.A.',
         rif_empresa: 'J-50088879-1',
         dias_utilidades: 30,
-        valor_ut: 43.00 // <-- NUEVO DEFAULT
+        valor_ut: 43.00
     },
     calculoVacacionesActual: null,
     calculoUtilidadesActual: [],
     calculoAntiguedadActual: null,
     calculoPrestacionesActual: null
+};
+
+// ============================================================
+// MÓDULOS Y MATRIZ DE PERMISOS — Estructura
+// ============================================================
+
+const MODULOS_PERMISOS = [
+    { key: 'dashboard',              label: 'Dashboard',              icon: 'fa-chart-pie' },
+    { key: 'departamentos',          label: 'Departamentos',          icon: 'fa-building' },
+    { key: 'cargos',                 label: 'Cargos',                 icon: 'fa-briefcase' },
+    { key: 'empleados',              label: 'Empleados',              icon: 'fa-users' },
+    { key: 'salarios',               label: 'Histórico Salarial',     icon: 'fa-chart-line' },
+    { key: 'prestamos',              label: 'Préstamos y Anticipos',  icon: 'fa-hand-holding-dollar' },
+    { key: 'nomina',                 label: 'Procesar Nómina',        icon: 'fa-calculator' },
+    { key: 'historico',              label: 'Nóminas Procesadas',     icon: 'fa-clock-rotate-left' },
+    { key: 'vacaciones',             label: 'Calcular Vacaciones',    icon: 'fa-umbrella-beach' },
+    { key: 'vacaciones-historico',   label: 'Vacaciones Procesadas',  icon: 'fa-folder-open' },
+    { key: 'utilidades',             label: 'Calcular Utilidades',    icon: 'fa-gift' },
+    { key: 'utilidades-historico',   label: 'Utilidades Procesadas',  icon: 'fa-box-archive' },
+    { key: 'antiguedad',             label: 'Prestaciones Antigüedad',icon: 'fa-piggy-bank' },
+    { key: 'antiguedad-historico',   label: 'Prestaciones Procesadas',icon: 'fa-coins' },
+    { key: 'liquidaciones',          label: 'Liquidaciones',          icon: 'fa-scale-balanced' },
+    { key: 'liquidaciones-historico',label: 'Liquidaciones Procesadas',icon: 'fa-file-signature' },
+    { key: 'impuestos',              label: 'Deberes Formales / Cargas',icon: 'fa-building-columns' },
+    { key: 'usuarios',               label: 'Usuarios',               icon: 'fa-users-gear' },
+    { key: 'parametros',             label: 'Parámetros',             icon: 'fa-sliders' }
+];
+
+const PERMISOS_COLUMNAS = [
+    { key: 'ver',      label: 'Ver',      icon: 'fa-eye' },
+    { key: 'crear',    label: 'Crear',    icon: 'fa-plus' },
+    { key: 'editar',   label: 'Editar',   icon: 'fa-pen' },
+    { key: 'borrar',   label: 'Borrar',   icon: 'fa-trash' },
+    { key: 'imprimir', label: 'Imprimir', icon: 'fa-print' },
+    { key: 'firmar',   label: 'Firmar',   icon: 'fa-signature' }
+];
+
+// Permisos por defecto por rol (se usan si no hay fila en Supabase)
+const PERMISOS_DEFAULT_POR_ROL = {
+    administrador: {
+        dashboard:               { ver: true,  imprimir: true },
+        departamentos:           { ver: true,  crear: true,  editar: true,  borrar: true },
+        cargos:                  { ver: true,  crear: true,  editar: true,  borrar: true },
+        empleados:               { ver: true,  crear: true,  editar: true,  borrar: true,  imprimir: true, firmar: true },
+        salarios:                { ver: true,  crear: true,  editar: true,  borrar: true,  imprimir: true },
+        prestamos:               { ver: true,  crear: true,  editar: true,                imprimir: true, firmar: true },
+        nomina:                  { ver: true,  crear: true,  editar: true,  borrar: true,  imprimir: true, firmar: true },
+        historico:               { ver: true,                                              imprimir: true },
+        vacaciones:              { ver: true,  crear: true,  editar: true,                imprimir: true, firmar: true },
+        'vacaciones-historico':  { ver: true,                                              imprimir: true },
+        utilidades:              { ver: true,  crear: true,  editar: true,                imprimir: true, firmar: true },
+        'utilidades-historico':  { ver: true,                                              imprimir: true },
+        antiguedad:              { ver: true,                                              imprimir: true, firmar: true },
+        'antiguedad-historico':  { ver: true,                                              imprimir: true },
+        liquidaciones:           { ver: true,  crear: true,                                imprimir: true, firmar: true },
+        'liquidaciones-historico':{ ver: true,                                             imprimir: true },
+        impuestos:               { ver: true,                                              imprimir: true },
+        usuarios:                { ver: true },
+        parametros:              { ver: true,  editar: true }
+    },
+    consulta: {
+        dashboard:               { ver: true },
+        historico:               { ver: true,  imprimir: true },
+        'vacaciones-historico':  { ver: true,  imprimir: true },
+        'utilidades-historico':  { ver: true,  imprimir: true },
+        'antiguedad-historico':  { ver: true,  imprimir: true },
+        'liquidaciones-historico':{ ver: true,  imprimir: true },
+        impuestos:               { ver: true,  imprimir: true }
+    }
 };
 
 // ============================================================
@@ -102,6 +171,43 @@ async function guardarFeatureFlagsConfig() {
 }
 
 // ============================================================
+// ROLES Y PERMISOS — Carga, verificación y fallback
+// ============================================================
+
+async function cargarRolesPermisos() {
+    try {
+        const { data, error } = await supabaseClient.from('roles_permisos').select('*');
+        if (error) throw error;
+        appState.rolesPermisos = data || [];
+    } catch (e) {
+        console.warn('No se pudo cargar roles_permisos:', e.message);
+        // Mantener lo que ya había en memoria (o vacío)
+    }
+}
+
+/**
+ * Permiso efectivo: consulta tabla; si no hay fila, usa defaults por rol.
+ * El rol Master siempre tiene todo (bypass).
+ */
+function permisoEfectivo(rol, modulo, perm) {
+    if (rol === 'master') return true;
+    const row = appState.rolesPermisos.find(p => p.rol === rol && p.modulo === modulo);
+    if (row) return row[`puede_${perm}`] === true;
+    const def = PERMISOS_DEFAULT_POR_ROL[rol]?.[modulo];
+    return def ? def[perm] === true : false;
+}
+
+function tienePermiso(modulo, accion) {
+    const rol = appState.usuarioActual?.rol;
+    if (!rol) return false;
+    return permisoEfectivo(rol, modulo, accion);
+}
+
+function contarModulosVisibles(rol) {
+    return MODULOS_PERMISOS.filter(m => permisoEfectivo(rol, m.key, 'ver')).length;
+}
+
+// ============================================================
 // CACHÉ LOCAL — Carga inicial desde localStorage
 // ============================================================
 
@@ -120,18 +226,12 @@ function cargarCacheLocal() {
     if (tm) {
         try {
             const parsed = JSON.parse(tm);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-                appState.tasasMensuales = parsed.map(t => {
-                    const prom = Number(t.tasa_promedio !== undefined ? t.tasa_promedio : (t.tasa_anual || 0));
-                    const men = Number(t.tasa_mensual !== undefined ? t.tasa_mensual : (prom / 12));
-                    return { mes: t.mes, tasa_promedio: prom, tasa_anual: prom, tasa_mensual: men, tasa_dolar: Number(t.tasa_dolar || 0) };
-                });
-            } else {
-                appState.tasasMensuales = [];
-            }
-        } catch (e) {
-            appState.tasasMensuales = [];
-        }
+            appState.tasasMensuales = Array.isArray(parsed) ? parsed.map(t => {
+                const prom = Number(t.tasa_promedio !== undefined ? t.tasa_promedio : (t.tasa_anual || 0));
+                const men = Number(t.tasa_mensual !== undefined ? t.tasa_mensual : (prom / 12));
+                return { mes: t.mes, tasa_promedio: prom, tasa_anual: prom, tasa_mensual: men, tasa_dolar: Number(t.tasa_dolar || 0) };
+            }) : [];
+        } catch (e) { appState.tasasMensuales = []; }
     } else {
         appState.tasasMensuales = [];
         localStorage.setItem('nomina_tasas_mensuales', JSON.stringify(appState.tasasMensuales));
@@ -160,40 +260,8 @@ function cargarCacheLocal() {
         try { appState.features = JSON.parse(fc); } catch (e) {}
     }
 
-    // Cargar matriz de permisos desde Supabase (no bloqueante)
+    // Carga de permisos (no bloqueante, con fallback a defaults)
     cargarRolesPermisos().catch(console.warn);
-}
-
-// ============================================================
-// ROLES Y PERMISOS — Carga y verificación
-// ============================================================
-
-async function cargarRolesPermisos() {
-    try {
-        const { data, error } = await supabaseClient.from('roles_permisos').select('*');
-        if (error) throw error;
-        appState.rolesPermisos = data || [];
-    } catch (e) {
-        console.warn('No se pudo cargar roles_permisos:', e.message);
-        appState.rolesPermisos = [];
-    }
-}
-
-function tienePermiso(modulo, accion) {
-    const rol = appState.usuarioActual?.rol;
-    if (!rol) return false;
-    if (rol === 'master') return true; // Master siempre tiene todo
-    const perm = appState.rolesPermisos.find(p => p.rol === rol && p.modulo === modulo);
-    if (!perm) return false;
-    const map = {
-        ver: 'puede_ver',
-        crear: 'puede_crear',
-        editar: 'puede_editar',
-        borrar: 'puede_borrar',
-        imprimir: 'puede_imprimir',
-        firmar: 'puede_firmar'
-    };
-    return perm[map[accion]] === true;
 }
 
 // ============================================================
@@ -212,8 +280,6 @@ function aplicarParametrosEnVista() {
     if (gId('brand-sidebar-rif')) gId('brand-sidebar-rif').innerText = appState.parametros.rif_empresa;
     if (gId('badge-uti-dias-base')) gId('badge-uti-dias-base').innerHTML = `<i class="fa-solid fa-scale-balanced mr-1.5"></i> Base: ${appState.parametros.dias_utilidades} Días`;
 
-    // ⚠️ Estas funciones se cargan en Fase 2 (tasas.js / usuarios.js).
-    // Al ejecutarse en DOMContentLoaded, todos los scripts ya están disponibles.
     if (typeof renderTablaTasasMensuales === 'function') renderTablaTasasMensuales();
     if (typeof renderTablaUsuarios === 'function') renderTablaUsuarios();
 }
