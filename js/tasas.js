@@ -10,9 +10,9 @@ async function guardarTasasMensualesPermanente() {
     localStorage.setItem('nomina_tasas_mensuales', JSON.stringify(appState.tasasMensuales));
 
     const payloadSupabase = appState.tasasMensuales.map(t => {
-        const prom = Number(t.tasa_promedio !== undefined ? t.tasa_promedio : (t.tasa_anual || 47.56));
+        const prom = Number(t.tasa_promedio !== undefined ? t.tasa_promedio : (t.tasa_anual || 0));
         const men = Number(t.tasa_mensual !== undefined ? t.tasa_mensual : (prom / 12));
-        return { mes: t.mes, tasa_promedio: prom, tasa_anual: prom, tasa_mensual: men, tasa_dolar: Number(t.tasa_dolar || 36.50) };
+        return { mes: t.mes, tasa_promedio: prom, tasa_anual: prom, tasa_mensual: men, tasa_dolar: Number(t.tasa_dolar || 0) };
     });
 
     let errorDetectado = null;
@@ -39,9 +39,9 @@ async function agregarTasaMensual() {
     if (appState.usuarioActual?.rol !== 'master') return showToast('No tiene permisos para modificar tasas', 'error');
 
     const m = gId('tasa-mes-input').value;
-    const tp = parseFloat(gId('tasa-prom-anual-input').value) || 47.56;
+    const tp = parseFloat(gId('tasa-prom-anual-input').value) || 0;
     const tm = tp / 12;
-    const td = parseFloat(gId('tasa-dolar-mes-input').value) || 36.5;
+    const td = parseFloat(gId('tasa-dolar-mes-input').value) || 0;
     if (!m) return showToast('Seleccione el mes', 'error');
 
     const registro = { mes: m, tasa_promedio: tp, tasa_anual: tp, tasa_mensual: tm, tasa_dolar: td };
@@ -67,16 +67,33 @@ function renderTablaTasasMensuales() {
 
     const isMaster = appState.usuarioActual?.rol === 'master';
     tbody.innerHTML = appState.tasasMensuales.map(t => {
-        const prom = Number(t.tasa_promedio !== undefined ? t.tasa_promedio : (t.tasa_anual || 47.56));
+        const prom = Number(t.tasa_promedio !== undefined ? t.tasa_promedio : (t.tasa_anual || 0));
         const mens = Number(t.tasa_mensual !== undefined ? t.tasa_mensual : (prom / 12));
         return `<tr class="hover:bg-slate-900/50">
             <td class="p-3 font-bold text-white font-mono">${t.mes}</td>
             <td class="p-3 text-cyan-300 font-mono font-semibold">${prom.toFixed(2)}%</td>
             <td class="p-3 text-amber-300 font-mono font-semibold">${mens.toFixed(3)}%</td>
-            <td class="p-3 text-emerald-400 font-mono font-bold">Bs. ${Number(t.tasa_dolar || 36.5).toFixed(2)}</td>
+            <td class="p-3 text-emerald-400 font-mono font-bold">Bs. ${Number(t.tasa_dolar || 0).toFixed(2)}</td>
             <td class="p-3 text-right">${isMaster ? `<button onclick="eliminarTasaMensual('${t.mes}')" class="text-slate-500 hover:text-red-400 p-1"><i class="fa-solid fa-trash"></i></button>` : '-'}</td>
         </tr>`;
     }).join('');
+}
+
+// --- Obtener cierres USD históricos desde la API (incluye Octubre y todos los meses) ---
+async function fetchCierresUSDHistoricos() {
+    try {
+        const resp = await fetch('https://ve.dolarapi.com/v1/historicos/dolares/oficial', { cache: 'no-store' });
+        const cotizaciones = await resp.json();
+        if (!Array.isArray(cotizaciones)) return {};
+        const map = {};
+        cotizaciones.forEach(c => {
+            if (!c.fecha || !c.promedio) return;
+            map[c.fecha.substring(0, 7)] = Number(c.promedio);
+        });
+        return map;
+    } catch (e) {
+        return {};
+    }
 }
 
 function importarExcelBCV(e) {
@@ -95,6 +112,9 @@ function importarExcelBCV(e) {
             let currentYear = null;
             let importados = 0;
 
+            // Obtener cierres USD históricos (incluye Octubre automáticamente)
+            const cierresUSD = await fetchCierresUSDHistoricos();
+
             for (let r = 0; r < jsonRows.length; r++) {
                 const row = jsonRows[r];
                 if (!row || row.length === 0) continue;
@@ -106,6 +126,8 @@ function importarExcelBCV(e) {
                 if (currentYear && mesesMap[mesNombre]) {
                     const mesNum = mesesMap[mesNombre];
                     const mesClave = `${currentYear}-${mesNum}`;
+
+                    // Columna E (índice 4) = Promedio Activa/Pasiva
                     const parseVal = (v) => {
                         if (typeof v === 'number') return v;
                         if (!v) return null;
@@ -114,14 +136,11 @@ function importarExcelBCV(e) {
                         return isNaN(num) ? null : num;
                     };
 
-                    let tasaProm = null;
-                    if (row[3] !== undefined) tasaProm = parseVal(row[3]);
-                    if ((!tasaProm || tasaProm <= 0) && row[4] !== undefined) tasaProm = parseVal(row[4]);
-                    if ((!tasaProm || tasaProm <= 0) && row[5] !== undefined) tasaProm = parseVal(row[5]);
-
+                    const tasaProm = parseVal(row[4]);
                     if (tasaProm !== null && tasaProm > 0) {
                         const existente = appState.tasasMensuales.find(x => x.mes === mesClave);
-                        const tasaDolar = existente?.tasa_dolar || 36.50;
+                        // Usar cierre USD del mes si está disponible; si no, conservar el existente
+                        const tasaDolar = cierresUSD[mesClave] !== undefined ? cierresUSD[mesClave] : (existente?.tasa_dolar || null);
                         const tasaMensual = tasaProm / 12;
                         const item = { mes: mesClave, tasa_promedio: tasaProm, tasa_anual: tasaProm, tasa_mensual: tasaMensual, tasa_dolar: tasaDolar };
 
@@ -174,7 +193,7 @@ async function fetchTasaBCV() {
     }
 
     if (!exito) {
-        const valActual = parseFloat(gId('nom-tasa-bcv')?.value) || 36.50;
+        const valActual = parseFloat(gId('nom-tasa-bcv')?.value) || 0;
         aplicarTasaEnVistas(valActual);
     }
 
@@ -204,14 +223,12 @@ async function sincronizarTasasCierreMesBCV() {
             cierresPorMes[c.fecha.substring(0, 7)] = Number(c.promedio);
         });
 
+        // Solo actualizar meses existentes, no crear filas con promedios falsos
         Object.keys(cierresPorMes).forEach(m => {
             const tasaDolar = cierresPorMes[m];
             const idx = appState.tasasMensuales.findIndex(t => t.mes === m);
             if (idx >= 0) {
                 appState.tasasMensuales[idx].tasa_dolar = tasaDolar;
-            } else {
-                const tp = 47.56;
-                appState.tasasMensuales.push({ mes: m, tasa_promedio: tp, tasa_anual: tp, tasa_mensual: tp / 12, tasa_dolar: tasaDolar });
             }
         });
 
