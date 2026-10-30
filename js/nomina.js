@@ -195,7 +195,7 @@ function calcularNominaFila(id) {
     const alimUSD = ((bam / 30) * (15 - df));
     const subsUSD = ((oim / 30) * (15 - df)) + oa - ((dia / 8) * hd) - od - ad - pr + totalRecargosUSD;
 
-    // --- CÁLCULOS EN BOLÍVARES ---
+    // --- CÁLCULOS EN BOLÍVARES (Para totales y recibos) ---
     const salarioBs = salarioUSD * t;
     const alimBs = alimUSD * t;
     const subsBs = subsUSD * t;
@@ -203,15 +203,14 @@ function calcularNominaFila(id) {
     const elLey = gId(`ley-${id}`);
     if (elLey) elLey.innerText = `Bs. ${(ivss + rpe + faov + (islrUSD * t)).toFixed(2)}`;
     
-    // Inyectar los Bs junto con el equivalente en $
-    if (gId(`salario-bs-${id}`)) gId(`salario-bs-${id}`).innerText = `Bs. ${salarioBs.toFixed(2)} ($${salarioUSD.toFixed(2)})`;
-    if (gId(`alim-bs-${id}`)) gId(`alim-bs-${id}`).innerText = `Bs. ${alimBs.toFixed(2)} ($${alimUSD.toFixed(2)})`;
-    if (gId(`subs-bs-${id}`)) gId(`subs-bs-${id}`).innerText = `Bs. ${subsBs.toFixed(2)} ($${subsUSD.toFixed(2)})`;
+    // ⚡ Inyectar SOLO los dólares en la tabla
+    if (gId(`salario-bs-${id}`)) gId(`salario-bs-${id}`).innerText = `$${salarioUSD.toFixed(2)}`;
+    if (gId(`alim-bs-${id}`)) gId(`alim-bs-${id}`).innerText = `$${alimUSD.toFixed(2)}`;
+    if (gId(`subs-bs-${id}`)) gId(`subs-bs-${id}`).innerText = `$${subsUSD.toFixed(2)}`;
 
-    // Guardamos para los totales
-    nominaTotalesCache[id] = { salarioBs, alimBs, subsBs, salarioUSD, alimUSD, subsUSD };
+    // Guardamos ambos para que los totales superiores no se rompan
+    nominaTotalesCache[id] = { salarioBs, alimBs, subsBs };
 }
-
 function actualizarFilaYTotales(id) {
     calcularNominaFila(id);
     sumarTotalesNomina();
