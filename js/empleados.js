@@ -1,149 +1,30 @@
-/* ============================================================
-   js/expediente.js
-   Gestión de documentos del empleado en Supabase Storage.
-   ============================================================ */
-
-const TIPOS_DOCUMENTO = {
-    'cedula':              { label: 'Cédula de Identidad', icon: 'fa-id-card', color: 'sky' },
-    'rif':                 { label: 'RIF', icon: 'fa-file-invoice', color: 'purple' },
-    'planilla_ingreso':    { label: 'Planilla de Ingreso', icon: 'fa-file-signature', color: 'emerald' },
-    'referencia':          { label: 'Referencia Personal/Laboral', icon: 'fa-address-book', color: 'amber' },
-    'ivss':                { label: 'Constancia IVSS', icon: 'fa-shield-heart', color: 'rose' },
-    'nomina':              { label: 'Nómina', icon: 'fa-receipt', color: 'emerald' },
-    'vacaciones':          { label: 'Vacaciones', icon: 'fa-umbrella-beach', color: 'teal' },
-    'prestaciones':        { label: 'Prestaciones', icon: 'fa-piggy-bank', color: 'cyan' },
-    'utilidades':          { label: 'Utilidades', icon: 'fa-gift', color: 'rose' },
-    'liquidacion':         { label: 'Liquidación', icon: 'fa-scale-balanced', color: 'amber' },
-    'justificativo':       { label: 'Justificativo', icon: 'fa-file-medical', color: 'indigo' },
-    'otro':                { label: 'Otro Documento', icon: 'fa-file', color: 'slate' }
-};
-
-let empleadoExpedienteActual = null;
-
-async function abrirExpediente(empId) {
-    const emp = appState.empleados.find(e => String(e.id) === String(empId));
-    if (!emp) return;
-    empleadoExpedienteActual = emp;
-    
-    gId('exp-nombre-empleado').innerText = emp.nombre;
-    gId('exp-upload-input').value = '';
-    gId('exp-nombre-doc').value = '';
-    gId('exp-tipo-doc').value = 'cedula';
-    gId('exp-visible-empleado').checked = false;
-    
-    await cargarArchivosExpediente(empId);
-    openModal('modal-expediente');
-}
-
-async function cargarArchivosExpediente(empId) {
-    const tbody = gId('tabla-expediente-body');
-    tbody.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-slate-500">Cargando documentos...</td></tr>';
-    
-    const { data, error } = await supabaseClient
-        .from('expediente_documentos')
-        .select('*')
-        .eq('empleado_id', empId)
-        .order('created_at', { ascending: false });
-
-    if (error) {
-        tbody.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-rose-400">Error: ' + error.message + '</td></tr>';
-        return;
-    }
-    if (!data || data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-slate-500">No hay documentos en el expediente.</td></tr>';
-        return;
-    }
-
-    tbody.innerHTML = data.map(doc => {
-        const tipo = TIPOS_DOCUMENTO[doc.tipo_documento] || TIPOS_DOCUMENTO['otro'];
-        const fecha = new Date(doc.created_at).toLocaleDateString('es-VE');
-        const badge = doc.visible_empleado
-            ? '<span class="text-[9px] bg-emerald-950 text-emerald-300 px-1.5 py-0.5 rounded">Visible al empleado</span>'
-            : '<span class="text-[9px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded">Solo sistema</span>';
-        
-        return `<tr class="border-b border-slate-800 hover:bg-slate-800/40">
-            <td class="p-2">
-                <div class="flex items-center gap-2">
-                    <i class="fa-solid ${tipo.icon} text-${tipo.color}-400"></i>
-                    <div>
-                        <!-- TÍTULO: El tipo de documento (ej: Nómina, Cédula) -->
-                        <div class="text-xs font-bold text-white">${tipo.label}</div>
-                        <!-- SUBTÍTULO: El nombre descriptivo (ej: Nomina 15/10/2026) -->
-                        <div class="text-[9px] text-slate-400">${doc.nombre_descriptivo}</div>
-                    </div>
-                </div>
+function renderEmpleados() {
+    const tbody = gId('tabla-empleados-body');
+    if (!tbody) return;
+    tbody.innerHTML = appState.empleados.map(e => `
+        <tr class="hover:bg-slate-900/50 ${!e.activo ? 'opacity-50' : ''}">
+            <td class="p-3.5 text-center">
+                <input type="checkbox" ${e.activo ? 'checked' : ''} onchange="toggleEstadoEmpleado(${e.id}, ${e.activo})" class="w-4 h-4 text-sky-500 rounded bg-slate-950 border-slate-800 cursor-pointer">
             </td>
-            <td class="p-2 text-[10px] text-slate-400 font-mono">${fecha}</td>
-            <td class="p-2 text-center">${badge}</td>
-            <td class="p-2 text-right space-x-1">
-                <a href="${doc.url_archivo}" target="_blank" class="text-sky-400 hover:text-sky-300 p-1" title="Ver"><i class="fa-solid fa-eye"></i></a>
-                <button onclick="toggleVisibilidadDocumento('${doc.id}', ${!doc.visible_empleado})" class="text-${doc.visible_empleado ? 'amber' : 'emerald'}-400 hover:opacity-70 p-1" title="Cambiar visibilidad"><i class="fa-solid fa-eye${doc.visible_empleado ? '-slash' : ''}"></i></button>
-                <button onclick="eliminarDocumentoExpediente('${doc.id}', '${doc.url_archivo}')" class="text-rose-400 hover:text-rose-300 p-1" title="Eliminar"><i class="fa-solid fa-trash"></i></button>
+            <td class="p-3.5 font-mono text-slate-400 text-[11px]">${e.fecha_ingreso || ''}</td>
+            <td class="p-3.5 font-semibold text-slate-200">${e.cedula}</td>
+            <td class="p-3.5 font-bold text-white">${e.nombre}</td>
+            <td class="p-3.5 text-slate-400">${e.telefono || '-'}</td>
+            <td class="p-3.5 text-amber-400">${e.departamentos?.nombre || '-'}</td>
+            <td class="p-3.5 text-purple-400">${e.cargos?.nombre || '-'}</td>
+            <td class="p-3.5 text-slate-300 font-medium">$${Number(e.sueldo).toFixed(2)}</td>
+            <td class="p-3.5 text-emerald-400">$${Number(e.bono_alimentacion).toFixed(2)}</td>
+            <td class="p-3.5 text-sky-400" data-feature="empleados.subsidio">$${Number(e.otros_ingresos).toFixed(2)}</td>
+            <td class="p-3.5 text-center font-mono text-xs ${e.device_user_id ? 'text-amber-400 font-bold' : 'text-slate-600'}" data-feature="empleados.dahua">${e.device_user_id || '—'}</td>
+            <td class="p-3.5 text-center min-w-[220px] space-x-1 whitespace-nowrap">
+                <button onclick="abrirExpediente(${e.id})" class="text-emerald-400 hover:text-emerald-300 p-1.5 transition" title="Ver Expediente de Documentos"><i class="fa-solid fa-folder-open"></i></button>
+                <button onclick="generarEnlacePortal(${e.id})" class="text-indigo-400 hover:text-indigo-300 p-1.5 transition" title="Portal del Empleado (Enviar Enlace)"><i class="fa-solid fa-user-shield"></i></button>
+                <button data-feature="empleados.ari" onclick="abrirModalGestionARI(${e.id})" class="text-amber-400 hover:text-amber-300 p-1.5 transition" title="Gestionar Formulario AR-I (I.S.L.R.)"><i class="fa-solid fa-receipt"></i></button>
+                <button data-feature="documentos.constancias" onclick="abrirModalDocumentoLaboral(${e.id})" class="text-teal-400 hover:text-teal-300 p-1.5 transition" title="Emitir Constancia o Amonestación"><i class="fa-solid fa-file-contract"></i></button>
+                <button onclick="editarEmpleado(${e.id})" class="text-sky-400 hover:text-sky-300 p-1.5 transition" title="Editar"><i class="fa-solid fa-pen"></i></button>
+                <button onclick="eliminarEmpleado(${e.id})" class="text-slate-500 hover:text-red-400 p-1.5 transition" title="Eliminar"><i class="fa-solid fa-trash"></i></button>
             </td>
-        </tr>`;
-    }).join('');
-}
-
-async function subirDocumentoExpediente() {
-    if (!empleadoExpedienteActual) return;
-    
-    const file = gId('exp-upload-input').files[0];
-    const tipo = gId('exp-tipo-doc').value;
-    const nombreDescriptivo = gId('exp-nombre-doc').value.trim();
-    const visible = gId('exp-visible-empleado').checked;
-    
-    if (!file) return showToast('Seleccioná un archivo', 'error');
-    if (!nombreDescriptivo) return showToast('Asignale un nombre al documento', 'error');
-    
-    showToast('Calculando hash y subiendo...');
-    
-    const arrayBuffer = await file.arrayBuffer();
-    const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-    
-    const sanitized = nombreDescriptivo.replace(/[^a-zA-Z0-9]/g, '_');
-    const filePath = `${empleadoExpedienteActual.id}/${Date.now()}_${sanitized}.${file.name.split('.').pop()}`;
-    
-    const { error: uploadError } = await supabaseClient.storage
-        .from('expediente')
-        .upload(filePath, file);
-    
-    if (uploadError) return showToast('Error al subir: ' + uploadError.message, 'error');
-    
-    const { data: urlData } = supabaseClient.storage.from('expediente').getPublicUrl(filePath);
-    
-    const { error: dbError } = await supabaseClient.from('expediente_documentos').insert([{
-        empleado_id: empleadoExpedienteActual.id,
-        tipo_documento: tipo,
-        nombre_descriptivo: nombreDescriptivo,
-        url_archivo: urlData.publicUrl,
-        hash_sha256: hashHex,
-        visible_empleado: visible,
-        subido_por: appState.usuarioActual?.rol || 'sistema'
-    }]);
-    
-    if (dbError) return showToast('Error en BD: ' + dbError.message, 'error');
-    
-    showToast('Documento cargado correctamente');
-    gId('exp-upload-input').value = '';
-    gId('exp-nombre-doc').value = '';
-    await cargarArchivosExpediente(empleadoExpedienteActual.id);
-}
-
-async function toggleVisibilidadDocumento(docId, nuevoEstado) {
-    await supabaseClient.from('expediente_documentos').update({ visible_empleado: nuevoEstado }).eq('id', docId);
-    showToast(nuevoEstado ? 'Visible al empleado' : 'Oculto al empleado');
-    await cargarArchivosExpediente(empleadoExpedienteActual.id);
-}
-
-async function eliminarDocumentoExpediente(docId, urlArchivo) {
-    if (!confirm('¿Eliminar este documento del expediente?')) return;
-    
-    const path = urlArchivo.split('/expediente/')[1];
-    if (path) await supabaseClient.storage.from('expediente').remove([decodeURIComponent(path)]);
-    
-    await supabaseClient.from('expediente_documentos').delete().eq('id', docId);
-    showToast('Documento eliminado');
-    await cargarArchivosExpediente(empleadoExpedienteActual.id);
+        </tr>
+    `).join('');
+    if (typeof aplicarFeatureFlagsDOM === 'function') aplicarFeatureFlagsDOM();
 }
