@@ -249,6 +249,56 @@ async function guardarMatrizPermisos() {
         return showToast('El rol Master no puede modificarse (siempre tiene acceso total)', 'error');
     }
 
+    // 1. Construir filas a partir de los checkboxes renderizados en la tabla
     const rows = [];
     MODULOS_PERMISOS.forEach(m => {
-        const row
+        const row = { rol, modulo: m.key };
+        PERMISOS_COLUMNAS.forEach(p => {
+            const cb = document.querySelector(
+                `input[data-matriz-rol="${rol}"][data-matriz-modulo="${m.key}"][data-matriz-perm="${p.key}"]`
+            );
+            row[`puede_${p.key}`] = cb ? cb.checked === true : false;
+        });
+        rows.push(row);
+    });
+
+    if (rows.length === 0) {
+        return showToast('No hay módulos para guardar', 'error');
+    }
+
+    // 2. Upsert en Supabase (onConflict por rol+modulo)
+    const resultado = await safeQuery(
+        supabaseClient.from('roles_permisos').upsert(rows, { onConflict: 'rol,modulo' }).select(),
+        'upsert_roles_permisos'
+    );
+
+    // 3. Actualizar appState en memoria (aunque Supabase falle, la UI queda coherente)
+    if (!Array.isArray(appState.rolesPermisos)) appState.rolesPermisos = [];
+    appState.rolesPermisos = appState.rolesPermisos.filter(p => p.rol !== rol);
+    rows.forEach(r => appState.rolesPermisos.push({ ...r }));
+
+    // 4. Recargar permisos desde BD si fue posible (para tener IDs/created_at reales)
+    if (resultado && Array.isArray(resultado) && resultado.length > 0) {
+        try {
+            if (typeof cargarRolesPermisos === 'function') {
+                await cargarRolesPermisos();
+            }
+        } catch (e) {
+            console.warn('[Permisos] No se pudo recargar desde BD, usando memoria local:', e);
+        }
+    }
+
+    // 5. Re-aplicar permisos al usuario actual (por si su propio rol cambió)
+    if (typeof aplicarPermisosSegunRol === 'function') {
+        aplicarPermisosSegunRol();
+    }
+
+    // 6. Refrescar tabla de usuarios (columna "Módulos Asignados")
+    renderTablaUsuarios();
+
+    if (resultado && Array.isArray(resultado) && resultado.length > 0) {
+        showToast(`Matriz de permisos actualizada para "${rol}" en Supabase`);
+    } else {
+        showToast(`Matriz guardada LOCAL para "${rol}" (Supabase no respondió, revise conexión)`, 'error');
+    }
+}
