@@ -136,9 +136,10 @@ function renderTablaNominaEditable() {
             <td class="p-3" style="min-width: 95px;"><input type="number" step="0.01" id="pr-${e.id}" value="${prVal}" oninput="actualizarFilaYTotales(${e.id}); autoguardarBorradorNomina();" style="width: 75px;" class="bg-slate-950 border border-slate-800 rounded p-1 text-xs text-white outline-none"></td>
             <td class="p-3 text-center" style="min-width: 70px;"><input type="number" step="0.01" id="islr-${e.id}" value="${islrVal}" min="0" max="100" oninput="actualizarFilaYTotales(${e.id}); autoguardarBorradorNomina();" style="width: 55px;" class="bg-slate-950 border border-amber-900/50 rounded text-center p-1 text-xs text-amber-300 outline-none"></td>
             <td class="p-3 text-amber-400 font-medium" style="min-width: 95px;" id="ley-${e.id}">Bs. 0.00</td>
-            <td class="p-3 font-bold text-emerald-400" style="min-width: 100px;" id="salario-bs-${e.id}">Bs. 0.00</td>
-            <td class="p-3 font-bold text-emerald-400" style="min-width: 100px;" id="alim-bs-${e.id}">Bs. 0.00</td>
-            <td class="p-3 font-bold text-emerald-400" style="min-width: 100px;" id="subs-bs-${e.id}">Bs. 0.00</td>
+                <td class="p-3 text-amber-400 font-medium" style="min-width: 100px;" id="ley-${e.id}">Bs. 0.00</td>
+            <td class="p-3 font-bold text-emerald-400" style="min-width: 140px;" id="salario-bs-${e.id}">Bs. 0.00</td>
+            <td class="p-3 font-bold text-emerald-400" style="min-width: 140px;" id="alim-bs-${e.id}">Bs. 0.00</td>
+            <td class="p-3 font-bold text-emerald-400" style="min-width: 140px;" id="subs-bs-${e.id}">Bs. 0.00</td>
         </tr>`;
     }).join('');
 
@@ -154,7 +155,9 @@ function calcularNominaFila(id) {
     const lun = parseInt(gId('nom-lunes').value) || 2;
 
     const sb = Number(e.sueldo) || 0;
-    const si = sb + (Number(e.bono_alimentacion) || 0) + (Number(e.otros_ingresos) || 0);
+    const bam = Number(e.bono_alimentacion) || 0;
+    const oim = Number(e.otros_ingresos) || 0;
+    const si = sb + bam + oim;
     const dia = si / 30;
     const base = dia * 15;
 
@@ -188,21 +191,26 @@ function calcularNominaFila(id) {
     const baseSalarialImponibleUSD = Math.max(0, (salarioBaseDia * (15 - df)) + totalRecargosUSD);
     const islrUSD = baseSalarialImponibleUSD * (islrPct / 100);
 
-    // Nuevos cálculos para el desglose
-    const bam = Number(e.bono_alimentacion) || 0;
-    const oim = Number(e.otros_ingresos) || 0;
-    const salarioBs = ((sb / 30) * (15 - df)) * t - (ivss + rpe + faov + (islrUSD * t));
-    const alimBs = ((bam / 30) * (15 - df)) * t;
-    const subsBs = ((oim / 30) * (15 - df)) * t + (oa * t) - (((dia / 8) * hd) * t) - (od * t) - (ad * t) - (pr * t) + totalRecargosUSD * t;
+    // --- CÁLCULOS EN DIVISAS ---
+    const salarioUSD = ((sb / 30) * (15 - df)) - leyU - islrUSD;
+    const alimUSD = ((bam / 30) * (15 - df));
+    const subsUSD = ((oim / 30) * (15 - df)) + oa - ((dia / 8) * hd) - od - ad - pr + totalRecargosUSD;
+
+    // --- CÁLCULOS EN BOLÍVARES ---
+    const salarioBs = salarioUSD * t;
+    const alimBs = alimUSD * t;
+    const subsBs = subsUSD * t;
 
     const elLey = gId(`ley-${id}`);
     if (elLey) elLey.innerText = `Bs. ${(ivss + rpe + faov + (islrUSD * t)).toFixed(2)}`;
-    if (gId(`salario-bs-${id}`)) gId(`salario-bs-${id}`).innerText = `Bs. ${salarioBs.toFixed(2)}`;
-    if (gId(`alim-bs-${id}`)) gId(`alim-bs-${id}`).innerText = `Bs. ${alimBs.toFixed(2)}`;
-    if (gId(`subs-bs-${id}`)) gId(`subs-bs-${id}`).innerText = `Bs. ${subsBs.toFixed(2)}`;
+    
+    // Inyectar los Bs junto con el equivalente en $
+    if (gId(`salario-bs-${id}`)) gId(`salario-bs-${id}`).innerText = `Bs. ${salarioBs.toFixed(2)} ($${salarioUSD.toFixed(2)})`;
+    if (gId(`alim-bs-${id}`)) gId(`alim-bs-${id}`).innerText = `Bs. ${alimBs.toFixed(2)} ($${alimUSD.toFixed(2)})`;
+    if (gId(`subs-bs-${id}`)) gId(`subs-bs-${id}`).innerText = `Bs. ${subsBs.toFixed(2)} ($${subsUSD.toFixed(2)})`;
 
     // Guardamos para los totales
-    nominaTotalesCache[id] = { salarioBs, alimBs, subsBs };
+    nominaTotalesCache[id] = { salarioBs, alimBs, subsBs, salarioUSD, alimUSD, subsUSD };
 }
 
 function actualizarFilaYTotales(id) {
