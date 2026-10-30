@@ -68,10 +68,17 @@ function cerrarSesion() {
     showToast('Sesión cerrada correctamente');
 }
 
-function iniciarSistemaAutenticado() {
+async function iniciarSistemaAutenticado() {
     gId('login-screen').classList.add('hidden');
     gId('app-wrapper').classList.remove('hidden');
     gId('app-wrapper').classList.add('flex');
+
+    // Cargar permisos desde Supabase ANTES de aplicar
+    if (typeof cargarRolesPermisos === 'function') {
+        try { await cargarRolesPermisos(); }
+        catch (e) { console.warn('No se pudo cargar permisos, usando defaults:', e); }
+    }
+
     aplicarPermisosSegunRol();
     if (typeof fetchTasaBCV === 'function') fetchTasaBCV();
     if (typeof fetchAllData === 'function') fetchAllData();
@@ -83,8 +90,8 @@ function aplicarPermisosSegunRol() {
 
     const isMaster = usr.rol === 'master';
     const isAdmin = usr.rol === 'administrador';
-    const tienePoderOperativo = isMaster || isAdmin;
 
+    // --- Badge de usuario ---
     if (gId('user-badge-name')) gId('user-badge-name').innerText = usr.nombre || usr.usuario;
     if (gId('user-badge-role')) {
         if (isMaster) {
@@ -99,37 +106,49 @@ function aplicarPermisosSegunRol() {
         }
     }
 
-    const modulosOperativos = [
-        'dashboard', 'departamentos', 'cargos', 'empleados', 'salarios',
-        'prestamos', 'nomina', 'vacaciones', 'utilidades', 'antiguedad',
-        'liquidaciones', 'impuestos', 'usuarios', 'parametros'
-    ];
-    const modulosConsulta = [
-        'historico', 'vacaciones-historico', 'utilidades-historico',
-        'antiguedad-historico', 'liquidaciones-historico', 'impuestos'
-    ];
-    const separadores = [
-        'sep-personal', 'sep-salarios', 'sep-nomina', 'sep-vacaciones',
-        'sep-utilidades', 'sep-antiguedad', 'sep-liquidaciones',
-        'sep-impuestos', 'sep-usuarios'
-    ];
+    // --- Visibilidad de módulos del sidebar según permisos ---
+    // Usamos style.display (no la clase 'hidden') para no chocar con Feature Flags
+    let primerModuloVisible = null;
 
-    if (tienePoderOperativo) {
-        modulosOperativos.forEach(m => { const btn = gId(`nav-${m}`); if (btn) btn.classList.remove('hidden'); });
-        modulosConsulta.forEach(m => { const btn = gId(`nav-${m}`); if (btn) btn.classList.remove('hidden'); });
-        separadores.forEach(s => { const el = gId(s); if (el) el.classList.remove('hidden'); });
-        if (typeof switchTab === 'function') switchTab('dashboard');
-    } else {
-        modulosOperativos.forEach(m => { const btn = gId(`nav-${m}`); if (btn) btn.classList.add('hidden'); });
-        modulosConsulta.forEach(m => { const btn = gId(`nav-${m}`); if (btn) btn.classList.remove('hidden'); });
-        separadores.forEach(s => { const el = gId(s); if (el) el.classList.add('hidden'); });
-        if (typeof switchTab === 'function') switchTab('historico');
-    }
+    MODULOS_PERMISOS.forEach(m => {
+        const btn = gId(`nav-${m.key}`);
+        if (!btn) return;
+        const puedeVer = tienePermiso(m.key, 'ver');
+        if (puedeVer) {
+            btn.style.display = '';
+            if (!primerModuloVisible) primerModuloVisible = m.key;
+        } else {
+            btn.style.display = 'none';
+        }
+    });
 
-    // El panel de licencias/flags SOLO es visible para MASTER
+    // --- Separadores del sidebar: solo si algún hijo es visible ---
+    const SECCIONES_SEP = {
+        'sep-personal':     ['departamentos', 'cargos', 'empleados'],
+        'sep-salarios':     ['salarios', 'prestamos'],
+        'sep-nomina':       ['nomina', 'historico'],
+        'sep-vacaciones':   ['vacaciones', 'vacaciones-historico'],
+        'sep-utilidades':   ['utilidades', 'utilidades-historico'],
+        'sep-antiguedad':   ['antiguedad', 'antiguedad-historico'],
+        'sep-liquidaciones':['liquidaciones', 'liquidaciones-historico'],
+        'sep-impuestos':    ['impuestos'],
+        'sep-usuarios':     ['usuarios', 'parametros']
+    };
+    Object.entries(SECCIONES_SEP).forEach(([sepId, hijos]) => {
+        const sep = gId(sepId);
+        if (!sep) return;
+        const algunoVisible = hijos.some(m => tienePermiso(m, 'ver'));
+        sep.style.display = algunoVisible ? '' : 'none';
+    });
+
+    // --- Panel de licencias/flags SOLO para MASTER ---
     const panelFlags = gId('panel-superadmin-features');
-    if (panelFlags) {
-        if (isMaster) panelFlags.classList.remove('hidden');
-        else panelFlags.classList.add('hidden');
+    if (panelFlags) panelFlags.style.display = isMaster ? '' : 'none';
+
+    // --- Redirigir al primer módulo visible ---
+    if (primerModuloVisible && typeof switchTab === 'function') {
+        switchTab(primerModuloVisible);
+    } else if (!primerModuloVisible) {
+        showToast('Su usuario no tiene acceso a ningún módulo. Contacte al administrador.', 'error');
     }
 }
