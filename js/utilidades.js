@@ -3,13 +3,22 @@
    Cálculo de utilidades, pagos parciales por %, historial y recibos.
    ============================================================ */
 
-function generarUtilidades() {
+async function generarUtilidades() {
+    // 2B.1 — Precargar tasa BCV desde API si el campo está vacío
+    await precargarTasaUtilidades();
+
     const p = gId('uti-periodo').value;
     const f = gId('uti-fecha-pago').value;
-    const t = parseFloat(gId('uti-tasa-bcv').value) || parseFloat(gId('nom-tasa-bcv').value) || 36.5;
+
+    // 2B.2 — Sin fallbacks hardcodeados: solo tasa del input o de nómina
+    const tasaInput  = parseFloat(gId('uti-tasa-bcv').value);
+    const tasaNomina = parseFloat(gId('nom-tasa-bcv').value);
+    const t = tasaInput > 0 ? tasaInput : (tasaNomina > 0 ? tasaNomina : 0);
+
     const porcentajeSolicitado = parseFloat(gId('uti-porcentaje').value);
 
     if (!p || !f) return showToast('Indique el período y la fecha de pago', 'error');
+    if (!t || t <= 0) return showToast('Debe indicar la Tasa BCV antes de calcular (use el campo o sincronice)', 'error');
     if (isNaN(porcentajeSolicitado) || porcentajeSolicitado <= 0) return showToast('Indique un porcentaje válido mayor a 0', 'error');
     if (porcentajeSolicitado > 100) return showToast('El porcentaje no puede ser mayor a 100', 'error');
 
@@ -89,6 +98,7 @@ function generarUtilidades() {
 
         huboAlgoQuePagar = true;
 
+        // 2B.3 — Congelar tasa al construir el objeto (x.tasa_bcv se usará tal cual al guardar)
         appState.calculoUtilidadesActual.push({
             empleado: e, periodo: p, fecha_pago: f, dias_trabajados: dt, dias_pagados: dp,
             salario_base: sb, subsidio_mensual: subMensual, subsidio_usd: subUSDPago,
@@ -135,7 +145,6 @@ function generarUtilidades() {
     }
     verificarEstadoPeriodo();
 }
-
 function verificarEstadoPeriodo() {
     const p = gId('uti-periodo').value;
     const badge = gId('uti-estado-pago-periodo');
@@ -357,10 +366,23 @@ function enviarWhatsAppUtilidadActual(id) {
     const u = appState.calculoUtilidadesActual.find(x => String(x.empleado.id) === String(id));
     if (!u) return;
     let t = u.empleado.telefono ? u.empleado.telefono.replace(/\D/g, '') : '';
-    if (!t) return showToast('Sin teléfono', 'error');
+    if (!t) return showToast('El empleado no tiene teléfono registrado', 'error');
     if (t.startsWith('0')) t = '58' + t.substring(1); else if (t.length === 10) t = '58' + t;
 
-    const msg = `RECIBO DE PAGO DE UTILIDADES (PERÍODO ${u.periodo})\n${appState.parametros.nombre_empresa}\n\nTrabajador: ${u.empleado.nombre}\nFecha de Pago: ${u.fecha_pago}\n\nGRAN TOTAL UTILIDADES A COBRAR:\nBs. ${fNum(Number(u.gran_total_bs))} ($${Number(u.gran_total_usd).toFixed(2)})\n\nPor favor, confirma la recepción de tu pago.`;
+    const empresa = appState.parametros?.nombre_empresa || 'NóminaApp';
+    const pct = Number(u.porcentaje_pagado) || 100;
+    const pctTxt = pct < 100 ? ` — Pago Parcial: ${pct.toFixed(2)}%` : '';
+
+    const msg =
+        `*RECIBO DE PAGO DE UTILIDADES (PERÍODO ${u.periodo})${pctTxt}*\n` +
+        `${empresa}\n\n` +
+        `Trabajador: ${u.empleado.nombre}\n` +
+        `Fecha de Pago: ${u.fecha_pago}\n` +
+        `Tasa BCV aplicada: ${Number(u.tasa_bcv).toFixed(2)} Bs/$\n\n` +
+        `*GRAN TOTAL A COBRAR:*\n` +
+        `Bs. ${fNum(Number(u.gran_total_bs))} ($${Number(u.gran_total_usd).toFixed(2)})\n\n` +
+        `Por favor, confirma la recepción de tu pago.`;
+
     window.open(`https://wa.me/${t}?text=${encodeURIComponent(msg)}`, '_blank');
 }
 
@@ -434,3 +456,48 @@ function abrirModalFirmaUtilidades(periodo, fecha) {
     }));
     abrirModalFirmaGenerico('utilidades', docs);
 }
+/* ============================================================
+   2B — Precarga automática de la tasa BCV en el módulo de Utilidades
+   ============================================================ */
+
+async function precargarTasaUtilidades() {
+    const input = gId('uti-tasa-bcv');
+    if (!input) return;
+    // No sobreescribir un override manual
+    if (input.value && parseFloat(input.value) > 0) return;
+
+    try {
+        if (typeof fetchTasaBCV === 'function') {
+            await fetchTasaBCV();
+        }
+        // fetchTasaBCV() normalmente llena nom-tasa-bcv; copiamos si uti sigue vacío
+        const nomTasa = gId('nom-tasa-bcv');
+        if ((!input.value || parseFloat(input.value) <= 0) && nomTasa && parseFloat(nomTasa.value) > 0) {
+            input.value = nomTasa.value;
+        }
+    } catch (e) {
+        console.warn('[Utilidades] No se pudo precargar tasa BCV:', e);
+    }
+}
+
+/* Listeners de cambio en período / fecha de pago (idempotentes) */
+(function attachUtilidadesListeners() {
+    const tryAttach = () => {
+        const up = gId('uti-periodo');
+        const uf = gId('uti-fecha-pago');
+        if (up && !up._tasaListener) {
+            up.addEventListener('change', () => { precargarTasaUtilidades(); });
+            up._tasaListener = true;
+        }
+        if (uf && !uf._tasaListener) {
+            uf.addEventListener('change', () => { precargarTasaUtilidades(); });
+            uf._tasaListener = true;
+        }
+    };
+    if (typeof document === 'undefined') return;
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', tryAttach);
+    } else {
+        tryAttach();
+    }
+})();
