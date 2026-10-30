@@ -309,7 +309,14 @@ async function procesarNominaGlobal() {
     }
 
     if (empUpdates.length > 0) await Promise.all(empUpdates);
-    await supabaseClient.from('nominas').insert(regs);
+      // ⚡ AQUÍ ESTÁ LA CORRECCIÓN: Validar si Supabase devuelve error
+       const { error: insertError } = await supabaseClient.from('nominas').insert(regs);
+    
+    if (insertError) {
+        console.error('Error al insertar nómina:', insertError);
+        return showToast('Error al guardar en BD: ' + insertError.message, 'error');
+        // Al hacer "return", NO se borra la pre-nómina y puedes intentar corregir.
+    }
     await safeQuery(supabaseClient.from('prenomina_borrador').delete().eq('id', 1), 'clear_prenomina');
     localStorage.removeItem('nomina_borrador_global');
 
