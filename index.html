@@ -797,9 +797,24 @@
                 <div id="area-impresion" class="p-4 overflow-y-auto custom-scrollbar">
                     <div class="hidden print:block mb-4 border-b pb-2"><h2 class="text-lg font-bold">Reporte General de Nómina</h2><p class="text-xs">Fecha: <span id="print-fecha-pago"></span></p></div>
                     <table class="w-full text-left text-xs whitespace-nowrap">
-                        <thead class="bg-slate-950 text-slate-400 uppercase text-[9px] sticky top-0 z-20 shadow-[0_1px_0_0_#1e293b]">
-                            <tr><th class="p-2.5">Empleado</th><th class="p-2.5">Cargo</th><th class="p-2.5">S. Quincena</th><th class="p-2.5">Asignac.</th><th class="p-2.5">IVSS 4%</th><th class="p-2.5">RPE 0.5%</th><th class="p-2.5">FAOV 1%</th><th class="p-2.5">Otr. Desc</th><th class="p-2.5">Salario (Bs)</th><th class="p-2.5">Alimentación (Bs)</th><th class="p-2.5">Subsidio (Bs)</th><th class="p-2.5">Neto ($)</th><th class="p-2.5">Neto (Bs)</th></tr>
-                        </thead>
+<thead class="bg-slate-950 text-slate-400 uppercase text-[9px] sticky top-0 z-20 shadow-[0_1px_0_0_#1e293b]">
+    <tr>
+        <th class="p-2.5">Empleado</th>
+        <th class="p-2.5">Cargo</th>
+        <th class="p-2.5 text-center">D. Trab.</th>
+        <th class="p-2.5">S. Quincena</th>
+        <th class="p-2.5">Asignac.</th>
+        <th class="p-2.5">IVSS 4%</th>
+        <th class="p-2.5">RPE 0.5%</th>
+        <th class="p-2.5">FAOV 1%</th>
+        <th class="p-2.5 text-center">Desc.</th>
+        <th class="p-2.5">Salario (Bs)</th>
+        <th class="p-2.5">Alimentación (Bs)</th>
+        <th class="p-2.5">Subsidio (Bs)</th>
+        <th class="p-2.5">Neto ($)</th>
+        <th class="p-2.5">Neto (Bs)</th>
+    </tr>
+</thead>
                         <tbody id="tabla-detalle-body" class="divide-y divide-slate-800/50"></tbody>
                         <tfoot id="tabla-detalle-foot" class="bg-slate-950 font-bold border-t border-slate-700"></tfoot>
                     </table>
