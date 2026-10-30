@@ -480,11 +480,15 @@ function verDetalleNomina(f) {
     gId('print-fecha-pago').innerText = f;
 
     let tb = 0, ta = 0, ti = 0, tr = 0, tf = 0, to = 0, tu = 0, tbs = 0;
-    let tSal = 0, tAlim = 0, tSub = 0, tRec = 0, tIslr = 0;
+    let tSal = 0, tAlim = 0, tSub = 0;
 
     gId('tabla-detalle-body').innerHTML = regs.map(r => {
         const sq = Number(r.salario_base) / 2;
         const as = (Number(r.bono_alimentacion) / 2) + (Number(r.otros_ingresos) / 2) + Number(r.otras_asignaciones);
+        
+        // ⚡ NUEVO: Calcular días trabajados (Base 15 quincenal - faltantes)
+        const dTrab = 15 - (Number(r.dias_faltantes) || 0);
+
         let ivss = Number(r.ivss_usd);
         if (ivss === 0 && Number(r.salario_base) > 0) ivss = ((Math.min(Number(r.salario_base) * r.tasa_bcv, 5 * r.salario_minimo_bs) * 12 / 52) * 0.04 * 2) / r.tasa_bcv;
         let rpe = Number(r.rpe_usd);
@@ -519,18 +523,17 @@ function verDetalleNomina(f) {
 
         tb += sq; ta += as + recargosUsd; ti += ivss; tr += rpe; tf += faov; to += od + islrUsd; tu += nu; tbs += nb;
         tSal += salarioColBs; tAlim += alimColBs; tSub += subColBs;
-        tRec += recargosUsd * t;
-        tIslr += islrUsd * t;
 
         return `<tr class="hover:bg-slate-800/40">
             <td class="p-2.5 font-semibold text-white">${r.empleado}</td>
             <td class="p-2.5 text-slate-400">${r.cargo || '-'}</td>
+            <td class="p-2.5 text-center font-bold text-sky-400">${dTrab} d</td>
             <td class="p-2.5 text-slate-300">$${sq.toFixed(2)}</td>
             <td class="p-2.5 text-emerald-400">$${as.toFixed(2)}</td>
             <td class="p-2.5 text-amber-400">$${ivss.toFixed(2)}</td>
             <td class="p-2.5 text-amber-400">$${rpe.toFixed(2)}</td>
             <td class="p-2.5 text-amber-400">$${faov.toFixed(2)}</td>
-            <td class="p-2.5 text-rose-400">$${od.toFixed(2)}</td>
+            <td class="p-2.5 text-rose-400 text-center">$${od.toFixed(2)}</td>
             <td class="p-2.5 text-sky-400 font-semibold">Bs. ${fNum(salarioColBs)}</td>
             <td class="p-2.5 text-teal-400 font-semibold">Bs. ${fNum(alimColBs)}</td>
             <td class="p-2.5 text-purple-400 font-semibold">Bs. ${fNum(subColBs)}</td>
@@ -539,14 +542,15 @@ function verDetalleNomina(f) {
         </tr>`;
     }).join('');
 
+    // Ajustamos el colspan a 3 por la nueva columna
     gId('tabla-detalle-foot').innerHTML = `<tr>
-        <td colspan="2" class="p-2.5 text-slate-300 text-right uppercase">Totales:</td>
+        <td colspan="3" class="p-2.5 text-slate-300 text-right uppercase">Totales:</td>
         <td class="p-2.5 text-white">$${tb.toFixed(2)}</td>
         <td class="p-2.5 text-emerald-400">$${ta.toFixed(2)}</td>
         <td class="p-2.5 text-amber-400">$${ti.toFixed(2)}</td>
         <td class="p-2.5 text-amber-400">$${tr.toFixed(2)}</td>
         <td class="p-2.5 text-amber-400">$${tf.toFixed(2)}</td>
-        <td class="p-2.5 text-rose-400">$${to.toFixed(2)}</td>
+        <td class="p-2.5 text-rose-400 text-center">$${to.toFixed(2)}</td>
         <td class="p-2.5 text-sky-400 font-bold">Bs. ${fNum(tSal)}</td>
         <td class="p-2.5 text-teal-400 font-bold">Bs. ${fNum(tAlim)}</td>
         <td class="p-2.5 text-purple-400 font-bold">Bs. ${fNum(tSub)}</td>
@@ -555,7 +559,6 @@ function verDetalleNomina(f) {
     </tr>`;
     openModal('modal-detalle-nomina');
 }
-
 function verRecibosNomina(fecha) {
     const regs = appState.nominas.filter(n => n.fecha_pago === fecha);
     gId('recibos-fecha-pago').innerText = fecha;
