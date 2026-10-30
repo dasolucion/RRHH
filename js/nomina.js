@@ -136,9 +136,9 @@ function renderTablaNominaEditable() {
             <td class="p-3" style="min-width: 95px;"><input type="number" step="0.01" id="pr-${e.id}" value="${prVal}" oninput="actualizarFilaYTotales(${e.id}); autoguardarBorradorNomina();" style="width: 75px;" class="bg-slate-950 border border-slate-800 rounded p-1 text-xs text-white outline-none"></td>
             <td class="p-3 text-center" style="min-width: 70px;"><input type="number" step="0.01" id="islr-${e.id}" value="${islrVal}" min="0" max="100" oninput="actualizarFilaYTotales(${e.id}); autoguardarBorradorNomina();" style="width: 55px;" class="bg-slate-950 border border-amber-900/50 rounded text-center p-1 text-xs text-amber-300 outline-none"></td>
             <td class="p-3 text-amber-400 font-medium" style="min-width: 95px;" id="ley-${e.id}">Bs. 0.00</td>
-            <td class="p-3 font-bold text-emerald-400" style="min-width: 140px;" id="salario-bs-${e.id}">Bs. 0.00</td>
-            <td class="p-3 font-bold text-emerald-400" style="min-width: 140px;" id="alim-bs-${e.id}">Bs. 0.00</td>
-            <td class="p-3 font-bold text-emerald-400" style="min-width: 140px;" id="subs-bs-${e.id}">Bs. 0.00</td>
+            <td class="p-3 font-bold text-emerald-400" style="min-width: 95px;" id="salario-bs-${e.id}">Bs. 0.00</td>
+            <td class="p-3 font-bold text-emerald-400" style="min-width: 95px;" id="alim-bs-${e.id}">Bs. 0.00</td>
+            <td class="p-3 font-bold text-emerald-400" style="min-width: 95px;" id="subs-bs-${e.id}">Bs. 0.00</td>
         </tr>`;
     }).join('');
 
