@@ -244,25 +244,25 @@
                     </div>
                     <div class="overflow-x-auto overflow-y-auto max-h-[calc(100vh-300px)] border border-slate-800 rounded-xl custom-scrollbar shadow-inner">
                         <table class="w-full text-left text-xs whitespace-nowrap relative">
-                            <thead class="bg-slate-950 text-slate-400 uppercase text-[10px] tracking-wider sticky top-0 z-20 shadow-[0_1px_0_0_#1e293b]">
-                                <tr>
-                                    <th class="p-3 min-w-[170px]">Empleado</th>
-                                    <th class="p-3 min-w-[95px]">S. Integral ($)</th>
-                                    <th class="p-3 text-center min-w-[70px]">Días Falt.</th>
-                                    <th class="p-3 text-center min-w-[65px]" data-feature="nomina.recargos_lottt" title="Horas Extras Diurnas (Recargo 50% Art. 118)">H. Ext (50%)</th>
-                                    <th class="p-3 text-center min-w-[65px]" data-feature="nomina.recargos_lottt" title="Horas Nocturnas (Recargo 30% Art. 117)">H. Noct (30%)</th>
-                                    <th class="p-3 text-center min-w-[65px]" data-feature="nomina.recargos_lottt" title="Días Feriados/Descanso trabajados (Recargo 1.5x Art. 119/120)">Feriados</th>
-                                    <th class="p-3 min-w-[95px]">Otras Asig. ($)</th>
-                                    <th class="p-3 text-center min-w-[70px]">Hrs. Desc.</th>
-                                    <th class="p-3 min-w-[95px]">Otros Desc. ($)</th>
-                                    <th class="p-3 min-w-[95px]" data-feature="nomina.adelantos">Adelantos ($)</th>
-                                    <th class="p-3 min-w-[95px]" data-feature="nomina.prestamos">Préstamos ($)</th>
-                                    <th class="p-3 text-center min-w-[70px]" data-feature="nomina.islr" title="Retención I.S.L.R. según porcentaje AR-I">% ISLR</th>
-                                    <th class="p-3 min-w-[95px]">Desc. Ley (Bs)</th>
-                                    <th class="p-3 min-w-[85px]">Neto ($)</th>
-                                    <th class="p-3 min-w-[100px]">Neto (Bs)</th>
-                                </tr>
-                            </thead>
+<thead class="bg-slate-950 text-slate-400 uppercase text-[10px] tracking-wider sticky top-0 z-20 shadow-[0_1px_0_0_#1e293b]">
+    <tr>
+        <th class="p-3 min-w-[170px]">Empleado</th>
+        <th class="p-3 text-center min-w-[70px]">Días Falt.</th>
+        <th class="p-3 text-center min-w-[65px]" data-feature="nomina.recargos_lottt" title="Horas Extras Diurnas">H. Ext (50%)</th>
+        <th class="p-3 text-center min-w-[65px]" data-feature="nomina.recargos_lottt" title="Horas Nocturnas">H. Noct (30%)</th>
+        <th class="p-3 text-center min-w-[65px]" data-feature="nomina.recargos_lottt" title="Días Feriados">Feriados</th>
+        <th class="p-3 min-w-[95px]">Otras Asig. ($)</th>
+        <th class="p-3 text-center min-w-[70px]">Hrs. Desc.</th>
+        <th class="p-3 min-w-[95px]">Otros Desc. ($)</th>
+        <th class="p-3 min-w-[95px]" data-feature="nomina.adelantos">Adelantos ($)</th>
+        <th class="p-3 min-w-[95px]" data-feature="nomina.prestamos">Préstamos ($)</th>
+        <th class="p-3 text-center min-w-[70px]" data-feature="nomina.islr" title="Retención I.S.L.R.">% ISLR</th>
+        <th class="p-3 min-w-[95px]">Desc. Ley (Bs)</th>
+        <th class="p-3 min-w-[100px] text-emerald-400">Salario (Bs)</th>
+        <th class="p-3 min-w-[100px] text-emerald-400">Alimentación (Bs)</th>
+        <th class="p-3 min-w-[100px] text-emerald-400">Subsidio (Bs)</th>
+    </tr>
+</thead>
                             <tbody id="tabla-nomina-editable-body" class="divide-y divide-slate-800/50"></tbody>
                         </table>
                     </div>
@@ -1072,6 +1072,42 @@
         </div>
     </div>
 </div>
+
+     <!-- MODAL EDITAR NÓMINA PROCESADA -->
+<div id="modal-editar-nomina" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+    <div class="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-[95vw] overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+        <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-950">
+            <div><h3 class="font-bold text-sm text-white"><i class="fa-solid fa-pen text-amber-400 mr-2"></i> Editar Nómina Procesada <span id="edit-nom-fecha" class="text-sky-400"></span></h3></div>
+            <div class="flex space-x-2">
+                <button onclick="guardarEdicionNomina()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-4 py-2 rounded-lg font-bold shadow-lg"><i class="fa-solid fa-save mr-1"></i> Guardar Cambios</button>
+                <button onclick="closeModal('modal-editar-nomina')" class="text-slate-400 px-2"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+        </div>
+        <div class="overflow-x-auto overflow-y-auto custom-scrollbar">
+            <table class="w-full text-left text-xs whitespace-nowrap">
+                <thead class="bg-slate-950 text-slate-400 uppercase text-[9px] sticky top-0 z-20 shadow-[0_1px_0_0_#1e293b]">
+                    <tr>
+                        <th class="p-2">Empleado</th>
+                        <th class="p-2 text-center">Días Falt.</th>
+                        <th class="p-2 text-center">H. Ext</th>
+                        <th class="p-2 text-center">H. Noct</th>
+                        <th class="p-2 text-center">Feriados</th>
+                        <th class="p-2">Otras Asig. ($)</th>
+                        <th class="p-2 text-center">Hrs Desc.</th>
+                        <th class="p-2">Otros Desc. ($)</th>
+                        <th class="p-2">Adelantos ($)</th>
+                        <th class="p-2">Préstamos ($)</th>
+                        <th class="p-2 text-center">% ISLR</th>
+                        <th class="p-2">Desc. Ley (Bs)</th>
+                        <th class="p-2">Neto ($)</th>
+                        <th class="p-2">Neto (Bs)</th>
+                    </tr>
+                </thead>
+                <tbody id="tabla-editar-nomina-body" class="divide-y divide-slate-800/50"></tbody>
+            </table>
+        </div>
+    </div>
+</div>   
             <!-- MODAL GESTIÓN DE FIRMAS DIGITALES -->
 <div id="modal-gestion-firmas" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
     <div class="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
