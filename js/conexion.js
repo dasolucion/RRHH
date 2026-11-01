@@ -205,10 +205,17 @@ async function fetchAllData() {
     );
     if (paramConf) {
         appState.parametros = {
+            ...appState.parametros,
             nombre_empresa: paramConf.nombre_empresa || appState.parametros.nombre_empresa,
             rif_empresa: paramConf.rif_empresa || appState.parametros.rif_empresa,
-            dias_utilidades: paramConf.dias_utilidades || 30
+            dias_utilidades: paramConf.dias_utilidades || 30,
+            valor_ut: paramConf.valor_ut != null ? Number(paramConf.valor_ut) : (appState.parametros.valor_ut || 43.00),
+            riesgo_ivss: paramConf.riesgo_ivss != null ? Number(paramConf.riesgo_ivss) : (appState.parametros.riesgo_ivss || 9),
+            aplica_lpp: paramConf.aplica_lpp !== false
         };
+        try {
+            localStorage.setItem('nomina_parametros', JSON.stringify(appState.parametros));
+        } catch (e) {}
     }
     if (paramConf && paramConf.features_config) {
         appState.features = paramConf.features_config;
@@ -241,6 +248,41 @@ async function fetchAllData() {
 
     // --- Pre-nómina (borrador en nube) ---
     if (typeof cargarBorradorDesdeNube === 'function') await cargarBorradorDesdeNube();
+
+    // --- Préstamos y abonos (Bloque 2C) ---
+    const prestamosDb = await safeQuery(
+        supabaseClient.from('prestamos_anticipos').select('*').order('fecha_otorgamiento', { ascending: false }),
+        'prestamos_anticipos'
+    );
+    if (Array.isArray(prestamosDb)) {
+        appState.prestamos = prestamosDb;
+        localStorage.setItem('nomina_prestamos_cache', JSON.stringify(prestamosDb));
+    } else {
+        const localP = localStorage.getItem('nomina_prestamos_cache');
+        if (localP) {
+            try {
+                const p = JSON.parse(localP);
+                if (Array.isArray(p)) appState.prestamos = p;
+            } catch (e) {}
+        }
+    }
+
+    const abonosDb = await safeQuery(
+        supabaseClient.from('prestamos_abonos').select('*').order('fecha_pago', { ascending: false }),
+        'prestamos_abonos'
+    );
+    if (Array.isArray(abonosDb)) {
+        appState.prestamosAbonos = abonosDb;
+        localStorage.setItem('nomina_prestamos_abonos_cache', JSON.stringify(abonosDb));
+    } else {
+        const localA = localStorage.getItem('nomina_prestamos_abonos_cache');
+        if (localA) {
+            try {
+                const a = JSON.parse(localA);
+                if (Array.isArray(a)) appState.prestamosAbonos = a;
+            } catch (e) {}
+        }
+    }
 
     // --- Refresh de toda la vista ---
     aplicarParametrosEnVista();

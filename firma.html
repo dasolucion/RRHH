@@ -92,6 +92,7 @@
                 }
             } catch (e) { console.warn(e); }
 
+            // ⚠️ Préstamo: el UUID real se guarda en periodo_nomina (documento_id es bigint)
             let tablaOrigen = '';
             switch (firmaData.tipo_documento) {
                 case 'nomina': tablaOrigen = 'nominas'; break;
@@ -99,11 +100,14 @@
                 case 'prestaciones': tablaOrigen = 'antiguedad'; break;
                 case 'utilidades': tablaOrigen = 'utilidades'; break;
                 case 'liquidacion': tablaOrigen = 'prestaciones'; break;
+                case 'prestamo': tablaOrigen = 'prestamos_anticipos'; break;
                 default: tablaOrigen = 'nominas';
             }
 
-            const { data: docData } = await supabaseClient.from(tablaOrigen).select('*').eq('id', firmaData.documento_id).single();
-            const { data: empData } = await supabaseClient.from('empleados').select('*').eq('id', firmaData.empleado_id).single();
+            const colId = firmaData.tipo_documento === 'prestamo' ? 'periodo_nomina' : 'documento_id';
+            const valId = firmaData.tipo_documento === 'prestamo' ? firmaData.periodo_nomina : firmaData.documento_id;
+            const { data: docData } = await supabaseClient.from(tablaOrigen).select('*').eq('id', valId).single();
+            const { data: empData } = await supabaseClient.from('empleados').select('*, cargos: cargo_id(id, nombre)').eq('id', firmaData.empleado_id).single();
 
             empDataGlobal = empData;
             docDataGlobal = docData;
@@ -134,6 +138,8 @@
             } else if (tipo === 'liquidacion') {
                 const det = typeof doc.detalle_calculo === 'string' ? JSON.parse(doc.detalle_calculo) : doc.detalle_calculo;
                 htmlRecibo = generarHTMLReciboLiquidacion(det, emp);
+            } else if (tipo === 'prestamo') {
+                htmlRecibo = generarHTMLReciboPrestamoFirma(doc, emp);
             }
 
             document.getElementById('recibo-html').innerHTML = htmlRecibo;
@@ -478,6 +484,58 @@
         }
 
         // ═══════════════════════════════════════════════════════════════
+        // 6. GENERADOR: PRÉSTAMO / ANTICIPO
+        // ═══════════════════════════════════════════════════════════════
+        function generarHTMLReciboPrestamoFirma(p, e) {
+            const firmaImg = firmaTemporalBase64 ? `<img src="${firmaTemporalBase64}" style="height: 50px; display: block; margin: 0 auto;">` : '';
+            const empresa = paramsEmpresa;
+            const tasa = Number(p.tasa_bcv) || 0;
+            const monto = Number(p.monto_total || 0);
+            const montoBs = tasa > 0 ? monto * tasa : 0;
+            const saldo = Number(p.saldo_pendiente != null ? p.saldo_pendiente : monto);
+            const tipoTxt = String(p.tipo || 'prestamo').toUpperCase();
+            const fechaFmt = p.fecha_otorgamiento ? p.fecha_otorgamiento.split('-').reverse().join('/') : '-';
+
+            return `<div class="recibo-card bg-white text-black p-4 font-sans w-full">
+                <div class="flex justify-between items-start mb-2 pb-1 border-b-2 border-black"><div><h2 class="text-xl font-black tracking-widest text-black uppercase">${empresa.nombre_empresa.split('/')[0].trim()}</h2></div><div class="text-right"><h3 class="text-xs font-extrabold text-black uppercase">${empresa.nombre_empresa}</h3><p class="text-[9px] text-slate-800 font-semibold">${empresa.rif_empresa}</p></div></div>
+                <div class="bg-[#fde0e0] text-center font-bold text-[10px] py-1 border border-black mb-2 uppercase tracking-wider text-black">RECIBO DE ENTREGA DE ${tipoTxt} — ${fechaFmt}</div>
+
+                <table class="w-full text-[9.5px] border border-black mb-2 font-semibold">
+                    <tr><td class="bg-slate-100 px-1.5 py-0.5 border-r border-b border-black w-32 font-bold text-black">TRABAJADOR</td><td class="px-1.5 py-0.5 border-r border-b border-black font-bold uppercase text-black">${e?.nombre || '-'}</td><td class="bg-slate-100 px-1.5 py-0.5 border-r border-b border-black w-24 font-bold text-black">CÉDULA</td><td class="px-1.5 py-0.5 border-b border-black text-black">${e?.cedula || '-'}</td></tr>
+                    <tr><td class="bg-slate-100 px-1.5 py-0.5 border-r border-b border-black font-bold text-black">CARGO</td><td class="px-1.5 py-0.5 border-r border-b border-black uppercase text-black">${e?.cargos?.nombre || '-'}</td><td class="bg-slate-100 px-1.5 py-0.5 border-r border-b border-black font-bold text-black">FECHA</td><td class="px-1.5 py-0.5 border-b border-black text-black">${fechaFmt}</td></tr>
+                    <tr><td class="bg-slate-100 px-1.5 py-0.5 border-r border-black font-bold text-black">TASA BCV</td><td class="px-1.5 py-0.5 border-r border-black text-black">${tasa > 0 ? tasa.toFixed(2) + ' Bs/$' : 'No indicada'}</td><td class="bg-slate-100 px-1.5 py-0.5 border-r border-black font-bold text-black">ESTADO</td><td class="px-1.5 py-0.5 font-bold uppercase text-black">${p.estado || 'activo'}</td></tr>
+                </table>
+
+                <table class="w-full text-[10px] border border-black mb-2">
+                    <thead><tr class="bg-[#fde0e0] font-bold border-b border-black text-black"><th class="px-2 py-1 text-left border-r border-black">CONCEPTO</th><th class="px-2 py-1 text-right border-r border-black">MONTO ($)</th><th class="px-2 py-1 text-right border-r border-black">MONTO (BS)</th><th class="px-2 py-1 text-right">SALDO PENDIENTE ($)</th></tr></thead>
+                    <tbody><tr>
+                        <td class="px-2 py-1.5 font-semibold uppercase text-black">${tipoTxt} otorgado al trabajador</td>
+                        <td class="px-2 py-1.5 text-right font-mono font-bold text-black">$${monto.toFixed(2)}</td>
+                        <td class="px-2 py-1.5 text-right font-mono font-bold text-black">${tasa > 0 ? 'Bs. ' + fNum(montoBs) : '-'}</td>
+                        <td class="px-2 py-1.5 text-right font-mono font-bold text-black">$${saldo.toFixed(2)}</td>
+                    </tr></tbody>
+                </table>
+
+                ${p.observaciones ? `<div class="border border-black p-1.5 mb-2 text-[8.5px] text-black leading-tight bg-slate-50"><strong>OBSERVACIONES:</strong> ${p.observaciones}</div>` : ''}
+                <div class="border border-black p-1.5 mb-2 text-[8.5px] text-black leading-tight bg-slate-50">
+                    <strong>CONDICIONES:</strong> El trabajador autoriza el descuento de las cuotas correspondientes en su nómina, hasta la cancelación total del saldo pendiente. El saldo insoluto se mantiene exigible conforme a la LOTTT y a las políticas internas de la empresa.
+                </div>
+
+                <div class="border-t border-black pt-2 mt-6 text-black"><h4 class="text-center font-extrabold text-[9px] tracking-wider mb-4 text-black">RECIBO CONFORME</h4>
+                    <div class="grid grid-cols-2 gap-8 text-[9.5px] font-semibold text-black items-end">
+                        <div class="flex items-end"><span class="mr-2">PATRONO:</span><span class="border-b border-black flex-1 h-10"></span></div>
+                        <div class="flex flex-col items-center w-full">
+                            <div class="w-full border-b border-black h-14 flex items-end justify-center pb-1">
+                                ${firmaImg}
+                            </div>
+                            <span class="mt-1">TRABAJADOR</span>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        // ═══════════════════════════════════════════════════════════════
         // FUNCIONES DE FIRMA
         // ═══════════════════════════════════════════════════════════════
         function limpiarFirma() {
@@ -538,6 +596,10 @@
                 nombreDescriptivo = `Prestaciones ${firmaDataGlobal.periodo_nomina || ''}`;
             } else if (firmaDataGlobal.tipo_documento === 'liquidacion') {
                 nombreDescriptivo = `Liquidacion ${firmaDataGlobal.periodo_nomina || ''}`;
+            } else if (firmaDataGlobal.tipo_documento === 'prestamo') {
+                const tipoTxt = String(docDataGlobal?.tipo || 'prestamo') === 'anticipo' ? 'Anticipo' : 'Prestamo';
+                const fechRef = docDataGlobal?.fecha_otorgamiento ? docDataGlobal.fecha_otorgamiento.split('-').reverse().join('-') : `${d}-${m}-${y}`;
+                nombreDescriptivo = `${tipoTxt} ${fechRef}`;
             } else {
                 nombreDescriptivo = `Documento ${d}-${m}-${y}`;
             }

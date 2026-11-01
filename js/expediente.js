@@ -10,6 +10,7 @@ const TIPOS_DOCUMENTO = {
     'referencia':          { label: 'Referencia Personal/Laboral', icon: 'fa-address-book', color: 'amber' },
     'ivss':                { label: 'Constancia IVSS', icon: 'fa-shield-heart', color: 'rose' },
     'nomina':              { label: 'Recibo de Nómina', icon: 'fa-receipt', color: 'emerald' },
+    'prestamo':            { label: 'Recibo Préstamo / Anticipo', icon: 'fa-hand-holding-dollar', color: 'rose' },
     'vacaciones':          { label: 'Recibo de Vacaciones', icon: 'fa-umbrella-beach', color: 'teal' },
     'prestaciones':        { label: 'Prestaciones / Antigüedad', icon: 'fa-piggy-bank', color: 'cyan' },
     'utilidades':          { label: 'Recibo de Utilidades', icon: 'fa-gift', color: 'rose' },

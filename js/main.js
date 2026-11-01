@@ -28,7 +28,13 @@ async function switchTab(tab) {
     const isMaster = usr?.rol === 'master';
     const modulosConsultaPermitidos = ['historico', 'vacaciones-historico', 'utilidades-historico', 'antiguedad-historico', 'liquidaciones-historico', 'impuestos'];
 
-    if (!isMaster && !modulosConsultaPermitidos.includes(tab)) {
+    // La matriz de permisos manda. El fallback mantiene el comportamiento
+    // histórico si state.js aún no cargó tienePermiso().
+    const permitido = (typeof tienePermiso === 'function')
+        ? tienePermiso(tab, 'ver')
+        : modulosConsultaPermitidos.includes(tab);
+
+    if (!isMaster && !permitido) {
         showToast('No tiene permisos para acceder a esta sección', 'error');
         return;
     }

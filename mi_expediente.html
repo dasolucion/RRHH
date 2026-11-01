@@ -89,19 +89,40 @@
                 .order('fecha_emision', { ascending: false });
 
             if (pendientes && pendientes.length > 0) {
-                mostrarPantallaBloqueo(emp, pendientes);
+                // Préstamos/anticipos: el UUID real se guarda en periodo_nomina; buscamos sus datos para mostrar una etiqueta legible.
+                const prestamosMap = {};
+                const idsPrestamo = pendientes.filter(p => p.tipo_documento === 'prestamo' && p.periodo_nomina).map(p => p.periodo_nomina);
+                if (idsPrestamo.length > 0) {
+                    try {
+                        const { data: ps } = await supabaseClient
+                            .from('prestamos_anticipos')
+                            .select('id, tipo, monto_total, fecha_otorgamiento')
+                            .in('id', idsPrestamo);
+                        (ps || []).forEach(p => { prestamosMap[p.id] = p; });
+                    } catch (e) { console.warn('No se pudieron cargar datos de préstamos pendientes', e); }
+                }
+                mostrarPantallaBloqueo(emp, pendientes, prestamosMap);
                 return;
             }
 
             await mostrarExpedienteCompleto(emp);
         }
 
-function mostrarPantallaBloqueo(emp, pendientes) {
+function mostrarPantallaBloqueo(emp, pendientes, prestamosMap = {}) {
     const pendientesHtml = pendientes.map(p => {
-        const tipoLabel = { nomina: 'Nómina', vacaciones: 'Vacaciones', prestaciones: 'Prestaciones', utilidades: 'Utilidades', liquidacion: 'Liquidación' }[p.tipo_documento] || 'Documento';
-        
-        // ⚡ Usamos la nueva función aquí:
-        const periodoFormateado = formatearPeriodoVisual(p.periodo_nomina);
+        const tipoLabel = { nomina: 'Nómina', vacaciones: 'Vacaciones', prestaciones: 'Prestaciones', utilidades: 'Utilidades', liquidacion: 'Liquidación', prestamo: 'Préstamo / Anticipo' }[p.tipo_documento] || 'Documento';
+
+        // ⚡ Usamos la nueva función aquí (para préstamos armamos la etiqueta con sus datos reales):
+        const esPrestamo = p.tipo_documento === 'prestamo';
+        const periodoFormateado = esPrestamo
+            ? (() => {
+                const pr = prestamosMap[p.periodo_nomina];
+                if (!pr) return 'Firma requerida';
+                const [y, m, d] = (pr.fecha_otorgamiento || '').split('-');
+                const fFmt = (y && m && d) ? `${d}/${m}/${y}` : pr.fecha_otorgamiento;
+                return `${String(pr.tipo || 'préstamo') === 'anticipo' ? 'Anticipo' : 'Préstamo'} de $${Number(pr.monto_total || 0).toFixed(2)} — ${fFmt}`;
+            })()
+            : formatearPeriodoVisual(p.periodo_nomina);
         
         const baseUrl = window.location.href.split('?')[0].replace('mi_expediente.html', '');
         const enlace = `${baseUrl}firma.html?token=${p.token}&portal=${token}`;
@@ -189,6 +210,7 @@ function renderDocItem(d) {
         cedula: 'Cédula de Identidad', rif: 'RIF', planilla_ingreso: 'Planilla de Ingreso',
         referencia: 'Referencia', ivss: 'Constancia IVSS', nomina: 'Nómina',
         vacaciones: 'Vacaciones', prestaciones: 'Prestaciones', utilidades: 'Utilidades',
+        prestamo: 'Préstamo / Anticipo',
         liquidacion: 'Liquidación', justificativo: 'Justificativo', otro: 'Otro Documento'
     }[d.tipo_documento] || 'Documento';
 
@@ -209,8 +231,10 @@ function renderDocItem(d) {
     </div>`;
 }    
         
-    function formatearPeriodoVisual(periodo) {
+function formatearPeriodoVisual(periodo) {
     if (!periodo) return 'Sin período';
+    // Los préstamos/anticipos guardan un UUID aquí; no formatear.
+    if (/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(String(periodo))) return 'Firma requerida';
     if (!periodo.includes('/')) return periodo;
     
     const [d, m, y] = periodo.split('/');

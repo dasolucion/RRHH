@@ -100,7 +100,9 @@ function renderTablaNominaEditable() {
     }
 
     tbody.innerHTML = emps.map(e => {
-        const saldoPres = Number(e.saldo_prestamo) || 0;
+        const saldoPres = (typeof saldoPrestamosEmpleado === 'function')
+            ? saldoPrestamosEmpleado(e.id)
+            : (Number(e.saldo_prestamo) || 0);
         const prestamoSugeridoDef = saldoPres > 0 ? saldoPres.toFixed(2) : "0.00";
         const bEmp = borrador?.filas?.[e.id] || {};
 
@@ -248,8 +250,25 @@ async function procesarNominaGlobal() {
     const act = appState.empleados.filter(e => e.activo);
     if (!act.length) return;
 
+    // Evitar doble descuento de préstamos por reprocesar la misma fecha.
+    const yaProcesada = (appState.nominas || []).some(n => n.fecha_pago === f);
+    if (yaProcesada && !confirm(`Ya existe una nómina procesada para el ${f}. Si continúa se registrará otra y se volverán a descontar los préstamos. ¿Desea continuar?`)) {
+        return;
+    }
+
+    // Lote UUID propio para vincular los abonos de préstamos con esta nómina.
+    // (nominas.id es numérico; prestamos_abonos.nomina_id es UUID).
+    const loteUUID = (typeof _uuidPrestamo === 'function')
+        ? _uuidPrestamo()
+        : (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : String(Date.now()));
+
+    // Cargar saldos reales de préstamos antes de calcular los descuentos.
+    if (typeof cargarPrestamosYAbonos === 'function') {
+        try { await cargarPrestamosYAbonos(true); } catch (e) {}
+    }
+
     const regs = [];
-    const empUpdates = [];
+    const advertencias = [];
 
     for (const e of act) {
         const sb = Number(e.sueldo) || 0;
@@ -262,7 +281,14 @@ async function procesarNominaGlobal() {
         const hd = parseFloat(gId(`hd-${e.id}`).value) || 0;
         const od = parseFloat(gId(`od-${e.id}`).value) || 0;
         const ad = parseFloat(gId(`ad-${e.id}`).value) || 0;
-        const pr = parseFloat(gId(`pr-${e.id}`).value) || 0;
+        const prSolicitado = parseFloat(gId(`pr-${e.id}`).value) || 0;
+        const saldoDisponible = (typeof saldoPrestamosEmpleado === 'function')
+            ? saldoPrestamosEmpleado(e.id)
+            : (Number(e.saldo_prestamo) || 0);
+        const pr = Math.min(prSolicitado, saldoDisponible);
+        if (prSolicitado > saldoDisponible + 0.009) {
+            advertencias.push(`${e.nombre}: préstamo ajustado de $${prSolicitado.toFixed(2)} a $${saldoDisponible.toFixed(2)} (saldo disponible)`);
+        }
 
         const hed = (typeof getFeatureFlag === 'function' && getFeatureFlag('nomina.recargos_lottt')) ? (parseFloat(gId(`hed-${e.id}`)?.value) || 0) : 0;
         const hnoct = (typeof getFeatureFlag === 'function' && getFeatureFlag('nomina.recargos_lottt')) ? (parseFloat(gId(`hnoct-${e.id}`)?.value) || 0) : 0;
@@ -288,12 +314,6 @@ async function procesarNominaGlobal() {
 
         const netoU = base - (dia * df) + oa + totalRecargosUSD - ((dia / 8) * hd) - od - ad - pr - leyU - islrUSD;
 
-        if (pr > 0) {
-            const nuevoSaldo = Math.max(0, (Number(e.saldo_prestamo) || 0) - pr);
-            e.saldo_prestamo = nuevoSaldo;
-            empUpdates.push(supabaseClient.from('empleados').update({ saldo_prestamo: nuevoSaldo }).eq('id', e.id));
-        }
-
         regs.push({
             fecha_pago: f, empleado_id: e.id, empleado: e.nombre, cargo: e.cargos?.nombre || '-',
             tasa_bcv: t, salario_minimo_bs: sM, salario_base: sb,
@@ -304,11 +324,11 @@ async function procesarNominaGlobal() {
             recargos_lottt_usd: totalRecargosUSD,
             islr_porcentaje: islrPct, islr_usd: islrUSD, islr_bs: islrUSD * t,
             ivss_usd: ivss / t, rpe_usd: rpe / t, faov_usd: faov / t, descuentos_ley_usd: leyU,
-            neto_usd: netoU, neto_bs: netoU * t, estado: 'Procesado'
+            neto_usd: netoU, neto_bs: netoU * t, estado: 'Procesado',
+            detalle_calculo: { lote_uuid: loteUUID }
         });
     }
 
-    if (empUpdates.length > 0) await Promise.all(empUpdates);
       // ⚡ AQUÍ ESTÁ LA CORRECCIÓN: Validar si Supabase devuelve error
        const { error: insertError } = await supabaseClient.from('nominas').insert(regs);
     
@@ -317,6 +337,21 @@ async function procesarNominaGlobal() {
         return showToast('Error al guardar en BD: ' + insertError.message, 'error');
         // Al hacer "return", NO se borra la pre-nómina y puedes intentar corregir.
     }
+
+    // Aplicar abonos a préstamos SOLO después de que la nómina se guardó bien.
+    if (typeof aplicarAbonosNomina === 'function') {
+        try {
+            await aplicarAbonosNomina(regs, loteUUID, t, f);
+        } catch (e) {
+            console.warn('[Nómina] No se pudieron registrar los abonos a préstamos:', e);
+            showToast('Nómina guardada, pero no se pudieron registrar los abonos a préstamos', 'error');
+        }
+    }
+
+    if (advertencias.length > 0) {
+        showToast(`Nómina guardada con ajustes: ${advertencias.join(' | ')}`, 'error');
+    }
+
     await safeQuery(supabaseClient.from('prenomina_borrador').delete().eq('id', 1), 'clear_prenomina');
     localStorage.removeItem('nomina_borrador_global');
 
@@ -455,18 +490,42 @@ async function eliminarNominaProcesada(f) {
 
     const nominasDeFecha = appState.nominas.filter(n => n.fecha_pago === f);
     const empReintegros = [];
+    const empsLegado = new Set();
+    const lotesRevertidos = new Set();
 
-    nominasDeFecha.forEach(n => {
+    for (const n of nominasDeFecha) {
         const montoPres = Number(n.prestamos) || 0;
-        if (montoPres > 0) {
+        const lote = (typeof obtenerLoteNominaUUID === 'function') ? obtenerLoteNominaUUID(n) : null;
+
+        // Revertir una sola vez por lote (todos los abonos del lote).
+        if (lote && !lotesRevertidos.has(lote) && typeof revertirAbonosNomina === 'function') {
+            await revertirAbonosNomina(n);
+            lotesRevertidos.add(lote);
+        }
+
+        // Los empleados con saldo legado no tienen abonos registrados:
+        // se les reintegra el monto descontado directamente.
+        const tieneFormales = (typeof obtenerPrestamosEmpleado === 'function')
+            ? obtenerPrestamosEmpleado(n.empleado_id).length > 0
+            : false;
+
+        if (!tieneFormales && montoPres > 0) {
             const emp = appState.empleados.find(e => String(e.id) === String(n.empleado_id));
             if (emp) {
-                const nuevoSaldo = (Number(emp.saldo_prestamo) || 0) + montoPres;
-                emp.saldo_prestamo = nuevoSaldo;
-                empReintegros.push(supabaseClient.from('empleados').update({ saldo_prestamo: nuevoSaldo }).eq('id', emp.id));
+                emp.saldo_prestamo = (Number(emp.saldo_prestamo) || 0) + montoPres;
+                empsLegado.add(String(emp.id));
             }
         }
-    });
+    }
+
+    for (const empId of empsLegado) {
+        const emp = appState.empleados.find(e => String(e.id) === empId);
+        if (emp) {
+            empReintegros.push(
+                supabaseClient.from('empleados').update({ saldo_prestamo: emp.saldo_prestamo }).eq('id', emp.id)
+            );
+        }
+    }
 
     if (empReintegros.length > 0) await Promise.all(empReintegros);
     await supabaseClient.from('nominas').delete().eq('fecha_pago', f);
@@ -920,7 +979,9 @@ async function anularEnlaceFirma(token) {
 
     // 2. Determinar la fecha de pago (para recargar el modal correcto)
     let fechaPagoRecarga = firmaFechaActual;
-    if (!fechaPagoRecarga || !appState.nominas.find(n => n.fecha_pago === fechaPagoRecarga)) {
+    if (firma.tipo_documento === 'prestamo') {
+        fechaPagoRecarga = null; // Se recarga con abrirModalFirmaPrestamo(firma.periodo_nomina)
+    } else if (!fechaPagoRecarga || !appState.nominas.find(n => n.fecha_pago === fechaPagoRecarga)) {
         // Fallback: buscar en nominas por documento_id
         const { data: nom } = await supabaseClient
             .from('nominas')
@@ -960,6 +1021,11 @@ async function anularEnlaceFirma(token) {
     console.log('[Anular] Fila eliminada. Count:', count);
 
     showToast(yaFirmado ? 'Enlace + PDF eliminados' : 'Enlace anulado');
+
+    // Préstamo/anticipo: reabrir su propio modal de firmas (no el de nómina).
+    if (firma.tipo_documento === 'prestamo' && typeof abrirModalFirmaPrestamo === 'function' && firma.periodo_nomina) {
+        return abrirModalFirmaPrestamo(firma.periodo_nomina);
+    }
 
     // 5. Recargar el modal
     if (fechaPagoRecarga) {
@@ -1083,14 +1149,24 @@ async function abrirModalFirmaGenerico(tipo, docs) {
     // Guardamos temporalmente los docs en una variable global para que las funciones puedan consultarla
     window._docsFirmaActuales = docs;
 
-    const { data: firmasExistentes } = await supabaseClient
-        .from('firmas_recibos')
-        .select('*')
-        .eq('tipo_documento', tipo)
-        .in('documento_id', docs.map(d => d.id));
+    // ⚠️ Los préstamos/anticipos usan UUID: firmas_recibos.documento_id es bigint,
+    // por lo que su referencia se guarda en periodo_nomina (texto).
+    const esPrestamo = tipo === 'prestamo';
+
+    const { data: firmasExistentes } = esPrestamo
+        ? await supabaseClient
+            .from('firmas_recibos')
+            .select('*')
+            .eq('tipo_documento', tipo)
+            .in('periodo_nomina', docs.map(d => String(d.id)))
+        : await supabaseClient
+            .from('firmas_recibos')
+            .select('*')
+            .eq('tipo_documento', tipo)
+            .in('documento_id', docs.map(d => d.id));
 
     const mapaFirmas = {};
-    (firmasExistentes || []).forEach(f => { mapaFirmas[String(f.documento_id)] = f; });
+    (firmasExistentes || []).forEach(f => { mapaFirmas[String(esPrestamo ? f.periodo_nomina : f.documento_id)] = f; });
 
     gId('tabla-firmas-body').innerHTML = docs.map(r => {
         const firma = mapaFirmas[String(r.id)];
@@ -1120,7 +1196,7 @@ async function abrirModalFirmaGenerico(tipo, docs) {
         return `<tr class="border-b border-slate-800 hover:bg-slate-800/40">
             <td class="p-2 text-xs font-semibold text-white">${r.empleado}</td>
             <td class="p-2 text-center">${estadoBadge}</td>
-            <td class="p-2 text-center text-[10px] text-slate-400 font-mono">${r.neto_bs ? 'Bs. ' + fNum(r.neto_bs) : '-'}</td>
+            <td class="p-2 text-center text-[10px] text-slate-400 font-mono">${r.monto_label ? r.monto_label : (r.neto_bs ? 'Bs. ' + fNum(r.neto_bs) : '-')}</td>
             <td class="p-2 text-center text-[10px] text-slate-400">${r.periodo}</td>
             <td class="p-2 text-right space-x-1">${acciones}</td>
         </tr>`;
@@ -1132,15 +1208,20 @@ async function generarEnlaceGenerico(tipo, docId) {
     if (!docInfo) return showToast('Error: Documento no encontrado en memoria', 'error');
 
     const token = generarUUID();
-    const { error } = await supabaseClient.from('firmas_recibos').insert([{
+    // ⚠️ Préstamo: documento_id es bigint (no acepta UUID); la referencia
+    // real del préstamo se guarda en periodo_nomina.
+    const esPrestamo = tipo === 'prestamo';
+    const filaFirma = {
         token: token,
-        documento_id: docId,
+        documento_id: esPrestamo ? null : docId,
         empleado_id: docInfo.empleado_id,
         tipo_documento: tipo,
-        periodo_nomina: docInfo.periodo,
+        periodo_nomina: esPrestamo ? String(docId) : docInfo.periodo,
         estado: 'pendiente',
         fecha_emision: new Date().toISOString()
-    }]);
+    };
+
+    const { error } = await supabaseClient.from('firmas_recibos').insert([filaFirma]);
 
     if (error) {
         console.error(error);
@@ -1169,7 +1250,8 @@ function enviarWAEnlaceGenerico(token, empId, tipo) {
 
     const baseUrl = window.location.origin + window.location.pathname.replace(/index\.html$/, '').replace(/\/$/, '');
     const enlace = `${baseUrl}/firma.html?token=${token}`;
-    const msj = `Hola ${emp.nombre}, tu recibo de ${tipo} (${periodoStr}) está listo para firma digital. Ingresá aquí:\n\n${enlace}`;
+    const tipoTexto = tipo === 'prestamo' ? 'préstamo / anticipo' : tipo;
+    const msj = `Hola ${emp.nombre}, tu recibo de ${tipoTexto} (${periodoStr}) está listo para firma digital. Ingresá aquí:\n\n${enlace}`;
     
     window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msj)}`, '_blank');
 }
@@ -1298,7 +1380,19 @@ function recalcularFilaEdit(idx) {
     const hd = parseFloat(gId(`edit-hd-${idx}`).value) || 0;
     const od = parseFloat(gId(`edit-od-${idx}`).value) || 0;
     const ad = parseFloat(gId(`edit-ad-${idx}`).value) || 0;
-    const pr = parseFloat(gId(`edit-pr-${idx}`).value) || 0;
+    let pr = parseFloat(gId(`edit-pr-${idx}`).value) || 0;
+
+    // No permitir descontar más que el saldo disponible.
+    // Al editar una nómina ya procesada, el saldo actual ya excluye el descuento original.
+    if (typeof saldoPrestamosEmpleado === 'function') {
+        const maxPrEdit = saldoPrestamosEmpleado(r.empleado_id) + (Number(r.prestamos) || 0);
+        if (pr > maxPrEdit + 0.009) {
+            pr = Math.max(0, maxPrEdit);
+            gId(`edit-pr-${idx}`).value = pr.toFixed(2);
+            showToast(`Préstamo ajustado a $${pr.toFixed(2)} (saldo disponible)`, 'error');
+        }
+    }
+
     const islrPct = parseFloat(gId(`edit-islr-${idx}`).value) || 0;
 
     const horaBase = (sb / 30) / 8;
@@ -1354,12 +1448,32 @@ async function guardarEdicionNomina() {
         await supabaseClient.from('nominas').update(updateData).eq('id', r.id);
 
         if (prDiff !== 0) {
-            const emp = appState.empleados.find(e => String(e.id) === String(r.empleado_id));
-            if (emp) {
-                const nuevoSaldo = Math.max(0, (Number(emp.saldo_prestamo) || 0) - prDiff);
-                emp.saldo_prestamo = nuevoSaldo;
-                empUpdates.push(supabaseClient.from('empleados').update({ saldo_prestamo: nuevoSaldo }).eq('id', emp.id));
+            const lote = (typeof obtenerLoteNominaUUID === 'function') ? obtenerLoteNominaUUID(r) : null;
+            const tieneFormales = (typeof obtenerPrestamosEmpleado === 'function')
+                ? obtenerPrestamosEmpleado(r.empleado_id).length > 0
+                : false;
+
+            if (lote && tieneFormales) {
+                // Revertir SOLO los abonos de este empleado en este lote y reaplicar.
+                await revertirAbonosNomina(r, r.empleado_id);
+                if (Number(r._new_pr) > 0 && typeof aplicarAbonosNomina === 'function') {
+                    await aplicarAbonosNomina(
+                        [{ empleado_id: r.empleado_id, prestamos: Number(r._new_pr) }],
+                        lote,
+                        Number(r.tasa_bcv) || 1,
+                        r.fecha_pago
+                    );
+                }
+            } else {
+                // Compatibilidad con saldos legados (empleados.saldo_prestamo)
+                const emp = appState.empleados.find(e => String(e.id) === String(r.empleado_id));
+                if (emp) {
+                    const nuevoSaldo = Math.max(0, (Number(emp.saldo_prestamo) || 0) - prDiff);
+                    emp.saldo_prestamo = nuevoSaldo;
+                    empUpdates.push(supabaseClient.from('empleados').update({ saldo_prestamo: nuevoSaldo }).eq('id', emp.id));
+                }
             }
+            r.prestamos = r._new_pr;
         }
         cambios++;
     }

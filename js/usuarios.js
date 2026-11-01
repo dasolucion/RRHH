@@ -276,6 +276,9 @@ async function guardarMatrizPermisos() {
     if (!Array.isArray(appState.rolesPermisos)) appState.rolesPermisos = [];
     appState.rolesPermisos = appState.rolesPermisos.filter(p => p.rol !== rol);
     rows.forEach(r => appState.rolesPermisos.push({ ...r }));
+    try {
+        localStorage.setItem('nomina_roles_permisos', JSON.stringify(appState.rolesPermisos));
+    } catch (e) {}
 
     // 4. Recargar permisos desde BD si fue posible (para tener IDs/created_at reales)
     if (resultado && Array.isArray(resultado) && resultado.length > 0) {

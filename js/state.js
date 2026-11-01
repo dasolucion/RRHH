@@ -9,7 +9,7 @@
 let appState = {
     departamentos: [], cargos: [], empleados: [], nominas: [], vacaciones: [],
     utilidades: [], antiguedad: [], prestaciones: [], historicoSalarios: [],
-    anticipos: [],
+    anticipos: [], prestamos: [], prestamosAbonos: [],
     tasasMensuales: [], usuarios: [], usuarioActual: null, mesesEditablesActuales: [],
     rolesPermisos: [], // Matriz de permisos desde Supabase
     parametros: {
@@ -179,9 +179,12 @@ async function cargarRolesPermisos() {
         const { data, error } = await supabaseClient.from('roles_permisos').select('*');
         if (error) throw error;
         appState.rolesPermisos = data || [];
+        try {
+            localStorage.setItem('nomina_roles_permisos', JSON.stringify(appState.rolesPermisos));
+        } catch (e) {}
     } catch (e) {
         console.warn('No se pudo cargar roles_permisos:', e.message);
-        // Mantener lo que ya había en memoria (o vacío)
+        // Mantener la caché local cargada en cargarCacheLocal() o el fallback a defaults
     }
 }
 
@@ -253,11 +256,36 @@ function cargarCacheLocal() {
         try { appState.anticipos = JSON.parse(anticCache); } catch (e) {}
     }
 
+    const presCache = localStorage.getItem('nomina_prestamos_cache');
+    if (presCache) {
+        try {
+            const parsed = JSON.parse(presCache);
+            if (Array.isArray(parsed)) appState.prestamos = parsed;
+        } catch (e) {}
+    }
+
+    const abonosCache = localStorage.getItem('nomina_prestamos_abonos_cache');
+    if (abonosCache) {
+        try {
+            const parsed = JSON.parse(abonosCache);
+            if (Array.isArray(parsed)) appState.prestamosAbonos = parsed;
+        } catch (e) {}
+    }
+
     aplicarParametrosEnVista();
 
     const fc = localStorage.getItem('nomina_features_config');
     if (fc) {
         try { appState.features = JSON.parse(fc); } catch (e) {}
+    }
+
+    // Matriz de permisos: caché local primero (sirve si Supabase no responde)
+    const rpCache = localStorage.getItem('nomina_roles_permisos');
+    if (rpCache) {
+        try {
+            const parsed = JSON.parse(rpCache);
+            if (Array.isArray(parsed)) appState.rolesPermisos = parsed;
+        } catch (e) {}
     }
 
     // Carga de permisos (no bloqueante, con fallback a defaults)

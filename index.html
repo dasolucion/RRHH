@@ -197,14 +197,27 @@
             <div id="tab-prestamos-content" class="tab-content hidden space-y-6">
                 <section class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl p-5 space-y-5">
                     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-800 pb-3">
-                        <div><h3 class="font-bold text-sm text-white flex items-center"><i class="fa-solid fa-hand-holding-dollar text-emerald-400 mr-2 text-base"></i> Control de Préstamos y Anticipos</h3>
-                        <p class="text-[11px] text-slate-400">Administración de deudas amortizables en nómina y anticipos de prestaciones (registrados con fecha para el cálculo correcto LOTTT)</p></div>
-                        <span class="inline-flex items-center text-xs px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium"><i class="fa-solid fa-rotate mr-1.5"></i> Descuento y Reintegro Automático</span>
+                        <div><h3 class="font-bold text-sm text-white flex items-center"><i class="fa-solid fa-hand-holding-dollar text-emerald-400 mr-2 text-base"></i> Control de Préstamos, Abonos y Anticipos</h3>
+                        <p class="text-[11px] text-slate-400">Préstamos amortizables en nómina, abonos manuales/externos y anticipos de prestaciones (LOTTT Art. 144). El saldo no descontado permanece pendiente.</p></div>
+                        <div class="flex items-center space-x-2 flex-wrap gap-y-2">
+                            <button onclick="abrirModalNuevoPrestamo()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3.5 py-2 rounded-lg font-semibold flex items-center space-x-1.5 transition shadow-lg shadow-emerald-600/20">
+                                <i class="fa-solid fa-plus"></i><span>Nuevo Préstamo / Anticipo</span>
+                            </button>
+                            <span class="inline-flex items-center text-xs px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium"><i class="fa-solid fa-rotate mr-1.5"></i> Descuento y Reintegro Automático</span>
+                        </div>
                     </div>
                     <div class="overflow-x-auto overflow-y-auto max-h-[65vh] custom-scrollbar">
                         <table class="w-full text-left text-xs whitespace-nowrap">
                             <thead class="bg-slate-950 text-slate-400 uppercase text-[10px] tracking-wider sticky top-0 z-20 shadow-[0_1px_0_0_#1e293b]">
-                                <tr><th class="p-3.5">Empleado</th><th class="p-3.5">Cédula</th><th class="p-3.5">Saldo Préstamo Actual ($)</th><th class="p-3.5">Anticipos Prestaciones (Bs)</th><th class="p-3.5 text-right">Acciones</th></tr>
+                                <tr>
+                                    <th class="p-3.5">Empleado</th>
+                                    <th class="p-3.5">Cédula</th>
+                                    <th class="p-3.5 text-center">Préstamos Activos</th>
+                                    <th class="p-3.5">Saldo Pendiente ($)</th>
+                                    <th class="p-3.5">Total Abonado ($)</th>
+                                    <th class="p-3.5">Anticipos Prestaciones (Bs)</th>
+                                    <th class="p-3.5 text-right">Acciones</th>
+                                </tr>
                             </thead>
                             <tbody id="tabla-prestamos-body" class="divide-y divide-slate-800/50"></tbody>
                         </table>
@@ -838,7 +851,7 @@
         </div>
 
         <!-- MODAL RECIBOS -->
-        <div id="modal-recibos-nomina" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+        <div id="modal-recibos-nomina" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4 z-[70]">
             <div class="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-4xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
                 <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-950">
                     <div><h3 class="font-bold text-sm text-white"><i class="fa-solid fa-receipt text-emerald-400 mr-2"></i> Recibos de Pago <span id="recibos-fecha-pago" class="text-emerald-400"></span></h3></div>
@@ -859,30 +872,170 @@
                     <p class="text-[11px] text-slate-400 mt-0.5">Cada anticipo se descuenta del capital acumulado en su fecha (LOTTT Art. 143)</p></div>
                     <button onclick="closeModal('modal-anticipos')" class="text-slate-400 px-2"><i class="fa-solid fa-xmark text-lg"></i></button>
                 </div>
-                <div class="p-4 bg-slate-950 border-b border-slate-800">
-                    <input type="hidden" id="anticipo-emp-id">
-                    <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
-                        <div class="sm:col-span-3"><label class="text-[11px] text-slate-400 block mb-1">Fecha del Anticipo</label>
-                        <input type="date" id="anticipo-fecha" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-cyan-500"></div>
-                        <div class="sm:col-span-4"><label class="text-[11px] text-slate-400 block mb-1">Monto (Bs)</label>
-                        <input type="number" step="0.01" id="anticipo-monto" placeholder="0.00" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-cyan-500"></div>
-                        <div class="sm:col-span-5"><label class="text-[11px] text-slate-400 block mb-1">Concepto (Opcional)</label>
-                            <div class="flex gap-2">
-                                <input type="text" id="anticipo-concepto" placeholder="Ej: Adelanto personal" class="flex-1 bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-cyan-500">
-                                <button onclick="agregarAnticipo()" class="bg-cyan-600 hover:bg-cyan-500 text-white text-xs px-3 py-2 rounded-lg font-bold flex items-center justify-center space-x-1 transition"><i class="fa-solid fa-plus"></i><span>Registrar</span></button>
-                            </div>
-                        </div>
-                    </div>
+                <input type="hidden" id="anticipo-emp-id">
+                <div class="px-4 py-2.5 bg-slate-950 border-b border-slate-800">
+                    <p class="text-[11px] text-slate-400"><i class="fa-solid fa-circle-info text-cyan-400 mr-1"></i> Módulo de <strong class="text-white">solo consulta</strong>. Los adelantos de prestaciones se registran desde <strong class="text-white">Prestaciones / Antigüedad</strong> y aquí se reflejan automáticamente.</p>
                 </div>
-                <div class="overflow-y-auto custom-scrollbar p-4" style="max-height: 45vh;">
+                <div class="overflow-y-auto custom-scrollbar p-4" style="max-height: 55vh;">
                     <table class="w-full text-left text-xs">
-                        <thead class="bg-slate-950 text-slate-400 uppercase text-[10px] sticky top-0 z-10"><tr><th class="p-2.5">Fecha</th><th class="p-2.5">Monto (Bs)</th><th class="p-2.5">Concepto</th><th class="p-2.5 text-right">Acción</th></tr></thead>
+                        <thead class="bg-slate-950 text-slate-400 uppercase text-[10px] sticky top-0 z-10"><tr><th class="p-2.5">Fecha</th><th class="p-2.5">Monto (Bs)</th><th class="p-2.5">Concepto</th></tr></thead>
                         <tbody id="tabla-anticipos-body" class="divide-y divide-slate-800/50"></tbody>
-                        <tfoot><tr class="bg-slate-900/60 font-bold"><td class="p-2.5 text-slate-300">TOTAL ANTICIPOS:</td><td class="p-2.5 text-cyan-300 font-mono" id="total-anticipos-bs">Bs. 0.00</td><td colspan="2"></td></tr></tfoot>
+                        <tfoot><tr class="bg-slate-900/60 font-bold"><td class="p-2.5 text-slate-300">TOTAL ANTICIPOS:</td><td class="p-2.5 text-cyan-300 font-mono" id="total-anticipos-bs">Bs. 0.00</td><td></td></tr></tfoot>
                     </table>
                 </div>
                 <div class="p-4 border-t border-slate-800 flex justify-end bg-slate-950">
                     <button onclick="closeModal('modal-anticipos')" class="px-4 py-2 rounded-lg text-xs bg-slate-800 text-slate-300 hover:bg-slate-700">Cerrar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL NUEVO PRÉSTAMO / ANTICIPO -->
+        <div id="modal-prestamo-nuevo" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+            <div class="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col">
+                <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-950">
+                    <div><h3 class="font-bold text-sm text-white flex items-center"><i class="fa-solid fa-hand-holding-dollar text-emerald-400 mr-2"></i> Nuevo Préstamo / Anticipo</h3>
+                    <p class="text-[11px] text-slate-400 mt-0.5">El recibo de entrega se genera automáticamente al guardar.</p></div>
+                    <button onclick="closeModal('modal-prestamo-nuevo')" class="text-slate-400 hover:text-white p-1"><i class="fa-solid fa-xmark text-lg"></i></button>
+                </div>
+                <div class="p-4 space-y-3">
+                    <div>
+                        <label class="text-[11px] font-semibold text-slate-400 block mb-1">Empleado</label>
+                        <select id="pres-nuevo-empleado" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-emerald-500"></select>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="text-[11px] font-semibold text-slate-400 block mb-1">Tipo</label>
+                            <select id="pres-nuevo-tipo" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-emerald-500">
+                                <option value="prestamo">Préstamo</option>
+                                <option value="anticipo">Anticipo</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-[11px] font-semibold text-slate-400 block mb-1">Monto ($)</label>
+                            <input type="number" step="0.01" min="0" id="pres-nuevo-monto" placeholder="0.00" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-emerald-300 font-bold outline-none focus:border-emerald-500">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="text-[11px] font-semibold text-slate-400 block mb-1">Tasa BCV (Bs/$)</label>
+                            <input type="number" step="0.01" min="0" id="pres-nuevo-tasa" placeholder="0.00" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-emerald-500">
+                        </div>
+                        <div>
+                            <label class="text-[11px] font-semibold text-slate-400 block mb-1">Fecha de Otorgamiento</label>
+                            <input type="date" id="pres-nuevo-fecha" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-emerald-500">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="text-[11px] font-semibold text-slate-400 block mb-1">Observaciones (opcional)</label>
+                        <textarea id="pres-nuevo-observaciones" rows="2" placeholder="Ej: Préstamo personal a 6 quincenas" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-emerald-500 resize-none"></textarea>
+                    </div>
+                    <div class="bg-slate-950 border border-slate-800 rounded-lg p-3 text-[11px] text-slate-400">
+                        <i class="fa-solid fa-circle-info text-sky-400 mr-1"></i>
+                        El saldo pendiente se descuenta automáticamente en <strong class="text-white">Procesar Nómina</strong>. Podés ajustar el monto manualmente en la columna <strong class="text-white">Préstamos ($)</strong>; la diferencia no descontada queda pendiente.
+                    </div>
+                </div>
+                <div class="p-4 border-t border-slate-800 flex justify-end space-x-2 bg-slate-950">
+                    <button onclick="closeModal('modal-prestamo-nuevo')" class="px-4 py-2 rounded-lg text-xs bg-slate-800 text-slate-300 hover:bg-slate-700">Cancelar</button>
+                    <button onclick="guardarNuevoPrestamo()" class="px-4 py-2 rounded-lg text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-bold flex items-center space-x-1.5"><i class="fa-solid fa-save"></i><span>Guardar y Generar Recibo</span></button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL DETALLE DE PRÉSTAMOS Y ABONOS -->
+        <div id="modal-prestamo-detalle" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+            <div class="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-6xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+                <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-950">
+                    <div><h3 class="font-bold text-sm text-white flex items-center"><i class="fa-solid fa-list text-sky-400 mr-2"></i> Préstamos y Abonos - <span id="pres-detalle-emp" class="text-sky-300"></span></h3>
+                    <p class="text-[11px] text-slate-400 mt-0.5">Los abonos por nómina no generan recibo extra; se reflejan en el recibo de nómina.</p></div>
+                    <button onclick="closeModal('modal-prestamo-detalle')" class="text-slate-400 hover:text-white p-1"><i class="fa-solid fa-xmark text-lg"></i></button>
+                </div>
+                <input type="hidden" id="pres-detalle-emp-id">
+                <div class="p-4 bg-slate-950/60 border-b border-slate-800 grid grid-cols-3 gap-3">
+                    <div class="bg-slate-900 border border-slate-800 rounded-lg p-3">
+                        <span class="text-[10px] text-slate-400 uppercase font-bold block">Saldo Pendiente</span>
+                        <span id="pres-detalle-saldo" class="text-lg font-black text-emerald-400 font-mono">$0.00</span>
+                    </div>
+                    <div class="bg-slate-900 border border-slate-800 rounded-lg p-3">
+                        <span class="text-[10px] text-slate-400 uppercase font-bold block">Total Abonado</span>
+                        <span id="pres-detalle-abonado" class="text-lg font-black text-cyan-300 font-mono">$0.00</span>
+                    </div>
+                    <div class="bg-slate-900 border border-slate-800 rounded-lg p-3">
+                        <span class="text-[10px] text-slate-400 uppercase font-bold block">Total Otorgado</span>
+                        <span id="pres-detalle-total" class="text-lg font-black text-white font-mono">$0.00</span>
+                    </div>
+                </div>
+                <div class="p-4 overflow-y-auto custom-scrollbar space-y-4 flex-1">
+                    <div class="flex justify-between items-center">
+                        <h4 class="text-xs font-bold text-emerald-400 uppercase tracking-wider"><i class="fa-solid fa-hand-holding-dollar mr-1.5"></i> Préstamos / Anticipos</h4>
+                        <p class="text-[10px] text-slate-500">Para registrar use el botón <strong class="text-slate-300">Nuevo Préstamo / Anticipo</strong> del módulo.</p>
+                    </div>
+                    <div class="overflow-x-auto border border-slate-800 rounded-lg">
+                        <table class="w-full text-left text-xs whitespace-nowrap">
+                            <thead class="bg-slate-950 text-slate-400 uppercase text-[10px] tracking-wider">
+                                <tr><th class="p-2.5">Fecha</th><th class="p-2.5">Tipo</th><th class="p-2.5 text-right">Monto ($)</th><th class="p-2.5 text-right">Abonado ($)</th><th class="p-2.5 text-right">Saldo ($)</th><th class="p-2.5 text-center">Estado</th><th class="p-2.5 text-right">Acciones</th></tr>
+                            </thead>
+                            <tbody id="tabla-prestamos-detalle-body" class="divide-y divide-slate-800/50"></tbody>
+                        </table>
+                    </div>
+                    <div class="flex justify-between items-center pt-2">
+                        <h4 class="text-xs font-bold text-cyan-400 uppercase tracking-wider"><i class="fa-solid fa-receipt mr-1.5"></i> Historial de Abonos</h4>
+                    </div>
+                    <div class="overflow-x-auto border border-slate-800 rounded-lg">
+                        <table class="w-full text-left text-xs whitespace-nowrap">
+                            <thead class="bg-slate-950 text-slate-400 uppercase text-[10px] tracking-wider">
+                                <tr><th class="p-2.5">Fecha</th><th class="p-2.5">Préstamo</th><th class="p-2.5 text-right">Monto ($)</th><th class="p-2.5 text-right">Tasa</th><th class="p-2.5 text-center">Origen</th><th class="p-2.5 text-right">Acciones</th></tr>
+                            </thead>
+                            <tbody id="tabla-abonos-detalle-body" class="divide-y divide-slate-800/50"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="p-3 bg-slate-950 border-t border-slate-800 flex justify-end">
+                    <button onclick="closeModal('modal-prestamo-detalle')" class="px-4 py-2 rounded-lg text-xs bg-slate-800 text-slate-300 hover:bg-slate-700">Cerrar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL REGISTRAR ABONO -->
+        <div id="modal-prestamo-abono" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+            <div class="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col">
+                <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-950">
+                    <div><h3 class="font-bold text-sm text-white flex items-center"><i class="fa-solid fa-plus text-emerald-400 mr-2"></i> Registrar Abono - <span id="pres-abono-emp" class="text-emerald-300"></span></h3>
+                    <p class="text-[11px] text-slate-400 mt-0.5">Saldo máximo disponible: <span id="pres-abono-saldo-max" class="font-bold text-emerald-400">$0.00</span></p></div>
+                    <button onclick="closeModal('modal-prestamo-abono')" class="text-slate-400 hover:text-white p-1"><i class="fa-solid fa-xmark text-lg"></i></button>
+                </div>
+                <div class="p-4 space-y-3">
+                    <input type="hidden" id="pres-abono-prestamo-id">
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="text-[11px] font-semibold text-slate-400 block mb-1">Monto ($)</label>
+                            <input type="number" step="0.01" min="0" id="pres-abono-monto" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-emerald-300 font-bold outline-none focus:border-emerald-500">
+                        </div>
+                        <div>
+                            <label class="text-[11px] font-semibold text-slate-400 block mb-1">Tasa BCV (Bs/$)</label>
+                            <input type="number" step="0.01" min="0" id="pres-abono-tasa" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-emerald-500">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="text-[11px] font-semibold text-slate-400 block mb-1">Fecha del Abono</label>
+                            <input type="date" id="pres-abono-fecha" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-emerald-500">
+                        </div>
+                        <div>
+                            <label class="text-[11px] font-semibold text-slate-400 block mb-1">Origen</label>
+                            <select id="pres-abono-origen" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-emerald-500">
+                                <option value="manual">Manual (efectivo/transferencia)</option>
+                                <option value="externo">Externo / fuera de nómina</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="bg-slate-950 border border-slate-800 rounded-lg p-3 text-[11px] text-slate-400">
+                        <i class="fa-solid fa-circle-info text-sky-400 mr-1"></i>
+                        El abono genera un recibo independiente. Si el abono se hace por nómina, no uses este formulario: se registra automáticamente al procesar la nómina.
+                    </div>
+                </div>
+                <div class="p-4 border-t border-slate-800 flex justify-end space-x-2 bg-slate-950">
+                    <button onclick="closeModal('modal-prestamo-abono')" class="px-4 py-2 rounded-lg text-xs bg-slate-800 text-slate-300 hover:bg-slate-700">Cancelar</button>
+                    <button onclick="guardarAbonoPrestamo()" class="px-4 py-2 rounded-lg text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-bold flex items-center space-x-1.5"><i class="fa-solid fa-save"></i><span>Guardar y Generar Recibo</span></button>
                 </div>
             </div>
         </div>
