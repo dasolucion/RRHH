@@ -59,6 +59,7 @@
                     <button id="nav-departamentos" onclick="switchTab('departamentos')" class="tab-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition"><i class="fa-solid fa-building w-5 text-center"></i><span>Departamentos</span></button>
                     <button id="nav-cargos" onclick="switchTab('cargos')" class="tab-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition"><i class="fa-solid fa-briefcase w-5 text-center"></i><span>Cargos</span></button>
                     <button id="nav-empleados" onclick="switchTab('empleados')" class="tab-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition"><i class="fa-solid fa-users w-5 text-center"></i><span>Empleados</span></button>
+                    <button id="nav-asistencia" data-feature="nomina.dahua_asistencia" onclick="switchTab('asistencia')" class="tab-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition"><i class="fa-solid fa-fingerprint w-5 text-center text-amber-400"></i><span>Asistencia</span></button>
                     <div id="sep-salarios" class="pt-2 my-1 border-t border-slate-800"></div>
                     <button id="nav-salarios" onclick="switchTab('salarios')" class="tab-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition"><i class="fa-solid fa-chart-line w-5 text-center text-cyan-400"></i><span>Histórico Salarial</span></button>
                     <button id="nav-prestamos" onclick="switchTab('prestamos')" class="tab-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition"><i class="fa-solid fa-hand-holding-dollar w-5 text-center text-emerald-400"></i><span>Préstamos y Anticipos</span></button>
@@ -163,6 +164,77 @@
                             <tbody id="tabla-empleados-body" class="divide-y divide-slate-800/50"></tbody>
                         </table>
                     </div>
+                </section>
+            </div>
+
+            <!-- ASISTENCIA -->
+            <div id="tab-asistencia-content" class="tab-content hidden space-y-6">
+                <section class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl space-y-4">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-800 pb-3">
+                        <div>
+                            <h3 class="font-bold text-sm text-white flex items-center"><i class="fa-solid fa-fingerprint text-amber-400 mr-2 text-base"></i> Control de Asistencia</h3>
+                            <p class="text-[11px] text-slate-400">Registros del reloj biométrico (Dahua) y faltas del personal</p>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            <button onclick="recargarAsistencia()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-3.5 py-2 rounded-lg font-semibold flex items-center space-x-1.5 transition" title="Volver a leer los registros de Supabase"><i class="fa-solid fa-rotate"></i><span>Actualizar</span></button>
+                            <button onclick="aplicarAsistenciaDesdeModulo()" class="bg-amber-600 hover:bg-amber-500 text-white text-xs px-3.5 py-2 rounded-lg font-semibold flex items-center space-x-1.5 transition shadow-lg shadow-amber-600/20" title="Aplicar los días faltantes a la nómina en curso"><i class="fa-solid fa-calculator"></i><span>Aplicar a Nómina</span></button>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                            <label class="text-[11px] font-semibold text-slate-400 block mb-1">Mes</label>
+                            <input type="month" id="asist-mes" onchange="renderModuloAsistencia()" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-amber-500 font-mono font-bold">
+                        </div>
+                        <div>
+                            <label class="text-[11px] font-semibold text-slate-400 block mb-1">Empleado</label>
+                            <select id="asist-emp" onchange="renderTablaAsistencia()" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-amber-500">
+                                <option value="">Todos los empleados</option>
+                            </select>
+                        </div>
+                        <div class="flex items-end">
+                            <p id="asist-ultima-sync" class="text-[11px] text-slate-400 leading-tight"><i class="fa-solid fa-circle-info text-slate-500 mr-1"></i> Leyendo registros...</p>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <div class="bg-slate-950 border border-slate-800 rounded-lg p-3">
+                            <span class="text-[10px] text-slate-400 uppercase font-bold block">Días Hábiles</span>
+                            <span id="asist-kpi-habiles" class="text-lg font-black text-white font-mono">0</span>
+                        </div>
+                        <div class="bg-slate-950 border border-slate-800 rounded-lg p-3">
+                            <span class="text-[10px] text-slate-400 uppercase font-bold block">Asistencias</span>
+                            <span id="asist-kpi-asistencias" class="text-lg font-black text-emerald-400 font-mono">0</span>
+                        </div>
+                        <div class="bg-slate-950 border border-slate-800 rounded-lg p-3">
+                            <span class="text-[10px] text-slate-400 uppercase font-bold block">Faltas</span>
+                            <span id="asist-kpi-faltas" class="text-lg font-black text-rose-400 font-mono">0</span>
+                        </div>
+                        <div class="bg-slate-950 border border-slate-800 rounded-lg p-3">
+                            <span class="text-[10px] text-slate-400 uppercase font-bold block">Justificadas</span>
+                            <span id="asist-kpi-justificadas" class="text-lg font-black text-sky-400 font-mono">0</span>
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto overflow-y-auto max-h-[60vh] custom-scrollbar border border-slate-800 rounded-lg">
+                        <table class="w-full text-left text-xs whitespace-nowrap">
+                            <thead class="bg-slate-950 text-slate-400 uppercase text-[10px] tracking-wider sticky top-0 z-20 shadow-[0_1px_0_0_#1e293b]">
+                                <tr>
+                                    <th class="p-3">Empleado</th>
+                                    <th class="p-3">Cédula</th>
+                                    <th class="p-3 text-center">ID Dahua</th>
+                                    <th class="p-3 text-center">Asistidos</th>
+                                    <th class="p-3 text-center">Faltas</th>
+                                    <th class="p-3 text-center">Justificadas</th>
+                                    <th class="p-3 text-center">Estado</th>
+                                    <th class="p-3 text-right">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabla-asistencia-body" class="divide-y divide-slate-800/50"></tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-[10px] text-slate-500"><i class="fa-solid fa-circle-info mr-1"></i> Las faltas se calculan sobre días hábiles (lun-vie, sin feriados) desde la fecha de ingreso. Los días posteriores a la última sincronización del reloj se muestran como <strong class="text-slate-400">sin datos</strong>, no como faltas.</p>
                 </section>
             </div>
 
@@ -1254,6 +1326,83 @@
                             <i class="fa-brands fa-whatsapp mr-1"></i><span>Enviar por WhatsApp</span>
                         </button>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL JUSTIFICATIVO DE FALTA -->
+        <div id="modal-justificativo-falta" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm hidden items-center justify-center p-4 z-[60]">
+            <div class="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col">
+                <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-950">
+                    <div>
+                        <h3 class="font-bold text-sm text-white flex items-center"><i class="fa-solid fa-file-medical text-sky-400 mr-2"></i> Justificativo de Falta</h3>
+                        <p class="text-[11px] text-slate-400 mt-0.5">Empleado: <span id="just-emp-nombre" class="text-sky-300 font-semibold"></span></p>
+                    </div>
+                    <button onclick="closeModal('modal-justificativo-falta')" class="text-slate-400 hover:text-white p-1"><i class="fa-solid fa-xmark text-lg"></i></button>
+                </div>
+                <input type="hidden" id="just-emp-id">
+                <div class="p-4 space-y-3">
+                    <div>
+                        <label class="text-[11px] font-semibold text-slate-400 block mb-1">Fecha de la falta</label>
+                        <select id="just-fecha" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-sky-500"></select>
+                    </div>
+                    <div>
+                        <label class="text-[11px] font-semibold text-slate-400 block mb-1">Motivo</label>
+                        <textarea id="just-motivo" rows="3" placeholder="Ej: Cita médica, permiso personal, duelo..." class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-sky-500 resize-none"></textarea>
+                    </div>
+                </div>
+                <div class="p-4 border-t border-slate-800 flex justify-end space-x-2 bg-slate-950">
+                    <button onclick="closeModal('modal-justificativo-falta')" class="px-4 py-2 rounded-lg text-xs bg-slate-800 text-slate-300 hover:bg-slate-700">Cancelar</button>
+                    <button onclick="guardarJustificativoFalta()" class="px-4 py-2 rounded-lg text-xs bg-sky-600 hover:bg-sky-500 text-white font-bold flex items-center space-x-1.5"><i class="fa-solid fa-save"></i><span>Guardar</span></button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL DETALLE DE ASISTENCIA -->
+        <div id="modal-asistencia-detalle" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+            <div class="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-4xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+                <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-950">
+                    <div>
+                        <h3 class="font-bold text-sm text-white flex items-center"><i class="fa-solid fa-calendar-days text-amber-400 mr-2"></i> Asistencia - <span id="asist-det-emp" class="text-amber-300"></span></h3>
+                        <p class="text-[11px] text-slate-400 mt-0.5">Detalle diario del mes <span id="asist-det-mes" class="font-mono text-slate-300"></span></p>
+                    </div>
+                    <button onclick="closeModal('modal-asistencia-detalle')" class="text-slate-400 hover:text-white p-1"><i class="fa-solid fa-xmark text-lg"></i></button>
+                </div>
+                <input type="hidden" id="asist-det-emp-id">
+                <div class="p-4 bg-slate-950/60 border-b border-slate-800 grid grid-cols-2 sm:grid-cols-5 gap-3">
+                    <div class="bg-slate-900 border border-slate-800 rounded-lg p-2.5">
+                        <span class="text-[10px] text-slate-400 uppercase font-bold block">Días Hábiles</span>
+                        <span id="asist-det-habiles" class="text-base font-black text-white font-mono">0</span>
+                    </div>
+                    <div class="bg-slate-900 border border-slate-800 rounded-lg p-2.5">
+                        <span class="text-[10px] text-slate-400 uppercase font-bold block">Asistidos</span>
+                        <span id="asist-det-asistidos" class="text-base font-black text-emerald-400 font-mono">0</span>
+                    </div>
+                    <div class="bg-slate-900 border border-slate-800 rounded-lg p-2.5">
+                        <span class="text-[10px] text-slate-400 uppercase font-bold block">Faltas</span>
+                        <span id="asist-det-faltas" class="text-base font-black text-rose-400 font-mono">0</span>
+                    </div>
+                    <div class="bg-slate-900 border border-slate-800 rounded-lg p-2.5">
+                        <span class="text-[10px] text-slate-400 uppercase font-bold block">Justificadas</span>
+                        <span id="asist-det-justificadas" class="text-base font-black text-sky-400 font-mono">0</span>
+                    </div>
+                    <div class="bg-slate-900 border border-slate-800 rounded-lg p-2.5">
+                        <span class="text-[10px] text-slate-400 uppercase font-bold block">ID Dahua</span>
+                        <span id="asist-det-device" class="text-base font-black text-amber-400 font-mono">—</span>
+                    </div>
+                </div>
+                <div class="p-4 overflow-y-auto custom-scrollbar flex-1">
+                    <div class="overflow-x-auto border border-slate-800 rounded-lg">
+                        <table class="w-full text-left text-xs whitespace-nowrap">
+                            <thead class="bg-slate-950 text-slate-400 uppercase text-[10px] tracking-wider sticky top-0 z-10">
+                                <tr><th class="p-2.5">Fecha</th><th class="p-2.5">Día</th><th class="p-2.5 text-center">Entrada</th><th class="p-2.5 text-center">Salida</th><th class="p-2.5 text-center">Estado</th><th class="p-2.5 text-right">Acción</th></tr>
+                            </thead>
+                            <tbody id="tabla-asistencia-detalle-body" class="divide-y divide-slate-800/50"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="p-3 bg-slate-950 border-t border-slate-800 flex justify-end">
+                    <button onclick="closeModal('modal-asistencia-detalle')" class="px-4 py-2 rounded-lg text-xs bg-slate-800 text-slate-300 hover:bg-slate-700">Cerrar</button>
                 </div>
             </div>
         </div>

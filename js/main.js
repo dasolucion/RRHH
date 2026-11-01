@@ -64,6 +64,8 @@ async function switchTab(tab) {
     if (tab === 'nomina') {
         await cargarBorradorDesdeNube();
         renderTablaNominaEditable();
+    } else if (tab === 'asistencia') {
+        await renderModuloAsistencia();
     } else if (tab === 'historico') {
         renderHistoricoNominas();
     } else if (tab === 'prestamos') {
