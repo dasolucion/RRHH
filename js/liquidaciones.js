@@ -133,6 +133,37 @@ async function guardarPrestaciones() {
     showToast('Liquidación guardada en el histórico');
 }
 
+async function firmarLiquidacionActual() {
+    const p = appState.calculoPrestacionesActual;
+    if (!p || !p.empleado) return showToast('Primero debe calcular una liquidación', 'error');
+
+    let liq = null;
+    if (p.id) {
+        liq = appState.prestaciones.find(x => String(x.id) === String(p.id)) || null;
+    }
+
+    if (!liq) {
+        // No hay liquidación guardada: se calcula de nuevo y se persiste para poder firmar
+        await calcularPrestaciones();
+        const r = appState.calculoPrestacionesActual;
+        if (!r || !r.empleado) return showToast('Error al calcular la liquidación', 'error');
+
+        const pay = {
+            empleado_id: r.empleado.id, empleado: r.empleado.nombre,
+            cargo: r.empleado.cargos?.nombre || '-', fecha_ingreso: r.fecha_ingreso,
+            fecha_calculo: r.fecha_calculo, motivo: r.motivo, tiempo_servicio: r.tiempo_servicio,
+            dias_pagar: r.dias_pagar, salario_base: r.salario_base, tasa_bcv: r.tasa_bcv,
+            total_usd: r.total_usd, total_bs: r.total_bs, detalle_calculo: r
+        };
+        await safeQuery(supabaseClient.from('prestaciones').insert([pay]));
+        fetchAllData();
+        liq = appState.prestaciones.find(x => String(x.empleado_id) === String(r.empleado.id) && x.fecha_calculo === r.fecha_calculo) || null;
+        if (!liq) return showToast('No se pudo persistir la liquidación calculada', 'error');
+    }
+
+    await abrirFirmaLiquidacion(String(liq.id));
+}
+
 function renderHistoricoPrestaciones() {
     const isMaster = appState.usuarioActual?.rol === 'master';
     const tbody = gId('tabla-historico-prestaciones-body');
