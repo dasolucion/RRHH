@@ -176,6 +176,10 @@
                             <p class="text-[11px] text-slate-400">Registros del reloj biométrico (Dahua) y faltas del personal</p>
                         </div>
                         <div class="flex flex-wrap gap-2">
+                            <label id="asist-btn-importar" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3.5 py-2 rounded-lg font-semibold flex items-center space-x-1.5 transition shadow-lg shadow-emerald-600/20 cursor-pointer" title="Cargar el reporte de marcaciones descargado del reloj (Excel)">
+                                <i class="fa-solid fa-file-excel"></i><span>Importar Excel</span>
+                                <input type="file" id="input-asistencia-excel" accept=".xlsx,.xls" class="hidden" onchange="importarExcelAsistencia(event)">
+                            </label>
                             <button onclick="recargarAsistencia()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-3.5 py-2 rounded-lg font-semibold flex items-center space-x-1.5 transition" title="Volver a leer los registros de Supabase"><i class="fa-solid fa-rotate"></i><span>Actualizar</span></button>
                             <button onclick="aplicarAsistenciaDesdeModulo()" class="bg-amber-600 hover:bg-amber-500 text-white text-xs px-3.5 py-2 rounded-lg font-semibold flex items-center space-x-1.5 transition shadow-lg shadow-amber-600/20" title="Aplicar los días faltantes a la nómina en curso"><i class="fa-solid fa-calculator"></i><span>Aplicar a Nómina</span></button>
                         </div>
@@ -1326,6 +1330,76 @@
                             <i class="fa-brands fa-whatsapp mr-1"></i><span>Enviar por WhatsApp</span>
                         </button>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL IMPORTAR ASISTENCIA DESDE EXCEL -->
+        <div id="modal-asistencia-import" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm hidden items-center justify-center p-4 z-[60]">
+            <div class="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+                <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-950">
+                    <div>
+                        <h3 class="font-bold text-sm text-white flex items-center"><i class="fa-solid fa-file-excel text-emerald-400 mr-2"></i> Importar Marcaciones desde Excel</h3>
+                        <p class="text-[11px] text-slate-400 mt-0.5" id="imp-asist-archivo">—</p>
+                    </div>
+                    <button onclick="closeModal('modal-asistencia-import')" class="text-slate-400 hover:text-white p-1"><i class="fa-solid fa-xmark text-lg"></i></button>
+                </div>
+
+                <div class="p-4 space-y-4 overflow-y-auto custom-scrollbar">
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div class="bg-slate-950 border border-slate-800 rounded-lg p-3">
+                            <span class="text-[10px] text-slate-400 uppercase font-bold block">Marcas leídas</span>
+                            <span id="imp-asist-marcas" class="text-lg font-black text-white font-mono">0</span>
+                        </div>
+                        <div class="bg-slate-950 border border-slate-800 rounded-lg p-3">
+                            <span class="text-[10px] text-slate-400 uppercase font-bold block">Días con marcas</span>
+                            <span id="imp-asist-dias" class="text-lg font-black text-sky-400 font-mono">0</span>
+                        </div>
+                        <div class="bg-slate-950 border border-slate-800 rounded-lg p-3">
+                            <span class="text-[10px] text-slate-400 uppercase font-bold block">Empleados</span>
+                            <span id="imp-asist-emps" class="text-lg font-black text-emerald-400 font-mono">0</span>
+                        </div>
+                        <div class="bg-slate-950 border border-slate-800 rounded-lg p-3">
+                            <span class="text-[10px] text-slate-400 uppercase font-bold block">Rango del archivo</span>
+                            <span id="imp-asist-rango" class="text-[11px] font-bold text-amber-400 font-mono">—</span>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="text-[11px] font-semibold text-slate-400 block mb-1">Importar desde</label>
+                            <input type="date" id="imp-asist-desde" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-emerald-500 font-mono font-bold">
+                        </div>
+                        <div>
+                            <label class="text-[11px] font-semibold text-slate-400 block mb-1">Importar hasta</label>
+                            <input type="date" id="imp-asist-hasta" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-emerald-500 font-mono font-bold">
+                        </div>
+                    </div>
+
+                    <p class="text-[11px] text-slate-400 bg-slate-950 border border-slate-800 rounded-lg p-3 leading-relaxed">
+                        <i class="fa-solid fa-circle-info text-emerald-400 mr-1"></i>
+                        Se toma la <strong class="text-slate-200">primera</strong> y la <strong class="text-slate-200">última</strong> marcación de cada día como <strong class="text-emerald-300">entrada</strong> y <strong class="text-rose-300">salida</strong>. Un día con al menos una marca cuenta como <strong class="text-slate-200">asistido</strong>. El empleado se identifica por su <strong class="text-slate-200">ID Dahua</strong> registrado en Empleados; los IDs que no existan en el sistema se omiten. Las marcas que ya están en la base no se duplican.
+                    </p>
+
+                    <div id="imp-asist-no-encontrados-wrap" class="hidden">
+                        <p class="text-[11px] font-semibold text-amber-400 mb-1"><i class="fa-solid fa-triangle-exclamation mr-1"></i> IDs del archivo sin empleado en el sistema</p>
+                        <p id="imp-asist-no-encontrados" class="text-[11px] text-slate-400 font-mono bg-slate-950 border border-amber-900/40 rounded-lg p-2.5"></p>
+                    </div>
+
+                    <div id="imp-asist-progress-wrap" class="hidden">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-[11px] text-slate-400">Guardando en Supabase...</span>
+                            <span id="imp-asist-progress-txt" class="text-[11px] text-emerald-400 font-mono font-bold">0%</span>
+                        </div>
+                        <div class="w-full h-2 bg-slate-950 border border-slate-800 rounded-full overflow-hidden">
+                            <div id="imp-asist-progress-bar" class="h-full bg-emerald-500 transition-all duration-200" style="width:0%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-4 border-t border-slate-800 flex justify-end space-x-2 bg-slate-950">
+                    <button onclick="closeModal('modal-asistencia-import')" class="px-4 py-2 rounded-lg text-xs bg-slate-800 text-slate-300 hover:bg-slate-700">Cancelar</button>
+                    <button id="imp-asist-btn-confirmar" onclick="confirmarImportacionAsistencia()" class="px-4 py-2 rounded-lg text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-bold flex items-center space-x-1.5"><i class="fa-solid fa-cloud-arrow-up"></i><span>Importar</span></button>
                 </div>
             </div>
         </div>

@@ -83,9 +83,11 @@ async function aplicarAsistenciaANomina() {
             continue;
         }
 
-        const asistidosSet = (e.device_user_id && diasAsistidos[String(e.device_user_id).trim()])
-            || (e.cedula && diasAsistidosCedula[String(e.cedula).trim()])
-            || null;
+        const setDev = (e.device_user_id && diasAsistidos[String(e.device_user_id).trim()]) || null;
+        const setCed = (e.cedula && diasAsistidosCedula[String(e.cedula).trim()]) || null;
+        const asistidosSet = (setDev && setCed)
+            ? new Set([...setDev, ...setCed])
+            : (setDev || setCed || null);
 
         if (!asistidosSet) {
             // Sin lecturas del reloj para este empleado: no se puede afirmar que faltó
@@ -165,6 +167,13 @@ async function renderModuloAsistencia(force = false) {
         if (tbody) tbody.innerHTML = '<tr><td colspan="8" class="p-4 text-center text-rose-400">No se pudieron cargar los registros.</td></tr>';
         return;
     }
+
+    const btnImport = gId('asist-btn-importar');
+    if (btnImport) {
+        const puedeImportar = typeof tienePermiso === 'function' ? tienePermiso('asistencia', 'editar') : true;
+        btnImport.style.display = puedeImportar ? '' : 'none';
+    }
+
     renderTablaAsistencia();
 }
 
@@ -234,11 +243,8 @@ async function cargarAsistenciaMes(mes, force = false) {
         if (!dias.has(fecha)) dias.set(fecha, { entrada: null, salida: null, count: 0 });
         const dia = dias.get(fecha);
         dia.count++;
-        if (String(r.tipo || '').toLowerCase() === 'salida') {
-            if (!dia.salida || hora > dia.salida) dia.salida = hora;
-        } else if (!dia.entrada || hora < dia.entrada) {
-            dia.entrada = hora;
-        }
+        if (!dia.entrada || hora < dia.entrada) dia.entrada = hora;
+        if (!dia.salida || hora > dia.salida) dia.salida = hora;
     };
 
     (registros || []).forEach(r => {
@@ -252,8 +258,8 @@ async function cargarAsistenciaMes(mes, force = false) {
     const emps = (appState.empleados || []).filter(e => e.activo).map(e => {
         const deviceMap = porDevice.get(String(e.device_user_id || '').trim()) || null;
         const cedMap = porCedula.get(String(e.cedula || '').trim()) || null;
-        const dayMap = deviceMap || cedMap;
-        const fuente = deviceMap ? 'device' : (cedMap ? 'cedula' : null);
+        const dayMap = _asistUnirDias(deviceMap, cedMap);
+        const fuente = dayMap ? (deviceMap && cedMap ? 'mixta' : (deviceMap ? 'device' : 'cedula')) : null;
         const tieneId = !!(e.device_user_id || e.cedula);
         const fIngreso = e.fecha_ingreso ? new Date(e.fecha_ingreso + 'T00:00:00') : null;
 
@@ -283,7 +289,8 @@ async function cargarAsistenciaMes(mes, force = false) {
                 dow: dh.getDay(),
                 estado,
                 entrada: reg ? reg.entrada : null,
-                salida: reg ? reg.salida : null,
+                salida: reg && reg.salida && reg.salida !== reg.entrada ? reg.salida : null,
+                marcas: reg ? reg.count : 0,
                 justificativo: just
             });
         });
@@ -521,6 +528,377 @@ async function quitarJustificativoAsistencia(justId) {
 async function recargarAsistencia() {
     await renderModuloAsistencia(true);
     showToast('Asistencia actualizada');
+}
+
+/* ============================================================
+   CARGA MANUAL DEL REPORTE EXCEL DEL RELOJ (Dahua)
+   Columnas esperadas: Tiempo | ID de usuario | Nombre | ...
+   Por cada empleado y día se registra la primera marca como
+   entrada y la última como salida. Un día con marcas = asistió.
+   ============================================================ */
+
+let _asistImport = null;
+
+function _asistNormTxt(s) {
+    return String(s == null ? '' : s)
+        .trim().toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+function _asistDosDigitos(n) {
+    return String(n).padStart(2, '0');
+}
+
+function _asistParseFechaHora(valor) {
+    const conSegundos = (h, m, s) => `${_asistDosDigitos(h)}:${_asistDosDigitos(m)}:${_asistDosDigitos(s || 0)}`;
+
+    if (valor instanceof Date && !isNaN(valor)) {
+        return {
+            fecha: `${valor.getFullYear()}-${_asistDosDigitos(valor.getMonth() + 1)}-${_asistDosDigitos(valor.getDate())}`,
+            hora: conSegundos(valor.getHours(), valor.getMinutes(), valor.getSeconds())
+        };
+    }
+    const s = String(valor == null ? '' : valor).trim();
+    if (!s) return null;
+
+    // 2026-04-29 13:24:06  /  2026-04-29T13:24:06
+    let m = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?/);
+    if (m) {
+        return {
+            fecha: `${m[1]}-${_asistDosDigitos(m[2])}-${_asistDosDigitos(m[3])}`,
+            hora: conSegundos(m[4], m[5], m[6])
+        };
+    }
+    // 29/04/2026 13:24:06  /  29/04/26 13:24
+    m = s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})[ ,]+(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+    if (m) {
+        const anio = m[3].length === 2 ? '20' + m[3] : m[3];
+        return {
+            fecha: `${anio}-${_asistDosDigitos(m[2])}-${_asistDosDigitos(m[1])}`,
+            hora: conSegundos(m[4], m[5], m[6])
+        };
+    }
+    // 2026-04-29 (sin hora): se ignora, no sirve para entrada/salida
+    return null;
+}
+
+function _asistMapaEmpleados() {
+    const porDevice = new Map();
+    (appState.empleados || []).forEach(e => {
+        if (e.device_user_id == null || String(e.device_user_id).trim() === '') return;
+        const raw = String(e.device_user_id).trim();
+        porDevice.set(raw, e);
+        const num = parseInt(raw, 10);
+        if (!isNaN(num)) porDevice.set(String(num), e);
+    });
+    return porDevice;
+}
+
+function _asistUnirDias(a, b) {
+    if (!a) return b || null;
+    if (!b) return a;
+    const out = new Map(a);
+    b.forEach((dia, fecha) => {
+        const prev = out.get(fecha);
+        if (!prev) { out.set(fecha, dia); return; }
+        out.set(fecha, {
+            entrada: (!prev.entrada || (dia.entrada && dia.entrada < prev.entrada)) ? dia.entrada : prev.entrada,
+            salida: (!prev.salida || (dia.salida && dia.salida > prev.salida)) ? dia.salida : prev.salida,
+            count: (prev.count || 0) + (dia.count || 0)
+        });
+    });
+    return out;
+}
+
+async function importarExcelAsistencia(ev) {
+    const input = ev && ev.target;
+    const file = input && input.files && input.files[0];
+    if (input) input.value = ''; // permite volver a elegir el mismo archivo
+    if (!file) return;
+
+    if (typeof tienePermiso === 'function' && !tienePermiso('asistencia', 'editar')) {
+        return showToast('No tiene permiso para importar asistencia', 'error');
+    }
+    if (typeof XLSX === 'undefined') {
+        return showToast('La librería de Excel no está disponible. Verifique la conexión a internet.', 'error');
+    }
+
+    showToast('Leyendo ' + file.name + '...');
+
+    try {
+        const buffer = await file.arrayBuffer();
+        const wb = XLSX.read(buffer, { type: 'array' });
+        const hoja = wb.Sheets[wb.SheetNames[0]];
+        if (!hoja) throw new Error('El archivo no contiene hojas');
+
+        const filas = XLSX.utils.sheet_to_json(hoja, { header: 1, raw: false, defval: '' });
+        if (!filas || filas.length < 2) throw new Error('El archivo está vacío');
+
+        // Detectar encabezados (Tiempo / ID de usuario / Nombre)
+        let iTiempo = 0, iId = 1, iNombre = 2, filaEncabezado = -1;
+        for (let i = 0; i < Math.min(filas.length, 25); i++) {
+            const cols = (filas[i] || []).map(_asistNormTxt);
+            const t = cols.findIndex(c => c === 'tiempo' || c === 'fecha' || c === 'fecha y hora' || c === 'fecha/hora');
+            const id = cols.findIndex(c => c.includes('id de usuario') || c === 'id usuario' || c === 'id' || c === 'user id');
+            const nom = cols.findIndex(c => c === 'nombre' || c === 'nombre de usuario' || c === 'empleado');
+            if (t >= 0 && id >= 0) {
+                iTiempo = t; iId = id; iNombre = nom >= 0 ? nom : -1;
+                filaEncabezado = i;
+                break;
+            }
+        }
+        if (filaEncabezado < 0) {
+            throw new Error('No se encontró el formato esperado (columnas "Tiempo" e "ID de usuario")');
+        }
+
+        const grupos = new Map(); // device|fecha -> { device, nombre, fecha, primera, ultima, marcas }
+        const diasSet = new Set();
+        let totalMarcas = 0, minFecha = null, maxFecha = null;
+
+        for (let i = filaEncabezado + 1; i < filas.length; i++) {
+            const fila = filas[i] || [];
+            const marca = _asistParseFechaHora(fila[iTiempo]);
+            if (!marca) continue;
+            const device = String(fila[iId] == null ? '' : fila[iId]).trim();
+            if (!device) continue;
+            const nombre = iNombre >= 0 ? String(fila[iNombre] || '').trim() : '';
+
+            totalMarcas++;
+            diasSet.add(marca.fecha);
+            if (!minFecha || marca.fecha < minFecha) minFecha = marca.fecha;
+            if (!maxFecha || marca.fecha > maxFecha) maxFecha = marca.fecha;
+
+            const clave = device + '|' + marca.fecha;
+            if (!grupos.has(clave)) {
+                grupos.set(clave, {
+                    device, nombre, fecha: marca.fecha,
+                    primera: marca.hora, ultima: marca.hora, marcas: 0
+                });
+            }
+            const g = grupos.get(clave);
+            g.marcas++;
+            if (marca.hora < g.primera) g.primera = marca.hora;
+            if (marca.hora > g.ultima) g.ultima = marca.hora;
+            if (!g.nombre && nombre) g.nombre = nombre;
+        }
+
+        if (totalMarcas === 0) throw new Error('No se encontraron marcaciones con fecha y hora válidas');
+
+        const porDevice = _asistMapaEmpleados();
+        const noEncontrados = new Set();
+        const empsEncontrados = new Set();
+        grupos.forEach(g => {
+            const emp = porDevice.get(g.device);
+            if (emp) empsEncontrados.add(String(emp.id));
+            else noEncontrados.add(g.device);
+        });
+
+        _asistImport = {
+            archivo: file.name,
+            grupos,
+            totalMarcas,
+            dias: diasSet.size,
+            empleados: empsEncontrados.size,
+            minFecha,
+            maxFecha,
+            noEncontrados: [...noEncontrados].sort((a, b) => (parseInt(a, 10) || 0) - (parseInt(b, 10) || 0)),
+            porDevice
+        };
+
+        abrirModalImportacionAsistencia();
+    } catch (e) {
+        console.error('Error importando Excel de asistencia:', e);
+        showToast('No se pudo leer el archivo: ' + (e.message || e), 'error');
+    }
+}
+
+function abrirModalImportacionAsistencia() {
+    if (!_asistImport) return;
+
+    const d = _asistImport;
+    if (gId('imp-asist-archivo')) gId('imp-asist-archivo').innerText = d.archivo;
+    if (gId('imp-asist-marcas')) gId('imp-asist-marcas').innerText = d.totalMarcas.toLocaleString('es-VE');
+    if (gId('imp-asist-dias')) gId('imp-asist-dias').innerText = d.dias.toLocaleString('es-VE');
+    if (gId('imp-asist-emps')) gId('imp-asist-emps').innerText = d.empleados;
+    if (gId('imp-asist-rango')) gId('imp-asist-rango').innerText = `${_asistFechaCorta(d.minFecha)} - ${_asistFechaCorta(d.maxFecha)}`;
+
+    // Por defecto, el mes que se está consultando en el módulo
+    const mes = (gId('asist-mes') && gId('asist-mes').value) || _asistMesActualISO();
+    const [y, m] = mes.split('-').map(Number);
+    const primero = `${mes}-01`;
+    const ultimo = fechaLocalISO(new Date(y, m, 0));
+    if (gId('imp-asist-desde')) gId('imp-asist-desde').value = primero;
+    if (gId('imp-asist-hasta')) gId('imp-asist-hasta').value = ultimo;
+
+    const wrap = gId('imp-asist-no-encontrados-wrap');
+    if (wrap) {
+        if (d.noEncontrados.length > 0) {
+            wrap.classList.remove('hidden');
+            const lista = d.noEncontrados.slice(0, 25).join(', ');
+            gId('imp-asist-no-encontrados').innerText = d.noEncontrados.length > 25
+                ? `${lista}... (${d.noEncontrados.length} en total)`
+                : lista;
+        } else {
+            wrap.classList.add('hidden');
+        }
+    }
+
+    if (gId('imp-asist-progress-wrap')) gId('imp-asist-progress-wrap').classList.add('hidden');
+    if (gId('imp-asist-progress-bar')) gId('imp-asist-progress-bar').style.width = '0%';
+    if (gId('imp-asist-progress-txt')) gId('imp-asist-progress-txt').innerText = '0%';
+    if (gId('imp-asist-btn-confirmar')) {
+        gId('imp-asist-btn-confirmar').disabled = false;
+        gId('imp-asist-btn-confirmar').classList.remove('opacity-50', 'cursor-not-allowed');
+    }
+
+    openModal('modal-asistencia-import');
+}
+
+function _asistSetProgreso(pct, texto) {
+    if (gId('imp-asist-progress-bar')) gId('imp-asist-progress-bar').style.width = Math.max(0, Math.min(100, pct)) + '%';
+    if (gId('imp-asist-progress-txt')) gId('imp-asist-progress-txt').innerText = Math.round(pct) + '%';
+    if (texto) showToast(texto);
+}
+
+async function _asistRegistrosExistentes(desde, hasta) {
+    const out = [];
+    const page = 1000;
+    let from = 0;
+
+    while (true) {
+        const { data, error } = await supabaseClient
+            .from('asistencia_registros')
+            .select('id, device_user_id, fecha_hora')
+            .gte('fecha_hora', desde + 'T00:00:00')
+            .lte('fecha_hora', hasta + 'T23:59:59')
+            .order('id', { ascending: true })
+            .range(from, from + page - 1);
+
+        if (error) throw error;
+        out.push(...(data || []));
+        if (!data || data.length < page) break;
+        from += page;
+        if (from > 500000) break;
+    }
+    return out;
+}
+
+async function confirmarImportacionAsistencia() {
+    if (typeof tienePermiso === 'function' && !tienePermiso('asistencia', 'editar')) {
+        return showToast('No tiene permiso para importar asistencia', 'error');
+    }
+    if (!_asistImport) return showToast('Primero seleccione un archivo Excel', 'error');
+
+    const desde = gId('imp-asist-desde') ? gId('imp-asist-desde').value : '';
+    const hasta = gId('imp-asist-hasta') ? gId('imp-asist-hasta').value : '';
+    if (!desde || !hasta) return showToast('Indique el rango de fechas a importar', 'error');
+    if (desde > hasta) return showToast('La fecha "desde" no puede ser mayor que "hasta"', 'error');
+
+    const btn = gId('imp-asist-btn-confirmar');
+    if (btn) {
+        btn.disabled = true;
+        btn.classList.add('opacity-50', 'cursor-not-allowed');
+    }
+    if (gId('imp-asist-progress-wrap')) gId('imp-asist-progress-wrap').classList.remove('hidden');
+    _asistSetProgreso(0);
+
+    try {
+        // Construir filas: primera marca = entrada, última = salida
+        const filas = [];
+        let diasImportar = 0, sinEmpleado = 0;
+
+        _asistImport.grupos.forEach(g => {
+            if (g.fecha < desde || g.fecha > hasta) return;
+            const emp = _asistImport.porDevice.get(g.device);
+            if (!emp) { sinEmpleado++; return; }
+
+            diasImportar++;
+            const dev = String(g.device).trim();
+            const base = {
+                cedula: emp.cedula || null,
+                device_user_id: dev,
+                device_name: 'Importado Excel',
+                device_user_id_num: /^\d+$/.test(dev) ? parseInt(dev, 10) : null
+            };
+
+            filas.push({
+                ...base,
+                fecha_hora: `${g.fecha}T${g.primera}+00:00`,
+                tipo: 'entrada'
+            });
+            if (g.ultima && g.ultima !== g.primera) {
+                filas.push({
+                    ...base,
+                    fecha_hora: `${g.fecha}T${g.ultima}+00:00`,
+                    tipo: 'salida'
+                });
+            }
+        });
+
+        if (filas.length === 0) {
+            if (gId('imp-asist-progress-wrap')) gId('imp-asist-progress-wrap').classList.add('hidden');
+            if (btn) { btn.disabled = false; btn.classList.remove('opacity-50', 'cursor-not-allowed'); }
+            return showToast('No hay marcaciones en el rango seleccionado para empleados del sistema', 'info');
+        }
+
+        // Evitar duplicados exactos (mismo dispositivo + mismo timestamp)
+        _asistSetProgreso(5, 'Revisando registros existentes...');
+        const existentes = await _asistRegistrosExistentes(desde, hasta);
+        const clavesExistentes = new Set(
+            existentes.map(r => String(r.device_user_id || '').trim() + '|' + String(r.fecha_hora || '').substring(0, 19))
+        );
+        const clavesNuevas = new Set();
+        const aInsertar = [];
+        let duplicadas = 0;
+
+        filas.forEach(f => {
+            const clave = f.device_user_id + '|' + f.fecha_hora.substring(0, 19);
+            if (clavesExistentes.has(clave) || clavesNuevas.has(clave)) { duplicadas++; return; }
+            clavesNuevas.add(clave);
+            aInsertar.push(f);
+        });
+
+        if (aInsertar.length === 0) {
+            if (gId('imp-asist-progress-wrap')) gId('imp-asist-progress-wrap').classList.add('hidden');
+            if (btn) { btn.disabled = false; btn.classList.remove('opacity-50', 'cursor-not-allowed'); }
+            closeModal('modal-asistencia-import');
+            return showToast(`Todas las marcaciones del rango ya estaban registradas (${duplicadas} duplicadas)`, 'info');
+        }
+
+        // Insertar por lotes para no saturar la API
+        const lote = 500;
+        let insertadas = 0;
+
+        for (let i = 0; i < aInsertar.length; i += lote) {
+            const batch = aInsertar.slice(i, i + lote);
+            const { error } = await supabaseClient.from('asistencia_registros').insert(batch);
+            if (error) throw new Error(`Error al guardar (lote ${Math.floor(i / lote) + 1}): ${error.message}`);
+
+            insertadas += batch.length;
+            _asistSetProgreso(10 + (insertadas / aInsertar.length) * 90);
+            await new Promise(r => setTimeout(r, 0));
+        }
+
+        _asistSetProgreso(100);
+        closeModal('modal-asistencia-import');
+
+        _asistMesCache = null;
+        _asistDatosCache = null;
+        await renderModuloAsistencia(true);
+
+        const extras = [];
+        if (duplicadas > 0) extras.push(`${duplicadas} duplicadas omitidas`);
+        if (sinEmpleado > 0) extras.push(`${sinEmpleado} días sin empleado`);
+        showToast(`Importación completa: ${insertadas} marcaciones en ${diasImportar} días${extras.length ? ` (${extras.join(', ')})` : ''}`);
+    } catch (e) {
+        console.error('Error importando asistencia:', e);
+        showToast('Error al importar: ' + (e.message || e), 'error');
+        if (gId('imp-asist-progress-wrap')) gId('imp-asist-progress-wrap').classList.add('hidden');
+        if (btn) {
+            btn.disabled = false;
+            btn.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+    }
 }
 
 async function aplicarAsistenciaDesdeModulo() {
