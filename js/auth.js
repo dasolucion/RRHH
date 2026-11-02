@@ -19,15 +19,32 @@ function verificarSesionInicial() {
     gId('app-wrapper').classList.remove('flex');
 }
 
-function ejecutarLogin(e) {
-    e.preventDefault();
+async function ejecutarLogin(e) {
+    if (e && e.preventDefault) e.preventDefault();
     const usr = gId('login-username').value.trim();
     const pass = gId('login-password').value;
     const errDiv = gId('login-error');
 
-    const coincidencia = appState.usuarios.find(
+    let coincidencia = appState.usuarios.find(
         u => u.usuario.toLowerCase() === usr.toLowerCase() && String(u.clave) === String(pass)
     );
+
+    // Si no hay coincidencia (p.ej. ventana nueva/privada/incógnita sin caché
+    // local poblada, donde appState.usuarios cae al fallback), se consulta la
+    // tabla usuarios de Supabase antes de rechazar el acceso.
+    if (!coincidencia) {
+        const usrs = await safeQuery(
+            supabaseClient.from('usuarios').select('*').order('id'),
+            'login-usuarios'
+        );
+        if (usrs && usrs.length > 0) {
+            appState.usuarios = usrs;
+            try { localStorage.setItem('nomina_usuarios', JSON.stringify(usrs)); } catch (err) {}
+            coincidencia = appState.usuarios.find(
+                u => u.usuario.toLowerCase() === usr.toLowerCase() && String(u.clave) === String(pass)
+            );
+        }
+    }
 
     if (!coincidencia) {
         errDiv.innerText = 'Usuario o contraseña incorrectos.';
