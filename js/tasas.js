@@ -240,3 +240,141 @@ async function sincronizarTasasCierreMesBCV() {
         if (btnSync) btnSync.innerHTML = '<i class="fa-solid fa-cloud-arrow-down mr-1"></i> Sincronizar Cierres BCV';
     }
 }
+
+/* ============================================================
+   DEBERES FORMALES Y CARGAS PATRONALES — REPORTE MENSUAL
+   (tab: impuestos)
+   ============================================================ */
+
+function inicializarTabImpuestos() {
+    const input = gId('imp-mes-select');
+    if (input && !input.value) {
+        const d = new Date();
+        input.value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    }
+    renderCuadroImpuestosMes();
+}
+
+function _impMesActual() {
+    const input = gId('imp-mes-select');
+    const m = (input && input.value) || '';
+    if (!m) {
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    }
+    return m;
+}
+
+function _impRetencionesYMontos() {
+    const mes = _impMesActual();
+    const regs = (appState.nominas || []).filter(n => (n.fecha_pago || '').startsWith(mes));
+    const tasa = Number(regs[0]?.tasa_bcv || appState.parametros?.tasa_bcv || 1) || 1;
+
+    let retBs = 0, retUsd = 0, apBs = 0, apUsd = 0;
+
+    regs.forEach(n => {
+        const ivssBs = Number(n.ivss_usd || 0) * tasa;
+        const rpeBs = Number(n.rpe_usd || 0) * tasa;
+        const faovBs = Number(n.faov_usd || 0) * tasa;
+        const islrBs = Number(n.islr_usd || 0) * tasa;
+        const ret = ivssBs + rpeBs + faovBs + islrBs;
+        retBs += ret;
+        retUsd += (ivssBs + rpeBs + faovBs + islrBs) / tasa;
+
+        const integralBs = Number(n.salario_integral || 0) || 0;
+        const ivssPat = ivssBs;
+        const faovPat = faovBs;
+        const lppPat = integralBs * 0.09;
+        const banavihPat = 0;
+        const incesPat = 0;
+        const ap = ivssPat + lppPat + faovPat + banavihPat + incesPat;
+        apBs += ap;
+        apUsd += ap / tasa;
+    });
+
+    const granBs = retBs + apBs;
+    const granUsd = retUsd + apUsd;
+
+    return { mes, regs, tasa, retBs, retUsd, apBs, apUsd, granBs, granUsd };
+}
+
+function renderCuadroImpuestosMes() {
+    const { mes, regs, tasa, retBs, retUsd, apBs, apUsd, granBs, granUsd } = _impRetencionesYMontos();
+
+    const lblRiesgo = gId('lbl-riesgo-ivss-tag');
+    if (lblRiesgo) lblRiesgo.innerText = `Bs. ${fNum(retBs)}`;
+
+    if (gId('kpi-imp-retenciones')) {
+        gId('kpi-imp-retenciones').innerText = fNum(retBs);
+        gId('kpi-imp-retenciones-usd').innerText = `$${retUsd.toFixed(2)}`;
+    }
+    if (gId('kpi-imp-patronal')) {
+        gId('kpi-imp-patronal').innerText = fNum(apBs);
+        gId('kpi-imp-patronal-usd').innerText = `$${apUsd.toFixed(2)}`;
+    }
+    if (gId('kpi-imp-total')) {
+        gId('kpi-imp-total').innerText = fNum(granBs);
+        gId('kpi-imp-total-usd').innerText = `$${granUsd.toFixed(2)}`;
+    }
+    if (gId('lbl-lpp-tag')) gId('lbl-lpp-tag').innerText = 'Activo (9%)';
+
+    const tbody = gId('tabla-impuestos-body');
+    const tfoot = gId('tabla-impuestos-foot');
+
+    if (!tbody) return;
+
+    let rows;
+    if (regs.length > 0) {
+        rows = [
+            ['Retenciones a trabajadores (IVSS, FAOV, LPP, Paro Forzoso, ISLR)', retBs, retBs, 0, retBs, retUsd],
+            ['Aportes patronales (IVSS, FAOV, LPP, BANAVIH, INCES)', apBs, 0, apBs, apBs, apUsd]
+        ];
+    } else {
+        rows = [['Retenciones a trabajadores (IVSS, FAOV, LPP, Paro Forzoso, ISLR)', 0, 0, 0, 0, 0]];
+    }
+
+    tbody.innerHTML = rows.map((r, idx) => `
+        <tr class="border-b border-slate-800 hover:bg-slate-800/40">
+            <td class="p-3 font-semibold text-white">${r[0]}</td>
+            <td class="p-3 text-slate-400">${idx === 0 ? 'Entes del trabajador (IVSS, FAOV, LPP, RPE, ISLR)' : 'Ente patronal (IVSS, FAOV, LPP, BANAVIH, INCES)'}</td>
+            <td class="p-3 text-right font-mono text-slate-300">${fNum(r[2] || 0)}</td>
+            <td class="p-3 text-right font-mono font-bold ${idx === 0 ? 'text-amber-400' : 'text-slate-300'}">${fNum(r[1] || 0)}</td>
+            <td class="p-3 text-right font-mono font-bold ${idx === 1 ? 'text-rose-400' : 'text-slate-300'}">${fNum(r[3] || 0)}</td>
+            <td class="p-3 text-right font-mono font-bold text-emerald-400">${fNum(r[4] || 0)}</td>
+            <td class="p-3 text-right font-mono text-emerald-400 font-bold">$${(Number(r[5] || 0)).toFixed(2)}</td>
+        </tr>`).join('');
+
+    tfoot.innerHTML = `
+        <tr>
+            <td class="p-3 text-right uppercase tracking-wider font-extrabold text-xs">Gran Total a Enterar a los Entes</td>
+            <td class="p-3 text-right font-mono text-slate-300">${fNum(retBs + apBs)}</td>
+            <td class="p-3 text-right font-mono text-slate-300">${fNum(retBs + apBs)}</td>
+            <td class="p-3 text-right font-mono text-slate-300">${fNum(retBs + apBs)}</td>
+            <td class="p-3 text-right font-mono text-slate-300">${fNum(retBs + apBs)}</td>
+            <td class="p-3 text-right font-mono text-emerald-400 font-bold">$${(retUsd + apUsd).toFixed(2)}</td>
+        </tr>`;
+}
+
+function _impConstruirHTMLReporte() {
+    const { mes, regs, tasa, retBs, retUsd, apBs, apUsd, granBs, granUsd } = _impRetencionesYMontos();
+    const rows = regs && regs.length > 0 ? [
+        ['Retenciones a trabajadores (IVSS, FAOV, LPP, Paro Forzoso, ISLR)', retBs, retBs, 0, retBs, retUsd],
+        ['Aportes patronales (IVSS, FAOV, LPP, BANAVIH, INCES)', apBs, 0, apBs, apBs, apUsd]
+    ] : [['Retenciones a trabajadores (IVSS, FAOV, LPP, Paro Forzoso, ISLR)', 0, 0, 0, 0, 0]];
+
+    let html = `<div class="bg-slate-900 border border-slate-800 rounded-xl p-5 text-black"><div class="flex justify-between items-center mb-4"><h2 class="font-bold text-lg text-slate-900">Reporte de Obligaciones Fiscales y Cargas Patronales</h2><span class="text-xs font-bold text-slate-600">${mes}</span></div>`;
+    html += `<div class="grid grid-cols-3 gap-3 mb-4">${['Retenciones a trabajadores', 'Aportes patronales', 'Gran Total a Enterar'].map((lbl, i) => `<div class="bg-slate-100 border border-slate-300 p-3 rounded"><div class="text-[10px] uppercase font-bold text-slate-600">${lbl}</div><div class="text-xl font-black text-slate-900">${fNum([retBs, apBs, granBs][i])}</div><div class="text-xs font-bold text-slate-700">$${[retUsd, apUsd, granUsd][i].toFixed(2)}</div></div>`).join('')}</div>`;
+    html += `<table class="w-full text-xs border border-slate-700 bg-white"><thead><tr class="bg-slate-200 text-slate-900 font-bold">${['Concepto', 'Ente Receptor', 'Base Imponible', 'Retención Personal', 'Aporte Empresa', 'Total a Enterar', 'Equivalente ($)'].map(h => `<th class="p-2 border-b border-slate-400 text-left">${h}</th>`).join('')}</tr></thead><tbody>`;
+    rows.forEach(r => {
+        html += `<tr>${[r[0], r[6] === undefined ? (r[0].includes('Retenciones') ? 'Entes del trabajador' : 'Ente patronal') : '', r[2], r[1], r[3], r[4], r[5]].map((c, i) => `<td class="p-2 border-b border-slate-200 ${i === 0 ? 'font-bold text-slate-900' : 'text-slate700'}">${c}</td>`).join('')}</tr>`;
+    });
+    html += `</tbody><tfoot><tr class="bg-slate-200 font-bold"><td class="p-2 font-bold text-slate-900">Gran Total a Enterar a los Entes</td><td class="p-2"></td><td class="p-2"></td><td class="p-2"></td><td class="p-2"></td><td class="p-2 font-black text-slate-900">${fNum(retBs + apBs)}</td><td class="p-2 font-black text-slate-900">$${(retUsd + apUsd).toFixed(2)}</td></tr></tfoot></table>`;
+    html += `<p class="text-[10px] text-slate-500 mt-3">Tasa BCV aplicada: ${fNum(tasa)} Bs/$</p></div>`;
+    return html;
+}
+
+function imprimirReporteFiscalMensual() {
+    const html = _impConstruirHTMLReporte();
+    if (gId('print-container')) gId('print-container').innerHTML = `<div class="print-page">${html}</div>`;
+    window.print();
+}
