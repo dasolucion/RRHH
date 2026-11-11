@@ -197,11 +197,21 @@ function moduloDePermisoPara(control) {
         if (/liquidacion|prestacion/.test(id)) return 'liquidaciones';
         if (/firma/.test(id)) return window.__moduloPermisoActual || 'nomina';
         if (/usuario|matriz/.test(id)) return 'usuarios';
-        if (/nomina|recibo/.test(id)) return 'nomina';
+        if (/nomina|recibo/.test(id)) return window.__moduloPermisoActual || 'historico';
     }
 
     const visible = document.querySelector('.tab-content:not(.hidden)');
     return visible?.id?.startsWith('tab-') ? visible.id.slice(4, -8) : window.__moduloPermisoActual;
+}
+
+function esControlCierreModal(control) {
+    const modal = control.closest('[id^="modal-"]');
+    if (!modal) return false;
+    const handler = `${control.getAttribute('onclick') || ''} ${control.getAttribute('onkeydown') || ''}`.toLowerCase();
+    const label = `${control.title || ''} ${control.getAttribute('aria-label') || ''}`.toLowerCase();
+    return /closemodal|cerrarmodal|cerrar_modal|cerrarmodalfirma|hide.?modal/.test(handler) ||
+        /cerrar|close|dismiss/.test(label) ||
+        Boolean(control.querySelector('.fa-xmark, .fa-times, .fa-close'));
 }
 
 function accionDePermisoPara(control) {
@@ -209,12 +219,12 @@ function accionDePermisoPara(control) {
     const text = `${control.innerText || ''} ${control.title || ''} ${control.getAttribute('aria-label') || ''}`.toLowerCase();
     const target = `${onclick} ${text}`;
 
+    if (esControlCierreModal(control)) return 'cerrar';
     if (/imprimir|\bprint\b|descargar.?pdf/.test(target)) return 'imprimir';
     if (/firmar|firma|enlace.*firma|abrirfirma/.test(target)) return 'firmar';
     if (/eliminar|borrar|\bdelete\b|anularenlace/.test(target)) return 'borrar';
     if (/editar|actualizar|guardar.?edicion/.test(target)) return 'editar';
     if (/crear|nuevo|agregar|insertar|guardar|procesar|calcular|generar|aplicar|importar|registrar|abonar|sincronizar|migrar|toggleestado|cambiar/.test(target)) {
-        // Guardar un formulario existente cuenta como edición; un formulario nuevo como creación.
         const modal = control.closest('[id^="modal-"]');
         if (/guardar/.test(target) && modal) {
             const idInput = modal.querySelector('input[type="hidden"][id$="-id"]');
@@ -223,7 +233,6 @@ function accionDePermisoPara(control) {
         return /editar|actualizar/.test(target) ? 'editar' : 'crear';
     }
     if (/ver|detalle|recibo|consulta|cerrar|closemodal|switchtab|togglemobilemenu/.test(target)) return 'ver';
-    // Botones operativos no identificados se cierran por defecto en solo lectura.
     return 'crear';
 }
 
@@ -241,6 +250,15 @@ function aplicarPermisosUI(raiz = document) {
 
     controles.forEach(control => {
         if (control.closest('#modal-matriz-permisos, #modal-usuario, #login-screen, #sidebar')) return;
+
+        // Cerrar un diálogo es navegación de interfaz, no una operación del módulo.
+        // Debe seguir disponible aun si el perfil solo tiene permiso de consulta.
+        if (esControlCierreModal(control)) {
+            control.style.display = '';
+            control.removeAttribute('data-permiso-oculto');
+            return;
+        }
+
         const modulo = moduloDePermisoPara(control);
         if (!modulo || !MODULOS_PERMISOS.some(m => m.key === modulo)) return;
 
@@ -298,6 +316,9 @@ document.addEventListener('click', event => {
     const control = event.target.closest('button, a, label');
     if (!control || control.closest('#modal-matriz-permisos, #modal-usuario, #login-screen, #sidebar')) return;
 
+    // Cierre de modal permitido siempre, independientemente de los permisos CRUD.
+    if (esControlCierreModal(control)) return;
+
     const navCall = control.getAttribute('onclick') || '';
     const navMatch = navCall.match(/switchTab\(['"]([^'"]+)['"]\)/);
     if (navMatch) window.__moduloPermisoActual = navMatch[1];
@@ -312,7 +333,6 @@ document.addEventListener('click', event => {
     }
 }, true);
 
-// Controla también acciones y controles creados dinámicamente dentro de tablas/modales.
 const observadorPermisos = new MutationObserver(mutations => {
     for (const mutation of mutations) {
         mutation.addedNodes.forEach(node => {
