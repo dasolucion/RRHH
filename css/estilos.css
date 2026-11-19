@@ -1,0 +1,131 @@
+/* ============================================================
+   SISTEMA DE NÓMINA Y RRHH — Hoja de estilos principal
+   Extraído del <style> original. Solo estilos, sin lógica.
+   ============================================================ */
+
+/* Scrollbar personalizado (dark) */
+.custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: #0f172a; border-radius: 4px; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+/* Área de impresión de recibos: forzar fondo blanco y texto negro */
+#area-impresion-recibos,
+#area-impresion-recibos * { box-sizing: border-box; }
+
+#area-impresion-recibos .recibo-card,
+#area-impresion-recibos .recibo-vacaciones-print,
+#area-impresion-recibos .recibo-utilidades-print,
+#area-impresion-recibos .recibo-antiguedad-print,
+#area-impresion-recibos .recibo-prestaciones-print {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    border-color: #000000 !important;
+}
+
+#area-impresion-recibos table { color: #000000 !important; border-color: #000000 !important; }
+
+#area-impresion-recibos th,
+#area-impresion-recibos td,
+#area-impresion-recibos span,
+#area-impresion-recibos div,
+#area-impresion-recibos p,
+#area-impresion-recibos strong,
+#area-impresion-recibos h2,
+#area-impresion-recibos h3,
+#area-impresion-recibos h4 { color: #000000 !important; }
+
+#area-impresion-recibos .text-slate-400,
+#area-impresion-recibos .text-slate-500,
+#area-impresion-recibos .text-slate-600 { color: #4b5563 !important; }
+
+#area-impresion-recibos .text-rose-600 { color: #b91c1c !important; }
+
+/* Ocultar contenedor de impresión en pantalla */
+@media screen {
+    #print-container { display: none !important; }
+}
+
+/* Reglas de impresión */
+@media print {
+    @page { size: letter portrait; margin: 4mm; }
+
+    body > *:not(#print-container) { display: none !important; }
+    body {
+        background: #fff !important;
+        color: #000 !important;
+        height: auto !important;
+        overflow: visible !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    #print-container {
+        display: block !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        visibility: visible !important;
+    }
+
+    .print-page {
+        page-break-after: always;
+        break-after: page;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: space-between !important;
+        height: 268mm !important;
+        width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .print-page:last-child { page-break-after: auto; break-after: auto; }
+
+    .recibo-card {
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+        border: 1px solid #000 !important;
+        box-shadow: none !important;
+        margin: 0 auto !important;
+        width: 100% !important;
+        height: 129mm !important;
+        max-width: none !important;
+        border-radius: 0 !important;
+        box-sizing: border-box !important;
+        padding: 4px 8px !important;
+        overflow: hidden !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: space-between !important;
+        background: #fff !important;
+        color: #000 !important;
+    }
+
+    .recibo-vacaciones-print,
+    .recibo--print,
+    .recibo-prestaciones-print,
+    .recibo-antiguedad-print {
+        border: 1px solid #000 !important;
+        padding: 8px !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+        background: #fff !important;
+        color: #000 !important;
+    }
+
+    .divisor-recibo {
+        border-top: 1px dashed #000 !important;
+        height: 1px !important;
+        margin: auto 0 !important;
+        display: block !important;
+        width: 100% !important;
+    }
+
+    #print-container table { border-collapse: collapse !important; width: 100% !important; color: #000 !important; }
+    #print-container th,
+    #print-container td { border: 1px solid #ccc !important; padding: 2px 3px !important; color: #000 !important; }
+    #print-container th { background-color: #f1f5f9 !important; }
+
+    .print-hidden { display: none !important; }
+}
