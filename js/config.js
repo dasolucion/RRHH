@@ -47,6 +47,9 @@ function actualizarClienteSupabase() {
     return getSupabaseClient();
 }
 
+// Inicializar cliente con credenciales por defecto al cargar (antes de leer localStorage)
+supabaseClient = getSupabaseClient();
+
 // --- Usuarios de respaldo local (si Supabase no responde o está vacío) ---
 const USUARIOS_DEFAULT = [
     { id: 1, nombre: 'Super Administrador', usuario: 'master',       clave: 'master123',   rol: 'master',    activo: true },

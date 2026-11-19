@@ -252,6 +252,8 @@ function cargarCacheLocal() {
         try { appState.parametros = { ...appState.parametros, ...JSON.parse(p) }; }
         catch (e) { /* conserva defaults */ }
     }
+    // Asegurar que el cliente Supabase use las credenciales guardadas
+    if (typeof actualizarClienteSupabase === 'function') actualizarClienteSupabase();
 
     // Registro local de empresas (multiempresa)
     const emps = localStorage.getItem('nomina_empresas');
@@ -508,6 +510,8 @@ async function verificarConexionInicial() {
     }
 
     if (ok) {
+        // Asegurar cliente actualizado con la configuración vigente antes de cargar datos
+        if (typeof actualizarClienteSupabase === 'function') actualizarClienteSupabase();
         if (typeof fetchAllData === 'function') {
             try {
                 await fetchAllData();
