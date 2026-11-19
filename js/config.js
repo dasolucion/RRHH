@@ -4,12 +4,48 @@
    NO contiene lógica de negocio ni funciones de UI.
    ============================================================ */
 
-// --- Credenciales Supabase (hardcoded como en el original) ---
+// --- Credenciales Supabase (por defecto; se sobreescriben desde appState.parametros.supabase_*) ---
 const SUPABASE_URL = 'https://nrfplwpmwplpbskidtqs.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yZnBsd3Btd3BscGJza2lkdHFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc1OTA4MjIsImV4cCI6MjEwMzE2NjgyMn0.PZXrE9KtAVF2e4RbyM3-m1ClS8R8QaTCctLzZKAAYdQ';
 
-// Cliente Supabase (se crea al cargar; el SDK ya fue cargado vía CDN en <head>)
-const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// Cliente Supabase (se crea dinámicamente vía getSupabaseClient para respetar
+// la configuración guardada en Parámetros -> supabase_url / supabase_anon_key)
+let supabaseClient = null;
+let _sbConfig = { url: null, key: null };
+
+function crearClienteSupabase(url, key) {
+    return supabase.createClient(url, key);
+}
+
+function getSupabaseClient() {
+    const p = (typeof appState !== 'undefined' && appState && appState.parametros) ? appState.parametros : null;
+    let url = (p && p.supabase_url) || SUPABASE_URL;
+    let key = (p && p.supabase_anon_key) || SUPABASE_ANON_KEY;
+
+    // Validación mínima: si la URL guardada es inválida, usar la de respaldo
+    if (!/^https?:\/\//i.test(url)) {
+        url = SUPABASE_URL;
+        key = SUPABASE_ANON_KEY;
+    }
+
+    if (!supabaseClient || _sbConfig.url !== url || _sbConfig.key !== key) {
+        try {
+            supabaseClient = crearClienteSupabase(url, key);
+            _sbConfig = { url, key };
+        } catch (e) {
+            console.warn('Configuración Supabase inválida, usando valores por defecto:', e.message);
+            url = SUPABASE_URL;
+            key = SUPABASE_ANON_KEY;
+            supabaseClient = crearClienteSupabase(url, key);
+            _sbConfig = { url, key };
+        }
+    }
+    return supabaseClient;
+}
+
+function actualizarClienteSupabase() {
+    return getSupabaseClient();
+}
 
 // --- Usuarios de respaldo local (si Supabase no responde o está vacío) ---
 const USUARIOS_DEFAULT = [

@@ -211,11 +211,19 @@ async function fetchAllData() {
             dias_utilidades: paramConf.dias_utilidades || 30,
             valor_ut: paramConf.valor_ut != null ? Number(paramConf.valor_ut) : (appState.parametros.valor_ut || 43.00),
             riesgo_ivss: paramConf.riesgo_ivss != null ? Number(paramConf.riesgo_ivss) : (appState.parametros.riesgo_ivss || 9),
-            aplica_lpp: paramConf.aplica_lpp !== false
+            aplica_lpp: paramConf.aplica_lpp !== false,
+            supabase_url: paramConf.supabase_url || appState.parametros.supabase_url || '',
+            supabase_anon_key: paramConf.supabase_anon_key || appState.parametros.supabase_anon_key || ''
         };
         try {
             localStorage.setItem('nomina_parametros', JSON.stringify(appState.parametros));
         } catch (e) {}
+        // Registrar la empresa de la base en el selector multiempresa
+        if (typeof guardarEmpresaActivaEnRegistro === 'function') guardarEmpresaActivaEnRegistro();
+        if (typeof establecerEstadoConexion === 'function') {
+            establecerEstadoConexion('conectado',
+                appState.parametros.supabase_url ? 'Conectado a Supabase' : 'Conectado (base por defecto)');
+        }
     }
     if (paramConf && paramConf.features_config) {
         appState.features = paramConf.features_config;

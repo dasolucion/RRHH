@@ -16,8 +16,13 @@ let appState = {
         nombre_empresa: 'BOCANADA CAFÉ / GRUPO PRALUM, C.A.',
         rif_empresa: 'J-50088879-1',
         dias_utilidades: 30,
-        valor_ut: 43.00
+        valor_ut: 43.00,
+        supabase_url: '',
+        supabase_anon_key: ''
     },
+    empresas: [],          // Registro local de empresas (multiempresa)
+    empresaActiva: null,   // RIF de la empresa activa
+    estadoConexion: 'sinverificar', // sinverificar | comprobando | conectado | desconectado | cache
     calculoVacacionesActual: null,
     calculoUtilidadesActual: [],
     calculoAntiguedadActual: null,
@@ -213,75 +218,62 @@ function contarModulosVisibles(rol) {
 }
 
 // ============================================================
-// CACHÉ LOCAL — Carga inicial desde localStorage
+// CACHÉ LOCAL - Carga inicial desde localStorage
 // ============================================================
 
+function esConexionActiva() {
+    return appState.estadoConexion === 'conectado';
+}
+
+function limpiarEstadoNegocio() {
+    appState.departamentos = [];
+    appState.cargos = [];
+    appState.empleados = [];
+    appState.nominas = [];
+    appState.vacaciones = [];
+    appState.utilidades = [];
+    appState.antiguedad = [];
+    appState.prestaciones = [];
+    appState.historicoSalarios = [];
+    appState.anticipos = [];
+    appState.prestamos = [];
+    appState.prestamosAbonos = [];
+    appState.tasasMensuales = [];
+    appState.calculoVacacionesActual = null;
+    appState.calculoUtilidadesActual = [];
+    appState.calculoAntiguedadActual = null;
+    appState.calculoPrestacionesActual = null;
+}
+
 function cargarCacheLocal() {
+    // Credenciales de conexión Supabase (se preservan siempre)
     const p = localStorage.getItem('nomina_parametros');
-    if (p) appState.parametros = JSON.parse(p);
-
-    const u = localStorage.getItem('nomina_usuarios');
-    if (u) appState.usuarios = JSON.parse(u);
-    else {
-        appState.usuarios = [...USUARIOS_DEFAULT];
-        localStorage.setItem('nomina_usuarios', JSON.stringify(appState.usuarios));
+    if (p) {
+        try { appState.parametros = { ...appState.parametros, ...JSON.parse(p) }; }
+        catch (e) { /* conserva defaults */ }
     }
 
-    const tm = localStorage.getItem('nomina_tasas_mensuales');
-    if (tm) {
+    // Registro local de empresas (multiempresa)
+    const emps = localStorage.getItem('nomina_empresas');
+    if (emps) {
         try {
-            const parsed = JSON.parse(tm);
-            appState.tasasMensuales = Array.isArray(parsed) ? parsed.map(t => {
-                const prom = Number(t.tasa_promedio !== undefined ? t.tasa_promedio : (t.tasa_anual || 0));
-                const men = Number(t.tasa_mensual !== undefined ? t.tasa_mensual : (prom / 12));
-                return { mes: t.mes, tasa_promedio: prom, tasa_anual: prom, tasa_mensual: men, tasa_dolar: Number(t.tasa_dolar || 0) };
-            }) : [];
-        } catch (e) { appState.tasasMensuales = []; }
-    } else {
-        appState.tasasMensuales = [];
-        localStorage.setItem('nomina_tasas_mensuales', JSON.stringify(appState.tasasMensuales));
+            const parsed = JSON.parse(emps);
+            if (Array.isArray(parsed)) appState.empresas = parsed;
+        } catch (e) { appState.empresas = []; }
     }
+    appState.empresaActiva = localStorage.getItem('nomina_empresa_activa') || null;
 
-    const hs = localStorage.getItem('nomina_historico_salarios');
-    if (hs) appState.historicoSalarios = JSON.parse(hs);
+    // Usuarios esenciales para login (master/sistema). Datos completos se cargan al conectar.
+    appState.usuarios = [...USUARIOS_DEFAULT];
 
-    const ant = localStorage.getItem('nomina_antiguedad_cache');
-    if (ant) appState.antiguedad = JSON.parse(ant);
+    // Estado inicial limpio: sin datos de negocio hasta verificar conexión
+    limpiarEstadoNegocio();
 
-    const vacCache = localStorage.getItem('nomina_vacaciones_cache');
-    if (vacCache) {
-        try { appState.vacaciones = JSON.parse(vacCache).map(normalizarRegistroJson); } catch (e) {}
-    }
-
-    const anticCache = localStorage.getItem('nomina_anticipos_cache');
-    if (anticCache) {
-        try { appState.anticipos = JSON.parse(anticCache); } catch (e) {}
-    }
-
-    const presCache = localStorage.getItem('nomina_prestamos_cache');
-    if (presCache) {
-        try {
-            const parsed = JSON.parse(presCache);
-            if (Array.isArray(parsed)) appState.prestamos = parsed;
-        } catch (e) {}
-    }
-
-    const abonosCache = localStorage.getItem('nomina_prestamos_abonos_cache');
-    if (abonosCache) {
-        try {
-            const parsed = JSON.parse(abonosCache);
-            if (Array.isArray(parsed)) appState.prestamosAbonos = parsed;
-        } catch (e) {}
-    }
-
-    aplicarParametrosEnVista();
-
+    // Feature flags y matriz de permisos: esenciales para UI/roles
     const fc = localStorage.getItem('nomina_features_config');
     if (fc) {
         try { appState.features = JSON.parse(fc); } catch (e) {}
     }
-
-    // Matriz de permisos: caché local primero (sirve si Supabase no responde)
     const rpCache = localStorage.getItem('nomina_roles_permisos');
     if (rpCache) {
         try {
@@ -290,7 +282,14 @@ function cargarCacheLocal() {
         } catch (e) {}
     }
 
-    // Carga de permisos (no bloqueante, con fallback a defaults)
+    if (typeof establecerEstadoConexion === 'function') establecerEstadoConexion('sinverificar');
+    aplicarParametrosEnVista();
+    if (typeof renderPanelFeatureFlags === 'function') renderPanelFeatureFlags();
+
+    // Verificar conexión y, si está disponible, cargar datos desde Supabase
+    if (typeof verificarConexionInicial === 'function') verificarConexionInicial().catch(console.warn);
+
+    // Carga de permisos (no bloqueante, con fallback a defaults/caché)
     cargarRolesPermisos().catch(console.warn);
 }
 
@@ -299,16 +298,29 @@ function cargarCacheLocal() {
 // ============================================================
 
 function aplicarParametrosEnVista() {
-    if (gId('param-empresa-nombre')) gId('param-empresa-nombre').value = appState.parametros.nombre_empresa;
-    if (gId('param-empresa-rif')) gId('param-empresa-rif').value = appState.parametros.rif_empresa;
-    if (gId('param-dias-utilidades')) gId('param-dias-utilidades').value = appState.parametros.dias_utilidades;
+    const conectado = (typeof esConexionActiva === 'function') ? esConexionActiva() : appState.estadoConexion === 'conectado';
+
+    if (gId('param-empresa-nombre')) gId('param-empresa-nombre').value = appState.parametros.nombre_empresa || '';
+    if (gId('param-empresa-rif')) gId('param-empresa-rif').value = appState.parametros.rif_empresa || '';
+    if (gId('param-dias-utilidades')) gId('param-dias-utilidades').value = appState.parametros.dias_utilidades || 30;
     if (gId('param-valor-ut')) gId('param-valor-ut').value = Number(appState.parametros.valor_ut || 43.00).toFixed(2);
     if (gId('param-riesgo-ivss')) gId('param-riesgo-ivss').value = String(appState.parametros.riesgo_ivss || 9);
     if (gId('param-aplica-lpp')) gId('param-aplica-lpp').checked = appState.parametros.aplica_lpp !== false;
+    if (gId('param-supabase-url')) gId('param-supabase-url').value = appState.parametros.supabase_url || '';
+    if (gId('param-supabase-key')) gId('param-supabase-key').value = appState.parametros.supabase_anon_key || '';
 
-    if (gId('brand-sidebar-title')) gId('brand-sidebar-title').innerText = appState.parametros.nombre_empresa.split('/')[0].trim();
-    if (gId('brand-sidebar-rif')) gId('brand-sidebar-rif').innerText = appState.parametros.rif_empresa;
-    if (gId('badge-uti-dias-base')) gId('badge-uti-dias-base').innerHTML = `<i class="fa-solid fa-scale-balanced mr-1.5"></i> Base: ${appState.parametros.dias_utilidades} Días`;
+    if (typeof renderSelectorEmpresas === 'function') renderSelectorEmpresas();
+
+    if (conectado) {
+        const nombre = appState.parametros.nombre_empresa || 'EMPRESA';
+        if (gId('brand-sidebar-title')) gId('brand-sidebar-title').innerText = nombre.split('/')[0].trim();
+        if (gId('brand-sidebar-rif')) gId('brand-sidebar-rif').innerText = appState.parametros.rif_empresa || '';
+        if (gId('badge-uti-dias-base')) gId('badge-uti-dias-base').innerHTML = `<i class="fa-solid fa-scale-balanced mr-1.5"></i> Base: ${appState.parametros.dias_utilidades || 30} Días`;
+    } else {
+        if (gId('brand-sidebar-title')) gId('brand-sidebar-title').innerText = 'Sistema RRHH';
+        if (gId('brand-sidebar-rif')) gId('brand-sidebar-rif').innerText = 'Sin conexión';
+        if (gId('badge-uti-dias-base')) gId('badge-uti-dias-base').innerHTML = `<i class="fa-solid fa-scale-balanced mr-1.5"></i> Base: -- Días`;
+    }
 
     if (typeof renderTablaTasasMensuales === 'function') renderTablaTasasMensuales();
     if (typeof renderTablaUsuarios === 'function') renderTablaUsuarios();
@@ -325,22 +337,250 @@ async function guardarParametrosGenerales() {
     appState.parametros.valor_ut = parseFloat(gId('param-valor-ut').value) || 43.00;
     appState.parametros.riesgo_ivss = parseFloat(gId('param-riesgo-ivss').value) || 9;
     appState.parametros.aplica_lpp = gId('param-aplica-lpp').checked;
+    appState.parametros.supabase_url = (gId('param-supabase-url') ? gId('param-supabase-url').value.trim() : '') || '';
+    appState.parametros.supabase_anon_key = (gId('param-supabase-key') ? gId('param-supabase-key').value.trim() : '') || '';
 
+    // Persistencia local inmediata (funciona incluso sin conexión)
+    localStorage.setItem('nomina_parametros', JSON.stringify(appState.parametros));
+    guardarEmpresaActivaEnRegistro();
+
+    // Recrear el cliente con la configuración nueva antes de sincronizar
+    if (typeof actualizarClienteSupabase === 'function') actualizarClienteSupabase();
+
+    const payload = {
+        id: 1,
+        nombre_empresa: appState.parametros.nombre_empresa,
+        rif_empresa: appState.parametros.rif_empresa,
+        dias_utilidades: appState.parametros.dias_utilidades,
+        valor_ut: appState.parametros.valor_ut,
+        riesgo_ivss: appState.parametros.riesgo_ivss,
+        aplica_lpp: appState.parametros.aplica_lpp
+    };
+    const payloadConexion = {
+        ...payload,
+        supabase_url: appState.parametros.supabase_url || null,
+        supabase_anon_key: appState.parametros.supabase_anon_key || null
+    };
     try {
-        await supabaseClient.from('parametros_config').upsert([{
-            id: 1,
-            nombre_empresa: appState.parametros.nombre_empresa,
-            rif_empresa: appState.parametros.rif_empresa,
-            dias_utilidades: appState.parametros.dias_utilidades,
-            valor_ut: appState.parametros.valor_ut,
-            riesgo_ivss: appState.parametros.riesgo_ivss,
-            aplica_lpp: appState.parametros.aplica_lpp
-        }]);
+        // Intenta guardar también la conexión; si las columnas aún no existen
+        // (esquema anterior), reintenta solo con los parámetros clásicos.
+        const res = await supabaseClient.from('parametros_config').upsert([payloadConexion]);
+        if (res && res.error) {
+            await supabaseClient.from('parametros_config').upsert([payload]);
+        }
     } catch (e) {}
 
-    localStorage.setItem('nomina_parametros', JSON.stringify(appState.parametros));
+    if (typeof fetchAllData === 'function') {
+        try { await fetchAllData(); showToast('Datos cargados desde la base'); }
+        catch (e) { showToast('No se pudieron cargar los datos', 'error'); console.warn(e); }
+    }
+    // Actualizar matriz de permisos después de recargar datos
+    if (typeof cargarRolesPermisos === 'function') cargarRolesPermisos().catch(console.warn);
     aplicarParametrosEnVista();
     showToast('Parámetros corporativos guardados exitosamente');
+}
+
+// ============================================================
+// MULTIEMPRESA — Registro local, selector y creación rápida
+// ============================================================
+
+function guardarEmpresaActivaEnRegistro() {
+    const rif = (appState.parametros.rif_empresa || '').trim();
+    if (!rif) return;
+    if (!Array.isArray(appState.empresas)) appState.empresas = [];
+    const copia = JSON.parse(JSON.stringify(appState.parametros));
+    const idx = appState.empresas.findIndex(e => String(e.rif).toUpperCase() === rif.toUpperCase());
+    const entrada = { rif, nombre: appState.parametros.nombre_empresa, parametros: copia };
+    if (idx >= 0) appState.empresas[idx] = entrada;
+    else appState.empresas.push(entrada);
+    appState.empresaActiva = rif;
+    localStorage.setItem('nomina_empresas', JSON.stringify(appState.empresas));
+    localStorage.setItem('nomina_empresa_activa', rif);
+}
+
+function renderSelectorEmpresas() {
+    const sel = gId('param-empresa-selector');
+    if (!sel) return;
+    const conectado = (typeof esConexionActiva === 'function') ? esConexionActiva() : appState.estadoConexion === 'conectado';
+    if (!conectado) {
+        sel.innerHTML = `<option value="">Sin conexión — verifique Supabase para cargar empresa</option>`;
+        sel.disabled = true;
+        return;
+    }
+    sel.disabled = false;
+    const lista = Array.isArray(appState.empresas) ? appState.empresas.slice() : [];
+    const rifActual = String(appState.parametros.rif_empresa || '').trim().toUpperCase();
+    if (rifActual && !lista.some(e => String(e.rif).toUpperCase() === rifActual)) {
+        lista.unshift({ rif: appState.parametros.rif_empresa, nombre: appState.parametros.nombre_empresa });
+    }
+    sel.innerHTML = lista.length
+        ? lista.map(e => `<option value="${e.rif}" ${String(e.rif).toUpperCase() === rifActual ? 'selected' : ''}>${e.nombre || e.rif} — ${e.rif}</option>`).join('')
+        : `<option value="">(Sin empresas registradas)</option>`;
+}
+
+function abrirModalNuevaEmpresa() {
+    if (gId('nueva-empresa-rif')) gId('nueva-empresa-rif').value = '';
+    if (gId('nueva-empresa-nombre')) gId('nueva-empresa-nombre').value = '';
+    openModal('modal-nueva-empresa');
+}
+
+async function crearNuevaEmpresa() {
+    const rol = appState.usuarioActual?.rol;
+    if (rol !== 'master' && rol !== 'administrador') {
+        return showToast('No tiene permisos para crear empresas', 'error');
+    }
+    const rif = (gId('nueva-empresa-rif')?.value || '').trim().toUpperCase();
+    const nombre = (gId('nueva-empresa-nombre')?.value || '').trim();
+    if (!rif || !nombre) return showToast('Indique RIF y razón social de la nueva empresa', 'error');
+
+    const existente = (appState.empresas || []).find(e => String(e.rif).toUpperCase() === rif);
+    if (existente && !confirm(`La empresa ${existente.nombre} ya existe. ¿Desea activarla?`)) return;
+    if (existente) {
+        closeModal('modal-nueva-empresa');
+        return cambiarEmpresaActiva(rif);
+    }
+
+    // Nueva empresa: solo RIF + razón social. El resto se completa luego en esta misma pestaña.
+    appState.parametros = {
+        ...appState.parametros,
+        nombre_empresa: nombre,
+        rif_empresa: rif,
+        dias_utilidades: 30,
+        valor_ut: appState.parametros.valor_ut || 43.00,
+        riesgo_ivss: 9,
+        aplica_lpp: true
+    };
+    guardarEmpresaActivaEnRegistro();
+    localStorage.setItem('nomina_parametros', JSON.stringify(appState.parametros));
+    aplicarParametrosEnVista();
+    closeModal('modal-nueva-empresa');
+    await guardarParametrosGenerales();
+}
+
+async function cambiarEmpresaActiva(rif) {
+    const entrada = (appState.empresas || []).find(e => String(e.rif).toUpperCase() === String(rif).toUpperCase());
+    if (!entrada) return showToast('Empresa no encontrada en el registro local', 'error');
+    appState.parametros = {
+        ...appState.parametros,
+        ...(entrada.parametros || {}),
+        rif_empresa: entrada.rif,
+        nombre_empresa: entrada.nombre || entrada.parametros?.nombre_empresa || entrada.rif
+    };
+    appState.empresaActiva = entrada.rif;
+    localStorage.setItem('nomina_parametros', JSON.stringify(appState.parametros));
+    localStorage.setItem('nomina_empresa_activa', entrada.rif);
+    if (typeof actualizarClienteSupabase === 'function') actualizarClienteSupabase();
+    aplicarParametrosEnVista();
+    showToast(`Empresa activa: ${appState.parametros.nombre_empresa}`);
+    if (typeof fetchAllData === 'function') fetchAllData().catch(console.warn);
+}
+
+function establecerEstadoConexion(estado, detalle) {
+    appState.estadoConexion = estado || 'sinverificar';
+    const mapa = {
+        conectado:    { color: 'bg-emerald-500', text: 'Conectado a Supabase',      cls: 'text-emerald-400' },
+        comprobando:  { color: 'bg-amber-500',   text: 'Comprobando conexión...',   cls: 'text-amber-400' },
+        cache:        { color: 'bg-sky-500',     text: 'Sin conexión (caché local)', cls: 'text-sky-400' },
+        desconectado: { color: 'bg-rose-500',    text: 'Desconectado',               cls: 'text-rose-400' },
+        sinverificar: { color: 'bg-slate-600',   text: 'Sin verificar',              cls: 'text-slate-400' }
+    };
+    const m = mapa[appState.estadoConexion] || mapa.sinverificar;
+    const dot = gId('supabase-status-dot');
+    const txt = gId('supabase-status');
+    const txtParam = gId('supabase-status-param');
+    if (dot) dot.className = 'w-2 h-2 rounded-full ' + m.color;
+    if (txt) { txt.innerText = detalle || m.text; txt.className = 'text-[11px] font-semibold ' + m.cls; }
+    if (txtParam) { txtParam.innerText = detalle || m.text; txtParam.className = 'font-bold ' + m.cls; }
+}
+
+async function verificarConexionInicial() {
+    const url = (appState.parametros.supabase_url || SUPABASE_URL).replace(/\/+$/, '');
+    const key = appState.parametros.supabase_anon_key || SUPABASE_ANON_KEY;
+    establecerEstadoConexion('comprobando');
+    let ok = false;
+    try {
+        const resp = await fetch(`${url}/rest/v1/parametros_config?select=id&limit=1`, {
+            headers: { apikey: key, Authorization: `Bearer ${key}` }
+        });
+        ok = resp.ok;
+    } catch (e) {
+        ok = false;
+    }
+
+    if (ok) {
+        if (typeof fetchAllData === 'function') {
+            try {
+                await fetchAllData();
+                if (typeof cargarRolesPermisos === 'function') cargarRolesPermisos().catch(console.warn);
+            } catch (e) {
+                console.warn('Error cargando datos tras verificar conexión:', e);
+            }
+        }
+        establecerEstadoConexion('conectado',
+            appState.parametros.supabase_url ? 'Conectado a Supabase' : 'Conectado (base por defecto)');
+        aplicarParametrosEnVista();
+        if (typeof renderDashboard === 'function') renderDashboard();
+    } else {
+        limpiarEstadoNegocio();
+        establecerEstadoConexion('desconectado');
+        aplicarParametrosEnVista();
+        if (typeof renderDashboard === 'function') renderDashboard();
+    }
+}
+
+async function probarConexionSupabase() {
+    const url = ((gId('param-supabase-url')?.value || '').trim() || SUPABASE_URL).replace(/\/+$/, '');
+    const key = (gId('param-supabase-key')?.value || '').trim() || SUPABASE_ANON_KEY;
+
+    if (!/^https?:\/\//i.test(url)) {
+        establecerEstadoConexion('desconectado');
+        return showToast('URL de Supabase inválida (debe iniciar con https://)', 'error');
+    }
+
+    establecerEstadoConexion('comprobando');
+    let ok = false;
+    try {
+        const resp = await fetch(`${url}/rest/v1/parametros_config?select=id&limit=1`, {
+            headers: { apikey: key, Authorization: `Bearer ${key}` }
+        });
+        ok = resp.ok;
+        if (!ok) showToast(`Supabase respondió ${resp.status}. Verifique URL y anon key.`, 'error');
+    } catch (e) {
+        showToast('No se pudo conectar con Supabase. Verifique la URL y su conexión a internet.', 'error');
+    }
+
+    if (!ok) {
+        limpiarEstadoNegocio();
+        establecerEstadoConexion('desconectado');
+        aplicarParametrosEnVista();
+        if (typeof renderDashboard === 'function') renderDashboard();
+        return;
+    }
+
+    // Guardar la configuración de conexión y recrear el cliente Supabase
+    appState.parametros.supabase_url = url;
+    appState.parametros.supabase_anon_key = key;
+    try { localStorage.setItem('nomina_parametros', JSON.stringify(appState.parametros)); } catch (e) {}
+    if (typeof actualizarClienteSupabase === 'function') actualizarClienteSupabase();
+
+    establecerEstadoConexion('conectado');
+    showToast('Conexión verificada. Cargando datos desde Supabase...');
+
+    if (typeof fetchAllData === 'function') {
+        try {
+            await fetchAllData();
+            if (typeof cargarRolesPermisos === 'function') cargarRolesPermisos().catch(console.warn);
+            aplicarParametrosEnVista();
+            establecerEstadoConexion('conectado', 'Conectado a Supabase');
+            showToast('Datos cargados desde Supabase correctamente');
+        } catch (e) {
+            console.warn(e);
+            establecerEstadoConexion('cache', 'Conectado, usando caché local');
+            showToast('Conectado, pero no se pudieron cargar todos los datos', 'error');
+        }
+    } else {
+        aplicarParametrosEnVista();
+    }
 }
 
 // ============================================================
