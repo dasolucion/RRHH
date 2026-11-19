@@ -378,7 +378,12 @@ async function guardarParametrosGenerales() {
         }
     } catch (e) {}
 
-    if (typeof fetchAllData === 'function') fetchAllData().catch(console.warn);
+    if (typeof fetchAllData === 'function') {
+        try { await fetchAllData(); showToast('Datos cargados desde la base'); }
+        catch (e) { showToast('No se pudieron cargar los datos', 'error'); console.warn(e); }
+    }
+    // Actualizar matriz de permisos después de recargar datos
+    if (typeof cargarRolesPermisos === 'function') cargarRolesPermisos().catch(console.warn);
     aplicarParametrosEnVista();
     showToast('Parámetros corporativos guardados exitosamente');
 }
