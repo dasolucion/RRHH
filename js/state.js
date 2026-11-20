@@ -276,25 +276,61 @@ function _migrarStorageAntiguo() {
 function cargarCacheLocal() {
     _migrarStorageAntiguo();
 
-    // Guardar referencia de credenciales guardadas/defaults para prellenar (sin exponer datos de cliente)
     let savedParams = null;
     const p = lsGet('nomina_parametros');
     if (p) {
         try { savedParams = JSON.parse(p); } catch (e) { savedParams = null; }
     }
 
-    // SIEMPRE iniciar en modo local demostrativo antes de conectar (sin rastro de datos de cliente)
-    appState.modoDatos = 'demo';
+    const modoGuardado = lsGet('nomina_modo_datos');
+    const prefillUrl = (savedParams && savedParams.supabase_url) || (typeof DEFAULT_SUPABASE_URL !== 'undefined' ? DEFAULT_SUPABASE_URL : '') || '';
+    const prefillKey = (savedParams && savedParams.supabase_anon_key) || (typeof DEFAULT_SUPABASE_ANON_KEY !== 'undefined' ? DEFAULT_SUPABASE_ANON_KEY : '') || '';
+    const tieneCreds = !!(prefillUrl && prefillKey && /^https?:\/\//i.test(prefillUrl));
+
     appState.esquemaOk = false;
     appState.esquemaFaltantes = [];
     appState.licenciaBloqueada = false;
     appState.licenciaMensaje = '';
+    appState.empresas = [];
+    appState.empresaActiva = null;
+    appState.rolesPermisos = [];
+    appState.features = (typeof DEFAULT_FEATURES !== 'undefined') ? { ...DEFAULT_FEATURES } : (appState.features || {});
 
-    // Prefill de conexión: usar lo guardado por usuario o defaults del despliegue, pero NO conectar automáticamente
-    const prefillUrl = (savedParams && savedParams.supabase_url) || (typeof DEFAULT_SUPABASE_URL !== 'undefined' ? DEFAULT_SUPABASE_URL : '') || '';
-    const prefillKey = (savedParams && savedParams.supabase_anon_key) || (typeof DEFAULT_SUPABASE_ANON_KEY !== 'undefined' ? DEFAULT_SUPABASE_ANON_KEY : '') || '';
+    // Si ya fue conectado/configurado a BD, reconectar automáticamente (sin mostrar datos de cliente hasta verificar)
+    if (modoGuardado === 'db' && tieneCreds) {
+        appState.modoDatos = 'db';
+        appState.parametros = {
+            nombre_empresa: 'DEMOSTRATIVA',
+            rif_empresa: 'J-00000000-0',
+            dias_utilidades: (savedParams && savedParams.dias_utilidades) || 30,
+            valor_ut: (savedParams && savedParams.valor_ut) != null ? Number(savedParams.valor_ut) : 43.00,
+            riesgo_ivss: (savedParams && savedParams.riesgo_ivss) != null ? Number(savedParams.riesgo_ivss) : 9,
+            aplica_lpp: savedParams && savedParams.aplica_lpp === false ? false : true,
+            supabase_url: prefillUrl,
+            supabase_anon_key: prefillKey
+        };
+        appState.usuarios = [...USUARIOS_DEFAULT];
+        limpiarEstadoNegocio();
+        if (typeof actualizarClienteSupabase === 'function') actualizarClienteSupabase();
+        establecerEstadoConexion('sinverificar', 'Reconectando a base de datos...');
+        aplicarParametrosEnVista();
+        if (typeof renderPanelFeatureFlags === 'function') renderPanelFeatureFlags();
+        if (typeof renderDashboard === 'function') renderDashboard();
 
-    // Estado demostrativo limpio
+        if (typeof verificarConexionInicial === 'function') {
+            verificarConexionInicial().catch((e) => {
+                console.warn('Error reconectando:', e);
+                limpiarEstadoNegocio();
+                establecerEstadoConexion('desconectado', 'No se pudo reconectar. Verifique la conexión.');
+                aplicarParametrosEnVista();
+                if (typeof renderDashboard === 'function') renderDashboard();
+            });
+        }
+        return;
+    }
+
+    // Primera vez / sin BD configurada: modo demostrativo local (sin rastro de datos de cliente)
+    appState.modoDatos = 'demo';
     appState.parametros = {
         nombre_empresa: 'DEMOSTRATIVA',
         rif_empresa: 'J-00000000-0',
@@ -305,22 +341,13 @@ function cargarCacheLocal() {
         supabase_url: prefillUrl,
         supabase_anon_key: prefillKey
     };
-    appState.empresas = [];
-    appState.empresaActiva = null;
     appState.usuarios = [...USUARIOS_DEFAULT];
 
     if (typeof actualizarClienteSupabase === 'function') actualizarClienteSupabase();
 
-    // No cargar datos de negocio ni caches de BD previas en la vista inicial
     limpiarEstadoNegocio();
-    if (typeof cargarDatosDemoLocal === 'function') cargarDatosDemoLocal();
-    // Forzar ausencia de datos demo visibles (empresa demostrativa en blanco)
-    limpiarEstadoNegocio();
+    // No cargar datos demo visibles ni caches de BD; mantener demostrativo en blanco
     appState.usuarios = [...USUARIOS_DEFAULT];
-
-    // Feature flags locales (UI); no exponer configuración remota de cliente
-    appState.features = (typeof DEFAULT_FEATURES !== 'undefined') ? { ...DEFAULT_FEATURES } : (appState.features || {});
-    appState.rolesPermisos = [];
 
     establecerEstadoConexion('demo', 'Modo Demo (datos en este equipo). Conecte la base de datos para trabajar con su empresa.');
     aplicarParametrosEnVista();
@@ -960,13 +987,13 @@ function verificarLicenciaBloqueo() {
             const venc = new Date(p.licencia_vencimiento + 'T00:00:00');
             if (!isNaN(venc.getTime()) && venc < hoy) {
                 bloqueada = true;
-                if (!mensaje) mensaje = 'La suscripción del servicio se encuentra vencida. Contacte al proveedor.';
+                if (!mensaje) mensaje = 'Servicio suspendido. Contacte al proveedor.';
             }
         } catch (e) {}
     }
 
     appState.licenciaBloqueada = bloqueada;
-    appState.licenciaMensaje = mensaje || 'El servicio se encuentra temporalmente bloqueado. Contacte al proveedor para regularizar la suscripción.';
+    appState.licenciaMensaje = mensaje || 'Servicio suspendido. Contacte al proveedor.';
     const ov = gId('license-block-overlay');
     if (ov) {
         const msg = gId('license-block-message');
