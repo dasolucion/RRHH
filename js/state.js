@@ -976,7 +976,7 @@ function verificarLicenciaBloqueo() {
     }
     const p = appState.parametros || {};
     let bloqueada = false;
-    let mensaje = p.licencia_mensaje || '';
+    let mensaje = String(p.licencia_mensaje || '').replace(/\s*por falta de pago\.?/ig, '').replace(/\s{2,}/g, ' ').trim();
 
     if (p.licencia_bloqueada === true || p.licencia_estado === 'bloqueada' || p.licencia_estado === 'suspendida') {
         bloqueada = true;
@@ -993,7 +993,7 @@ function verificarLicenciaBloqueo() {
     }
 
     appState.licenciaBloqueada = bloqueada;
-    appState.licenciaMensaje = mensaje || 'Servicio suspendido. Contacte al proveedor.';
+    appState.licenciaMensaje = (mensaje || 'Servicio suspendido. Contacte al proveedor.').replace(/\s*por falta de pago\.?/ig, '').replace(/\s{2,}/g, ' ').trim();
     const ov = gId('license-block-overlay');
     if (ov) {
         const msg = gId('license-block-message');
