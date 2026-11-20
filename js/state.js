@@ -22,6 +22,7 @@ let appState = {
     },
     empresas: [],          // Registro local de empresas (multiempresa)
     empresaActiva: null,   // RIF de la empresa activa
+    empresaRecienCreada: false, // true cuando se acaba de registrar una empresa nueva (estado en blanco, sin datos previos)
     estadoConexion: 'sinverificar', // sinverificar | comprobando | conectado | desconectado | cache | demo
     modoDatos: null,       // 'demo' | 'db' (null = auto según config)
     esquemaOk: false,
@@ -299,9 +300,11 @@ function cargarCacheLocal() {
     // Si ya fue conectado/configurado a BD, reconectar automáticamente (sin mostrar datos de cliente hasta verificar)
     if (modoGuardado === 'db' && tieneCreds) {
         appState.modoDatos = 'db';
+        const rifGuardado = (savedParams && savedParams.rif_empresa) ? String(savedParams.rif_empresa).trim().toUpperCase() : '';
+        const nomGuardado = (savedParams && savedParams.nombre_empresa) ? String(savedParams.nombre_empresa) : '';
         appState.parametros = {
-            nombre_empresa: 'DEMOSTRATIVA',
-            rif_empresa: 'J-00000000-0',
+            nombre_empresa: nomGuardado || 'DEMOSTRATIVA',
+            rif_empresa: rifGuardado || 'J-00000000-0',
             dias_utilidades: (savedParams && savedParams.dias_utilidades) || 30,
             valor_ut: (savedParams && savedParams.valor_ut) != null ? Number(savedParams.valor_ut) : 43.00,
             riesgo_ivss: (savedParams && savedParams.riesgo_ivss) != null ? Number(savedParams.riesgo_ivss) : 9,
@@ -309,6 +312,13 @@ function cargarCacheLocal() {
             supabase_url: prefillUrl,
             supabase_anon_key: prefillKey
         };
+        // Restaurar el registro de empresas y la empresa activa guardadas (multiempresa)
+        appState.empresas = [];
+        try {
+            const empsRaw = lsGet('nomina_empresas');
+            if (empsRaw) { const emps = JSON.parse(empsRaw); if (Array.isArray(emps)) appState.empresas = emps; }
+        } catch (e) {}
+        appState.empresaActiva = lsGet('nomina_empresa_activa') || rifGuardado || null;
         appState.usuarios = [...USUARIOS_DEFAULT];
         limpiarEstadoNegocio();
         if (typeof actualizarClienteSupabase === 'function') actualizarClienteSupabase();
@@ -482,7 +492,10 @@ async function guardarParametrosGenerales() {
     } catch (e) {}
 
     if (typeof fetchAllData === 'function') {
-        try { await fetchAllData(); } catch (e) { console.warn(e); }
+        // Si se acaba de crear una empresa nueva, no recargar datos de la empresa anterior (estado en blanco).
+        if (!appState.empresaRecienCreada) {
+            try { await fetchAllData(); } catch (e) { console.warn(e); }
+        }
     }
     if (typeof cargarRolesPermisos === 'function') cargarRolesPermisos().catch(console.warn);
     aplicarParametrosEnVista();
@@ -559,6 +572,15 @@ async function crearNuevaEmpresa() {
         riesgo_ivss: 9,
         aplica_lpp: true
     };
+    // Empresa recién creada: estado en blanco sin datos previos (no se borra la base de datos,
+    // solo se muestra el estado vacío para cargar empleados/cargos/departamentos de la nueva empresa).
+    appState.empresaRecienCreada = true;
+    if (typeof limpiarEstadoNegocio === 'function') limpiarEstadoNegocio();
+    if (typeof renderDashboard === 'function') renderDashboard();
+    if (typeof renderDepartamentos === 'function') renderDepartamentos();
+    if (typeof renderCargos === 'function') renderCargos();
+    if (typeof renderEmpleados === 'function') renderEmpleados();
+
     guardarEmpresaActivaEnRegistro();
     lsSet('nomina_parametros', JSON.stringify(appState.parametros));
     aplicarParametrosEnVista();
@@ -569,6 +591,8 @@ async function crearNuevaEmpresa() {
 async function cambiarEmpresaActiva(rif) {
     const entrada = (appState.empresas || []).find(e => String(e.rif).toUpperCase() === String(rif).toUpperCase());
     if (!entrada) return showToast('Empresa no encontrada en el registro local', 'error');
+    // Al activar una empresa registrada, volver al modo de carga normal (datos de esa empresa)
+    appState.empresaRecienCreada = false;
     appState.parametros = {
         ...appState.parametros,
         ...(entrada.parametros || {}),
