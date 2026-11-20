@@ -90,6 +90,7 @@ async function iniciarSistemaAutenticado() {
 
     // Si hay varias empresas registradas en BD (multiempresa), pedir la empresa con la que trabajar.
     if (appState.modoDatos === 'db' && Array.isArray(appState.empresas) && appState.empresas.length > 1) {
+        if (typeof aplicarPermisosSegunRol === 'function') aplicarPermisosSegunRol();
         if (typeof abrirSelectorEmpresaDb === 'function') {
             abrirSelectorEmpresaDb();
             return;
