@@ -51,6 +51,11 @@ function toggleMobileMenu() {
     }
 }
 
+// --- Escape HTML simple (para usar en templates) ---
+function esc(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
 // --- Query Supabase safe (captura errores y devuelve data o null) ---
 async function safeQuery(queryPromise, context = '') {
     try {

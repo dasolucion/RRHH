@@ -88,6 +88,14 @@ async function iniciarSistemaAutenticado() {
     gId('app-wrapper').classList.remove('hidden');
     gId('app-wrapper').classList.add('flex');
 
+    // Si hay varias empresas registradas en BD (multiempresa), pedir la empresa con la que trabajar.
+    if (appState.modoDatos === 'db' && Array.isArray(appState.empresas) && appState.empresas.length > 1) {
+        if (typeof abrirSelectorEmpresaDb === 'function') {
+            abrirSelectorEmpresaDb();
+            return;
+        }
+    }
+
     if (typeof cargarRolesPermisos === 'function') {
         try { await cargarRolesPermisos(); }
         catch (e) { console.warn('No se pudo cargar permisos, usando defaults:', e); }

@@ -319,6 +319,8 @@ function cargarCacheLocal() {
             if (empsRaw) { const emps = JSON.parse(empsRaw); if (Array.isArray(emps)) appState.empresas = emps; }
         } catch (e) {}
         appState.empresaActiva = lsGet('nomina_empresa_activa') || rifGuardado || null;
+        // Si la empresa activa es una recién creada, mantener estado en blanco (sin cargar datos previos).
+        appState.empresaRecienCreada = !!lsGet('nomina_empresa_recien_creada');
         appState.usuarios = [...USUARIOS_DEFAULT];
         limpiarEstadoNegocio();
         if (typeof actualizarClienteSupabase === 'function') actualizarClienteSupabase();
@@ -546,6 +548,24 @@ function abrirModalNuevaEmpresa() {
     openModal('modal-nueva-empresa');
 }
 
+function abrirSelectorEmpresaDb() {
+    const cont = gId('selector-empresas-lista');
+    const modal = gId('modal-selector-empresa');
+    if (!cont || !modal) return;
+    const lista = (Array.isArray(appState.empresas) ? appState.empresas : []).filter(e => e && e.rif).slice();
+    if (!lista.length) { closeModal('modal-selector-empresa'); return; }
+    cont.innerHTML = lista.map(e => `<button onclick="elegirEmpresa('${String(e.rif).replace(/'/g, "''")}')" class="w-full text-left bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-lg p-3 flex items-center justify-between gap-2 transition">
+        <span class="text-xs font-bold text-slate-100">${esc(e.nombre || e.rif)}</span>
+        <span class="text-[11px] text-slate-400 font-mono">${esc(e.rif)}</span>
+    </button>`).join('');
+    openModal('modal-selector-empresa');
+}
+
+function elegirEmpresa(rif) {
+    if (gId('modal-selector-empresa')) closeModal('modal-selector-empresa');
+    if (rif && typeof cambiarEmpresaActiva === 'function') cambiarEmpresaActiva(rif);
+}
+
 async function crearNuevaEmpresa() {
     const rol = appState.usuarioActual?.rol;
     if (rol !== 'master' && rol !== 'administrador') {
@@ -575,6 +595,7 @@ async function crearNuevaEmpresa() {
     // Empresa recién creada: estado en blanco sin datos previos (no se borra la base de datos,
     // solo se muestra el estado vacío para cargar empleados/cargos/departamentos de la nueva empresa).
     appState.empresaRecienCreada = true;
+    lsSet('nomina_empresa_recien_creada', rif);
     if (typeof limpiarEstadoNegocio === 'function') limpiarEstadoNegocio();
     if (typeof renderDashboard === 'function') renderDashboard();
     if (typeof renderDepartamentos === 'function') renderDepartamentos();
@@ -591,8 +612,14 @@ async function crearNuevaEmpresa() {
 async function cambiarEmpresaActiva(rif) {
     const entrada = (appState.empresas || []).find(e => String(e.rif).toUpperCase() === String(rif).toUpperCase());
     if (!entrada) return showToast('Empresa no encontrada en el registro local', 'error');
-    // Al activar una empresa registrada, volver al modo de carga normal (datos de esa empresa)
-    appState.empresaRecienCreada = false;
+    // Si se activa una empresa recién creada, mantener estado en blanco; si es una empresa registrada, cargar sus datos.
+    const esEmpresaNueva = (lsGet('nomina_empresa_recien_creada') || '') === String(rif || '').toUpperCase();
+    appState.empresaRecienCreada = esEmpresaNueva;
+    if (!esEmpresaNueva) lsRemove('nomina_empresa_recien_creada');
+    if (!esEmpresaNueva) {
+        // Limpiar estado previo para no mezclar datos entre empresas al cambiar.
+        limpiarEstadoNegocio();
+    }
     appState.parametros = {
         ...appState.parametros,
         ...(entrada.parametros || {}),

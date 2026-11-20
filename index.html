@@ -1688,6 +1688,21 @@
             </div>
         </div>
     </div>
+    <!-- MODAL SELECCIONAR EMPRESA (multiempresa, modo BD) -->
+    <div id="modal-selector-empresa" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md shadow-2xl">
+            <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-950">
+                <h3 class="font-bold text-white text-sm flex items-center">
+                    <i class="fa-solid fa-building text-indigo-400 mr-2"></i> Seleccionar Empresa
+                </h3>
+                <button onclick="closeModal('modal-selector-empresa')" class="text-slate-400 hover:text-white p-1"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div class="p-4 space-y-2 max-h-[50vh] overflow-auto" id="selector-empresas-lista"></div>
+            <div class="p-3 bg-slate-950 border-t border-slate-800 flex justify-end space-x-2">
+                <button onclick="closeModal('modal-selector-empresa')" class="px-3.5 py-2 rounded-lg text-xs bg-slate-800 text-slate-300 hover:bg-slate-700 font-semibold transition">Cerrar</button>
+            </div>
+        </div>
+    </div>
 </div>
     </div> <!-- FIN APP WRAPPER -->
 
