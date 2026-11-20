@@ -7,7 +7,7 @@ async function guardarTasasMensualesPermanente() {
     if (appState.usuarioActual?.rol !== 'master') return showToast('No tiene permisos para modificar tasas', 'error');
 
     appState.tasasMensuales.sort((a, b) => b.mes.localeCompare(a.mes));
-    localStorage.setItem('nomina_tasas_mensuales', JSON.stringify(appState.tasasMensuales));
+    lsSet('nomina_tasas_mensuales', JSON.stringify(appState.tasasMensuales));
 
     const payloadSupabase = appState.tasasMensuales.map(t => {
         const prom = Number(t.tasa_promedio !== undefined ? t.tasa_promedio : (t.tasa_anual || 0));
@@ -55,7 +55,7 @@ async function agregarTasaMensual() {
 async function eliminarTasaMensual(mes) {
     if (appState.usuarioActual?.rol !== 'master') return showToast('No tiene permisos para eliminar tasas', 'error');
     appState.tasasMensuales = appState.tasasMensuales.filter(x => x.mes !== mes);
-    localStorage.setItem('nomina_tasas_mensuales', JSON.stringify(appState.tasasMensuales));
+    lsSet('nomina_tasas_mensuales', JSON.stringify(appState.tasasMensuales));
     try { await supabaseClient.from('tasas_mensuales').delete().eq('mes', mes); } catch (e) {}
     renderTablaTasasMensuales();
     showToast('Tasa eliminada');

@@ -210,7 +210,7 @@ async function procesarUtilidadesGlobal() {
     }
 
     registrosNuevos.forEach(reg => appState.utilidades.unshift(reg));
-    localStorage.setItem('nomina_utilidades', JSON.stringify(appState.utilidades));
+    lsSet('nomina_utilidades', JSON.stringify(appState.utilidades));
 
     gId('uti-resultados').classList.add('hidden');
     renderHistoricoUtilidades();
@@ -280,7 +280,7 @@ async function eliminarUtilidadesProcesadas(p, f) {
     const antes = appState.utilidades.length;
     appState.utilidades = appState.utilidades.filter(u => !(String(u.periodo) === String(p) && String(u.fecha_pago) === String(f)));
     const eliminados = antes - appState.utilidades.length;
-    localStorage.setItem('nomina_utilidades', JSON.stringify(appState.utilidades));
+    lsSet('nomina_utilidades', JSON.stringify(appState.utilidades));
 
     renderHistoricoUtilidades();
     verificarEstadoPeriodo();

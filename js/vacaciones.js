@@ -161,7 +161,7 @@ async function guardarVacaciones() {
     }
 
     appState.vacaciones.unshift(registroLocal);
-    localStorage.setItem('nomina_vacaciones_cache', JSON.stringify(appState.vacaciones));
+    lsSet('nomina_vacaciones_cache', JSON.stringify(appState.vacaciones));
     renderHistoricoVacaciones();
 }
 
@@ -210,7 +210,7 @@ async function eliminarVacacionProcesada(id) {
     if (confirm('¿Desea eliminar este registro de vacaciones?')) {
         await safeQuery(supabaseClient.from('vacaciones').delete().eq('id', id), 'delete_vacaciones');
         appState.vacaciones = appState.vacaciones.filter(x => String(x.id) !== String(id));
-        localStorage.setItem('nomina_vacaciones_cache', JSON.stringify(appState.vacaciones));
+        lsSet('nomina_vacaciones_cache', JSON.stringify(appState.vacaciones));
         renderHistoricoVacaciones();
         showToast('Registro de vacaciones eliminado');
     }
@@ -223,7 +223,7 @@ function verReciboVacacionHistorico(id) {
     let detalle = normalizarRegistroJson(v).detalle_calculo;
     if (!detalle) {
         try {
-            const localVacs = JSON.parse(localStorage.getItem('nomina_vacaciones_cache') || '[]');
+            const localVacs = JSON.parse(lsGet('nomina_vacaciones_cache') || '[]');
             const localMatch = localVacs.find(lv => String(lv.id) === String(id));
             if (localMatch && localMatch.detalle_calculo) {
                 detalle = normalizarRegistroJson(localMatch).detalle_calculo;

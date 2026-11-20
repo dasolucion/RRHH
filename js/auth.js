@@ -5,7 +5,7 @@
    ============================================================ */
 
 function verificarSesionInicial() {
-    const ses = sessionStorage.getItem('nomina_usuario_activo');
+    const ses = sessionStorage.getItem(APP_ID + '__' + 'nomina_usuario_activo');
     if (ses) {
         try {
             const u = JSON.parse(ses);
@@ -37,7 +37,7 @@ async function ejecutarLogin(e) {
         );
         if (usrs && usrs.length > 0) {
             appState.usuarios = usrs;
-            try { localStorage.setItem('nomina_usuarios', JSON.stringify(usrs)); } catch (err) {}
+            try { lsSet('nomina_usuarios', JSON.stringify(usrs)); } catch (err) {}
             coincidencia = appState.usuarios.find(
                 u => u.usuario.toLowerCase() === usr.toLowerCase() && String(u.clave) === String(pass)
             );
@@ -65,14 +65,14 @@ async function ejecutarLogin(e) {
         rol: coincidencia.rol,
         activo: coincidencia.activo
     };
-    sessionStorage.setItem('nomina_usuario_activo', JSON.stringify(sesionSegura));
+    sessionStorage.setItem(APP_ID + '__' + 'nomina_usuario_activo', JSON.stringify(sesionSegura));
 
     showToast(`Bienvenido(a), ${coincidencia.nombre}`);
     iniciarSistemaAutenticado();
 }
 
 function cerrarSesion() {
-    sessionStorage.removeItem('nomina_usuario_activo');
+    sessionStorage.removeItem(APP_ID + '__' + 'nomina_usuario_activo');
     appState.usuarioActual = null;
     gId('login-username').value = '';
     gId('login-password').value = '';

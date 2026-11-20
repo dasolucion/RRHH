@@ -290,10 +290,10 @@ async function guardarAntiguedad() {
     };
 
     await safeQuery(supabaseClient.from('antiguedad').insert([reg]));
-    const list = JSON.parse(localStorage.getItem('nomina_antiguedad_cache') || '[]');
+    const list = JSON.parse(lsGet('nomina_antiguedad_cache') || '[]');
     reg.id = Date.now();
     list.unshift(reg);
-    localStorage.setItem('nomina_antiguedad_cache', JSON.stringify(list));
+    lsSet('nomina_antiguedad_cache', JSON.stringify(list));
     appState.antiguedad = list;
 
     if (a.monto_definitivo_bs > 0) {
@@ -326,7 +326,7 @@ async function guardarAntiguedad() {
             anticipoData.id = Date.now();
             appState.anticipos.push(anticipoData);
         }
-        localStorage.setItem('nomina_anticipos_cache', JSON.stringify(appState.anticipos));
+        lsSet('nomina_anticipos_cache', JSON.stringify(appState.anticipos));
         renderTablaPrestamos();
     }
 
@@ -459,8 +459,8 @@ async function eliminarAntiguedadProcesada(id) {
     if (!confirm('¿Eliminar registro de prestaciones de antigüedad?')) return;
 
     await safeQuery(supabaseClient.from('antiguedad').delete().eq('id', id));
-    const list = JSON.parse(localStorage.getItem('nomina_antiguedad_cache') || '[]').filter(x => String(x.id) !== String(id));
-    localStorage.setItem('nomina_antiguedad_cache', JSON.stringify(list));
+    const list = JSON.parse(lsGet('nomina_antiguedad_cache') || '[]').filter(x => String(x.id) !== String(id));
+    lsSet('nomina_antiguedad_cache', JSON.stringify(list));
     appState.antiguedad = list;
     fetchAllData();
     showToast('Registro eliminado');

@@ -21,9 +21,9 @@ async function fetchAllData() {
     );
     if (deptos && deptos.length > 0) {
         appState.departamentos = deptos;
-        localStorage.setItem('nomina_departamentos', JSON.stringify(deptos));
+        lsSet('nomina_departamentos', JSON.stringify(deptos));
     } else {
-        const localD = localStorage.getItem('nomina_departamentos');
+        const localD = lsGet('nomina_departamentos');
         if (localD) appState.departamentos = JSON.parse(localD);
     }
 
@@ -34,9 +34,9 @@ async function fetchAllData() {
     );
     if (cargos && cargos.length > 0) {
         appState.cargos = cargos;
-        localStorage.setItem('nomina_cargos', JSON.stringify(cargos));
+        lsSet('nomina_cargos', JSON.stringify(cargos));
     } else {
-        const localC = localStorage.getItem('nomina_cargos');
+        const localC = lsGet('nomina_cargos');
         if (localC) appState.cargos = JSON.parse(localC);
     }
 
@@ -59,9 +59,9 @@ async function fetchAllData() {
             departamentos: e.departamentos || appState.departamentos.find(d => String(d.id) === String(e.departamento_id)) || null,
             cargos: e.cargos || appState.cargos.find(c => String(c.id) === String(e.cargo_id)) || null
         }));
-        localStorage.setItem('nomina_empleados', JSON.stringify(appState.empleados));
+        lsSet('nomina_empleados', JSON.stringify(appState.empleados));
     } else {
-        const localE = localStorage.getItem('nomina_empleados');
+        const localE = lsGet('nomina_empleados');
         if (localE) appState.empleados = JSON.parse(localE);
     }
 
@@ -72,9 +72,9 @@ async function fetchAllData() {
     );
     if (nominas && nominas.length > 0) {
         appState.nominas = nominas;
-        localStorage.setItem('nomina_procesadas', JSON.stringify(nominas));
+        lsSet('nomina_procesadas', JSON.stringify(nominas));
     } else {
-        const localN = localStorage.getItem('nomina_procesadas');
+        const localN = lsGet('nomina_procesadas');
         if (localN) appState.nominas = JSON.parse(localN);
     }
 
@@ -85,9 +85,9 @@ async function fetchAllData() {
     );
     if (histSal && histSal.length > 0) {
         appState.historicoSalarios = histSal;
-        localStorage.setItem('nomina_historico_salarios', JSON.stringify(histSal));
+        lsSet('nomina_historico_salarios', JSON.stringify(histSal));
     } else {
-        const localHS = localStorage.getItem('nomina_historico_salarios');
+        const localHS = lsGet('nomina_historico_salarios');
         if (localHS) {
             try { appState.historicoSalarios = JSON.parse(localHS); }
             catch (e) { appState.historicoSalarios = []; }
@@ -101,7 +101,7 @@ async function fetchAllData() {
     );
     if (vacs && vacs.length > 0) {
         const localVacs = (() => {
-            try { return JSON.parse(localStorage.getItem('nomina_vacaciones_cache') || '[]'); }
+            try { return JSON.parse(lsGet('nomina_vacaciones_cache') || '[]'); }
             catch (e) { return []; }
         })();
         appState.vacaciones = vacs.map(v => {
@@ -114,9 +114,9 @@ async function fetchAllData() {
             }
             return normalizado;
         });
-        localStorage.setItem('nomina_vacaciones_cache', JSON.stringify(appState.vacaciones));
+        lsSet('nomina_vacaciones_cache', JSON.stringify(appState.vacaciones));
     } else {
-        const localV = localStorage.getItem('nomina_vacaciones_cache');
+        const localV = lsGet('nomina_vacaciones_cache');
         if (localV) {
             try { appState.vacaciones = JSON.parse(localV).map(normalizarRegistroJson); }
             catch (e) {}
@@ -135,9 +135,9 @@ async function fetchAllData() {
                 : (u.detalle_calculo || {});
             return { ...det, ...u };
         });
-        localStorage.setItem('nomina_utilidades', JSON.stringify(appState.utilidades));
+        lsSet('nomina_utilidades', JSON.stringify(appState.utilidades));
     } else {
-        const localU = localStorage.getItem('nomina_utilidades');
+        const localU = lsGet('nomina_utilidades');
         if (localU) appState.utilidades = JSON.parse(localU);
     }
 
@@ -148,9 +148,9 @@ async function fetchAllData() {
     );
     if (prest && prest.length > 0) {
         appState.prestaciones = prest;
-        localStorage.setItem('nomina_prestaciones', JSON.stringify(prest));
+        lsSet('nomina_prestaciones', JSON.stringify(prest));
     } else {
-        const localP = localStorage.getItem('nomina_prestaciones');
+        const localP = lsGet('nomina_prestaciones');
         if (localP) appState.prestaciones = JSON.parse(localP);
     }
 
@@ -161,9 +161,9 @@ async function fetchAllData() {
     );
     if (anticipos && anticipos.length > 0) {
         appState.anticipos = anticipos;
-        localStorage.setItem('nomina_anticipos_cache', JSON.stringify(anticipos));
+        lsSet('nomina_anticipos_cache', JSON.stringify(anticipos));
     } else {
-        const localA = localStorage.getItem('nomina_anticipos_cache');
+        const localA = lsGet('nomina_anticipos_cache');
         if (localA) {
             try { appState.anticipos = JSON.parse(localA); }
             catch (e) { appState.anticipos = []; }
@@ -179,9 +179,9 @@ async function fetchAllData() {
     );
     if (antProcesadas && antProcesadas.length > 0) {
         appState.antiguedad = antProcesadas.map(normalizarRegistroJson);
-        localStorage.setItem('nomina_antiguedad_cache', JSON.stringify(appState.antiguedad));
+        lsSet('nomina_antiguedad_cache', JSON.stringify(appState.antiguedad));
     } else {
-        const localAnt = localStorage.getItem('nomina_antiguedad_cache');
+        const localAnt = lsGet('nomina_antiguedad_cache');
         if (localAnt) {
             try { appState.antiguedad = JSON.parse(localAnt); }
             catch (e) { appState.antiguedad = []; }
@@ -195,7 +195,7 @@ async function fetchAllData() {
     );
     if (usrs && usrs.length > 0) {
         appState.usuarios = usrs;
-        localStorage.setItem('nomina_usuarios', JSON.stringify(usrs));
+        lsSet('nomina_usuarios', JSON.stringify(usrs));
     }
 
     // --- Parámetros corporativos + features_config ---
@@ -213,21 +213,28 @@ async function fetchAllData() {
             riesgo_ivss: paramConf.riesgo_ivss != null ? Number(paramConf.riesgo_ivss) : (appState.parametros.riesgo_ivss || 9),
             aplica_lpp: paramConf.aplica_lpp !== false,
             supabase_url: paramConf.supabase_url || appState.parametros.supabase_url || '',
-            supabase_anon_key: paramConf.supabase_anon_key || appState.parametros.supabase_anon_key || ''
+            supabase_anon_key: paramConf.supabase_anon_key || appState.parametros.supabase_anon_key || '',
+            licencia_estado: paramConf.licencia_estado || appState.parametros.licencia_estado || null,
+            licencia_bloqueada: paramConf.licencia_bloqueada === true || paramConf.licencia_bloqueada === 'true',
+            licencia_vencimiento: paramConf.licencia_vencimiento || appState.parametros.licencia_vencimiento || null,
+            licencia_mensaje: paramConf.licencia_mensaje || appState.parametros.licencia_mensaje || null
         };
         try {
-            localStorage.setItem('nomina_parametros', JSON.stringify(appState.parametros));
+            lsSet('nomina_parametros', JSON.stringify(appState.parametros));
         } catch (e) {}
-        // Registrar la empresa de la base en el selector multiempresa
-        if (typeof guardarEmpresaActivaEnRegistro === 'function') guardarEmpresaActivaEnRegistro();
-        if (typeof establecerEstadoConexion === 'function') {
-            establecerEstadoConexion('conectado',
-                appState.parametros.supabase_url ? 'Conectado a Supabase' : 'Conectado (base por defecto)');
+        // Registrar la empresa en el selector multiempresa (solo en DB mode)
+        if (!esModoDemo() && typeof guardarEmpresaActivaEnRegistro === 'function') guardarEmpresaActivaEnRegistro();
+        if (!esModoDemo() && typeof establecerEstadoConexion === 'function') {
+            const hayAdvertencias = !appState.esquemaOk && Array.isArray(appState.esquemaFaltantes) && appState.esquemaFaltantes.length > 0;
+            if (!hayAdvertencias) {
+                establecerEstadoConexion('conectado',
+                    appState.parametros.supabase_url ? 'Conectado a Supabase' : 'Conectado (base por defecto)');
+            }
         }
     }
     if (paramConf && paramConf.features_config) {
         appState.features = paramConf.features_config;
-        localStorage.setItem('nomina_features_config', JSON.stringify(paramConf.features_config));
+        lsSet('nomina_features_config', JSON.stringify(paramConf.features_config));
     }
     if (typeof renderPanelFeatureFlags === 'function') renderPanelFeatureFlags();
     if (typeof aplicarFeatureFlagsDOM === 'function') aplicarFeatureFlagsDOM();
@@ -243,9 +250,9 @@ async function fetchAllData() {
             const men = Number(t.tasa_mensual !== undefined ? t.tasa_mensual : (an / 12));
             return { mes: t.mes, tasa_promedio: an, tasa_anual: an, tasa_mensual: men, tasa_dolar: Number(t.tasa_dolar || 36.50) };
         });
-        localStorage.setItem('nomina_tasas_mensuales', JSON.stringify(appState.tasasMensuales));
+        lsSet('nomina_tasas_mensuales', JSON.stringify(appState.tasasMensuales));
     } else {
-        const tmLocal = localStorage.getItem('nomina_tasas_mensuales');
+        const tmLocal = lsGet('nomina_tasas_mensuales');
         if (tmLocal) {
             try {
                 const p = JSON.parse(tmLocal);
@@ -264,9 +271,9 @@ async function fetchAllData() {
     );
     if (Array.isArray(prestamosDb)) {
         appState.prestamos = prestamosDb;
-        localStorage.setItem('nomina_prestamos_cache', JSON.stringify(prestamosDb));
+        lsSet('nomina_prestamos_cache', JSON.stringify(prestamosDb));
     } else {
-        const localP = localStorage.getItem('nomina_prestamos_cache');
+        const localP = lsGet('nomina_prestamos_cache');
         if (localP) {
             try {
                 const p = JSON.parse(localP);
@@ -281,9 +288,9 @@ async function fetchAllData() {
     );
     if (Array.isArray(abonosDb)) {
         appState.prestamosAbonos = abonosDb;
-        localStorage.setItem('nomina_prestamos_abonos_cache', JSON.stringify(abonosDb));
+        lsSet('nomina_prestamos_abonos_cache', JSON.stringify(abonosDb));
     } else {
-        const localA = localStorage.getItem('nomina_prestamos_abonos_cache');
+        const localA = lsGet('nomina_prestamos_abonos_cache');
         if (localA) {
             try {
                 const a = JSON.parse(localA);
@@ -308,4 +315,5 @@ async function fetchAllData() {
     if (typeof renderHistoricoPrestaciones === 'function') renderHistoricoPrestaciones();
     if (typeof renderTablaUsuarios === 'function') renderTablaUsuarios();
     if (typeof populateSelects === 'function') populateSelects();
+    if (typeof verificarLicenciaBloqueo === 'function') verificarLicenciaBloqueo();
 }

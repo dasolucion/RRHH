@@ -891,7 +891,20 @@
                         </div>
                         <div class="flex items-center justify-between text-[11px] px-1">
                             <span class="text-slate-500">Estado: <span id="supabase-status-param" class="font-bold text-slate-400">Sin verificar</span></span>
-                            <span class="text-slate-600">Los datos se guardan en este equipo (localStorage) y en la nube (Supabase).</span>
+                            <span class="text-slate-600">Modo demo: datos en este equipo. Con base de datos: datos en Supabase.</span>
+                        </div>
+
+                        <!-- Esquema de Base de Datos -->
+                        <div class="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-3">
+                            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                                <h5 class="text-[11px] font-bold text-sky-400 uppercase tracking-wider flex items-center"><i class="fa-solid fa-sitemap mr-1.5"></i> Esquema de Base de Datos (Supabase)</h5>
+                                <div class="flex items-center gap-2">
+                                    <button onclick="verificarEsquemaUI()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] px-3 py-1.5 rounded-lg font-semibold flex items-center gap-1.5 transition"><i class="fa-solid fa-magnifying-glass"></i><span>Verificar esquema</span></button>
+                                    <button id="btn-crear-esquema" onclick="abrirModalEsquemaSql()" class="bg-sky-600 hover:bg-sky-500 text-white text-[11px] px-3 py-1.5 rounded-lg font-semibold flex items-center gap-1.5 transition"><i class="fa-solid fa-database"></i><span>Generar SQL de tablas</span></button>
+                                </div>
+                            </div>
+                            <div id="db-schema-status" class="text-[11px] text-slate-400">Conecte una base de datos para verificar o crear las tablas requeridas.</div>
+                            <p class="text-[10px] text-slate-500">Al conectarse por primera vez, el sistema verifica las tablas/campos. Si faltan, genere el SQL y ejecútelo en Supabase (SQL Editor). Cuando el esquema esté completo, el botón de creación se deshabilita y el sistema trabaja con la base de datos.</p>
                         </div>
                     </div>
 
@@ -1682,6 +1695,8 @@
          CARGA DE MÓDULOS JS (ORDEN DE DEPENDENCIA ESTRICTO)
          ============================================================ -->
     <script src="js/config.js"></script>
+    <script src="js/demo_client.js"></script>
+    <script src="js/db_schema.js"></script>
     <script src="js/utils.js"></script>
     <script src="js/state.js"></script>
     <script src="js/auth.js"></script>
@@ -1700,5 +1715,15 @@
     <script src="js/liquidaciones.js"></script>
     <script src="js/asistencia.js"></script>
     <script src="js/main.js"></script>
+
+    <!-- BLOQUEO POR LICENCIA/SUSCRIPCIÓN -->
+    <div id="license-block-overlay" class="fixed inset-0 bg-slate-950/95 backdrop-blur-sm hidden items-center justify-center p-6 z-[100]">
+        <div class="bg-slate-900 border border-rose-800/60 rounded-2xl p-6 max-w-lg w-full text-center shadow-2xl">
+            <div class="w-14 h-14 rounded-full bg-rose-950 border border-rose-800 flex items-center justify-center mx-auto mb-4"><i class="fa-solid fa-lock text-rose-400 text-xl"></i></div>
+            <h2 class="text-lg font-bold text-white mb-2">Sistema bloqueado</h2>
+            <p id="license-block-message" class="text-sm text-slate-300 mb-4">El servicio se encuentra temporalmente bloqueado. Contacte al proveedor para regularizar la suscripción.</p>
+            <p class="text-[11px] text-slate-500">Si es administrador del servicio, actualice el estado de licencia en la base de datos (parametros_config).</p>
+        </div>
+    </div>
 </body>
 </html>

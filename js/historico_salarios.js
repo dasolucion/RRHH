@@ -101,6 +101,6 @@ async function guardarHistoricoMeses() {
         else appState.historicoSalarios.push({ id: Date.now() + Math.random(), ...r });
     });
 
-    localStorage.setItem('nomina_historico_salarios', JSON.stringify(appState.historicoSalarios));
+    lsSet('nomina_historico_salarios', JSON.stringify(appState.historicoSalarios));
     showToast('Historial salarial guardado exitosamente');
 }

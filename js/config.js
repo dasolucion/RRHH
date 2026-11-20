@@ -4,50 +4,104 @@
    NO contiene lógica de negocio ni funciones de UI.
    ============================================================ */
 
-// --- Credenciales Supabase (por defecto; se sobreescriben desde appState.parametros.supabase_*) ---
-const SUPABASE_URL = 'https://nrfplwpmwplpbskidtqs.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yZnBsd3Btd3BscGJza2lkdHFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc1OTA4MjIsImV4cCI6MjEwMzE2NjgyMn0.PZXrE9KtAVF2e4RbyM3-m1ClS8R8QaTCctLzZKAAYdQ';
+// --- Identidad del sistema (aisla localStorage entre despliegues: rrhh, record, cliente-x, etc.) ---
+const APP_ID = 'rrhh'; // CAMBIAR por un ID único en cada despliegue/copia del sistema
 
-// Cliente Supabase (se crea dinámicamente vía getSupabaseClient para respetar
-// la configuración guardada en Parámetros -> supabase_url / supabase_anon_key)
+// --- Credenciales Supabase del despliegue ---
+// Dejar vacías ('') para que el sistema inicie en MODO DEMO (localStorage) y el cliente configure su BD.
+// Si se preconfiguran, el sistema intentará conectarse a esa base de datos.
+const DEFAULT_SUPABASE_URL = 'https://nrfplwpmwplpbskidtqs.supabase.co';
+const DEFAULT_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yZnBsd3Btd3BscGJza2lkdHFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc1OTA4MjIsImV4cCI6MjEwMzE2NjgyMn0.PZXrE9KtAVF2e4RbyM3-m1ClS8R8QaTCctLzZKAAYdQ';
+
+// Compatibilidad con código existente
+const SUPABASE_URL = DEFAULT_SUPABASE_URL;
+const SUPABASE_ANON_KEY = DEFAULT_SUPABASE_ANON_KEY;
+
+// --- Helpers de almacenamiento local (namespaced por APP_ID) ---
+function storageKey(key) { return `${APP_ID}__${key}`; }
+function lsGet(key) { try { return localStorage.getItem(storageKey(key)); } catch (e) { return null; } }
+function lsSet(key, value) { try { localStorage.setItem(storageKey(key), value); } catch (e) {} }
+function lsRemove(key) { try { localStorage.removeItem(storageKey(key)); } catch (e) {} }
+
+// Cliente Supabase (real o demo según modo/configuración)
 let supabaseClient = null;
-let _sbConfig = { url: null, key: null };
+let _sbConfig = { url: null, key: null, mode: null };
 
 function crearClienteSupabase(url, key) {
     return supabase.createClient(url, key);
 }
 
-function getSupabaseClient() {
+function _obtenerCredencialesDb() {
     const p = (typeof appState !== 'undefined' && appState && appState.parametros) ? appState.parametros : null;
-    let url = (p && p.supabase_url) || SUPABASE_URL;
-    let key = (p && p.supabase_anon_key) || SUPABASE_ANON_KEY;
+    let url = (p && p.supabase_url) || DEFAULT_SUPABASE_URL || '';
+    let key = (p && p.supabase_anon_key) || DEFAULT_SUPABASE_ANON_KEY || '';
+    if (url && !/^https?:\/\//i.test(url)) { url = DEFAULT_SUPABASE_URL || ''; key = DEFAULT_SUPABASE_ANON_KEY || ''; }
+    return { url: (url || '').replace(/\/+$/, ''), key: key || '' };
+}
 
-    // Validación mínima: si la URL guardada es inválida, usar la de respaldo
-    if (!/^https?:\/\//i.test(url)) {
-        url = SUPABASE_URL;
-        key = SUPABASE_ANON_KEY;
+function tieneCredencialesDb() {
+    const c = _obtenerCredencialesDb();
+    return !!(c.url && c.key);
+}
+
+function esModoDemoActivo() {
+    if (typeof appState !== 'undefined' && appState) {
+        if (appState.modoDatos === 'demo') return true;
+        if (appState.modoDatos === 'db') return false;
+    }
+    return !tieneCredencialesDb();
+}
+
+function getSupabaseClient() {
+    // Modo demo: usar cliente local (localStorage)
+    if (esModoDemoActivo() && typeof createDemoSupabaseClient === 'function') {
+        if (!supabaseClient || _sbConfig.mode !== 'demo') {
+            supabaseClient = createDemoSupabaseClient();
+            _sbConfig = { mode: 'demo', url: null, key: null };
+        }
+        return supabaseClient;
     }
 
-    if (!supabaseClient || _sbConfig.url !== url || _sbConfig.key !== key) {
+    const { url, key } = _obtenerCredencialesDb();
+    if (!url || !key) {
+        // Sin credenciales y sin demo disponible: intentar demo si existe
+        if (typeof createDemoSupabaseClient === 'function') {
+            supabaseClient = createDemoSupabaseClient();
+            _sbConfig = { mode: 'demo', url: null, key: null };
+            return supabaseClient;
+        }
+        return null;
+    }
+
+    if (!supabaseClient || _sbConfig.mode !== 'db' || _sbConfig.url !== url || _sbConfig.key !== key) {
         try {
             supabaseClient = crearClienteSupabase(url, key);
-            _sbConfig = { url, key };
+            _sbConfig = { mode: 'db', url, key };
         } catch (e) {
-            console.warn('Configuración Supabase inválida, usando valores por defecto:', e.message);
-            url = SUPABASE_URL;
-            key = SUPABASE_ANON_KEY;
-            supabaseClient = crearClienteSupabase(url, key);
-            _sbConfig = { url, key };
+            console.warn('Configuración Supabase inválida:', e.message);
+            if (typeof createDemoSupabaseClient === 'function') {
+                supabaseClient = createDemoSupabaseClient();
+                _sbConfig = { mode: 'demo', url: null, key: null };
+            } else {
+                supabaseClient = null;
+            }
         }
     }
     return supabaseClient;
 }
 
 function actualizarClienteSupabase() {
+    // Forzar recreación según modo/config actual
+    if (esModoDemoActivo() && typeof createDemoSupabaseClient === 'function') {
+        supabaseClient = createDemoSupabaseClient();
+        _sbConfig = { mode: 'demo', url: null, key: null };
+        return supabaseClient;
+    }
+    _sbConfig = { url: null, key: null, mode: null };
     return getSupabaseClient();
 }
 
-// Inicializar cliente con credenciales por defecto al cargar (antes de leer localStorage)
+// Inicializar cliente al cargar
 supabaseClient = getSupabaseClient();
 
 // --- Usuarios de respaldo local (si Supabase no responde o está vacío) ---

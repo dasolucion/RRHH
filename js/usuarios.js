@@ -113,7 +113,7 @@ async function guardarUsuario() {
         }
     }
 
-    localStorage.setItem('nomina_usuarios', JSON.stringify(appState.usuarios));
+    lsSet('nomina_usuarios', JSON.stringify(appState.usuarios));
     closeModal('modal-usuario');
     renderTablaUsuarios();
     showToast('Usuario guardado exitosamente en Supabase');
@@ -133,7 +133,7 @@ async function toggleEstadoUsuario(id, estadoActual) {
             supabaseClient.from('usuarios').update({ activo: u.activo }).eq('id', id),
             'toggle_usuario'
         );
-        localStorage.setItem('nomina_usuarios', JSON.stringify(appState.usuarios));
+        lsSet('nomina_usuarios', JSON.stringify(appState.usuarios));
         renderTablaUsuarios();
         showToast(`Usuario ${u.activo ? 'activado' : 'desactivado'}`);
     }
@@ -150,7 +150,7 @@ async function eliminarUsuario(id) {
     if (confirm(`¿Está seguro de eliminar al usuario ${u?.nombre}?`)) {
         await safeQuery(supabaseClient.from('usuarios').delete().eq('id', id), 'delete_usuario');
         appState.usuarios = appState.usuarios.filter(x => String(x.id) !== String(id));
-        localStorage.setItem('nomina_usuarios', JSON.stringify(appState.usuarios));
+        lsSet('nomina_usuarios', JSON.stringify(appState.usuarios));
         renderTablaUsuarios();
         showToast('Usuario eliminado de Supabase');
     }
@@ -277,7 +277,7 @@ async function guardarMatrizPermisos() {
     appState.rolesPermisos = appState.rolesPermisos.filter(p => p.rol !== rol);
     rows.forEach(r => appState.rolesPermisos.push({ ...r }));
     try {
-        localStorage.setItem('nomina_roles_permisos', JSON.stringify(appState.rolesPermisos));
+        lsSet('nomina_roles_permisos', JSON.stringify(appState.rolesPermisos));
     } catch (e) {}
 
     // 4. Recargar permisos desde BD si fue posible (para tener IDs/created_at reales)

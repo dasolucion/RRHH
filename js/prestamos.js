@@ -87,8 +87,8 @@ function totalAbonadoEmpleado(empId) {
 
 function persistirPrestamosLocal() {
     try {
-        localStorage.setItem('nomina_prestamos_cache', JSON.stringify(appState.prestamos || []));
-        localStorage.setItem('nomina_prestamos_abonos_cache', JSON.stringify(appState.prestamosAbonos || []));
+        lsSet('nomina_prestamos_cache', JSON.stringify(appState.prestamos || []));
+        lsSet('nomina_prestamos_abonos_cache', JSON.stringify(appState.prestamosAbonos || []));
     } catch (e) {}
 }
 

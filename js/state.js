@@ -13,8 +13,8 @@ let appState = {
     tasasMensuales: [], usuarios: [], usuarioActual: null, mesesEditablesActuales: [],
     rolesPermisos: [], // Matriz de permisos desde Supabase
     parametros: {
-        nombre_empresa: 'BOCANADA CAFÉ / GRUPO PRALUM, C.A.',
-        rif_empresa: 'J-50088879-1',
+        nombre_empresa: 'EMPRESA DEMO',
+        rif_empresa: 'J-00000000-0',
         dias_utilidades: 30,
         valor_ut: 43.00,
         supabase_url: '',
@@ -22,7 +22,12 @@ let appState = {
     },
     empresas: [],          // Registro local de empresas (multiempresa)
     empresaActiva: null,   // RIF de la empresa activa
-    estadoConexion: 'sinverificar', // sinverificar | comprobando | conectado | desconectado | cache
+    estadoConexion: 'sinverificar', // sinverificar | comprobando | conectado | desconectado | cache | demo
+    modoDatos: null,       // 'demo' | 'db' (null = auto según config)
+    esquemaOk: false,
+    esquemaFaltantes: [],
+    licenciaBloqueada: false,
+    licenciaMensaje: '',
     calculoVacacionesActual: null,
     calculoUtilidadesActual: [],
     calculoAntiguedadActual: null,
@@ -168,7 +173,7 @@ async function guardarFeatureFlagsConfig() {
         nuevasFlags[key] = chk ? chk.checked : true;
     });
     appState.features = nuevasFlags;
-    localStorage.setItem('nomina_features_config', JSON.stringify(nuevasFlags));
+    lsSet('nomina_features_config', JSON.stringify(nuevasFlags));
     await safeQuery(
         supabaseClient.from('parametros_config').upsert([{ id: 1, features_config: nuevasFlags }]),
         'save_features_config'
@@ -187,7 +192,7 @@ async function cargarRolesPermisos() {
         if (error) throw error;
         appState.rolesPermisos = data || [];
         try {
-            localStorage.setItem('nomina_roles_permisos', JSON.stringify(appState.rolesPermisos));
+            lsSet('nomina_roles_permisos', JSON.stringify(appState.rolesPermisos));
         } catch (e) {}
     } catch (e) {
         console.warn('No se pudo cargar roles_permisos:', e.message);
@@ -225,6 +230,10 @@ function esConexionActiva() {
     return appState.estadoConexion === 'conectado';
 }
 
+function esModoDemo() {
+    return appState.modoDatos === 'demo';
+}
+
 function limpiarEstadoNegocio() {
     appState.departamentos = [];
     appState.cargos = [];
@@ -245,38 +254,83 @@ function limpiarEstadoNegocio() {
     appState.calculoPrestacionesActual = null;
 }
 
+function _migrarStorageAntiguo() {
+    // Migra claves antiguas nomina_* (sin prefijo APP_ID) al namespace actual si no existen.
+    // Evita migrar config de conexión/empresas para no mezclar sistemas desplegados en el mismo origen.
+    try {
+        const skip = new Set(['nomina_parametros', 'nomina_empresas', 'nomina_empresa_activa']);
+        const keys = [];
+        for (let i = 0; i < localStorage.length; i++) keys.push(localStorage.key(i));
+        for (const k of keys) {
+            if (!k || !k.startsWith('nomina_')) continue;
+            if (skip.has(k)) continue;
+            const nuevo = storageKey(k);
+            if (localStorage.getItem(nuevo) == null) {
+                const v = localStorage.getItem(k);
+                if (v != null) localStorage.setItem(nuevo, v);
+            }
+        }
+    } catch (e) {}
+}
+
 function cargarCacheLocal() {
-    // Credenciales de conexión Supabase (se preservan siempre)
-    const p = localStorage.getItem('nomina_parametros');
+    _migrarStorageAntiguo();
+
+    // Credenciales de conexión Supabase configuradas por el usuario (si existen)
+    const p = lsGet('nomina_parametros');
     if (p) {
         try { appState.parametros = { ...appState.parametros, ...JSON.parse(p) }; }
         catch (e) { /* conserva defaults */ }
     }
-    // Asegurar que el cliente Supabase use las credenciales guardadas
+
+    // Determinar modo: DB si hay credenciales (usuario o despliegue), si no demo
+    const modoGuardado = lsGet('nomina_modo_datos');
+    if (modoGuardado === 'demo' || modoGuardado === 'db') appState.modoDatos = modoGuardado;
+    if (!tieneCredencialesDb()) {
+        appState.modoDatos = 'demo';
+    } else if (!appState.modoDatos) {
+        // Credenciales disponibles (defaults del despliegue o guardadas): usar DB
+        appState.modoDatos = 'db';
+    }
+
     if (typeof actualizarClienteSupabase === 'function') actualizarClienteSupabase();
 
-    // Registro local de empresas (multiempresa)
-    const emps = localStorage.getItem('nomina_empresas');
+    // Registro local de empresas
+    const emps = lsGet('nomina_empresas');
     if (emps) {
         try {
             const parsed = JSON.parse(emps);
             if (Array.isArray(parsed)) appState.empresas = parsed;
         } catch (e) { appState.empresas = []; }
     }
-    appState.empresaActiva = localStorage.getItem('nomina_empresa_activa') || null;
+    appState.empresaActiva = lsGet('nomina_empresa_activa') || null;
 
-    // Usuarios esenciales para login (master/sistema). Datos completos se cargan al conectar.
-    appState.usuarios = [...USUARIOS_DEFAULT];
+    // Usuarios: en demo mantener defaults + cualquier usuario demo guardado; en DB cargar luego
+    if (esModoDemo()) {
+        const u = lsGet('nomina_usuarios');
+        if (u) {
+            try { const parsed = JSON.parse(u); if (Array.isArray(parsed) && parsed.length) appState.usuarios = parsed; else appState.usuarios = [...USUARIOS_DEFAULT]; }
+            catch (e) { appState.usuarios = [...USUARIOS_DEFAULT]; }
+        } else {
+            appState.usuarios = [...USUARIOS_DEFAULT];
+        }
+        // Cargar datos demo desde tablas locales (demo client)
+        limpiarEstadoNegocio();
+        if (typeof cargarDatosDemoLocal === 'function') cargarDatosDemoLocal();
+        establecerEstadoConexion('demo', 'Modo Demo (datos en este equipo)');
+    } else {
+        // Modo DB: inicio limpio hasta verificar/cargar desde Supabase
+        appState.usuarios = [...USUARIOS_DEFAULT];
+        limpiarEstadoNegocio();
+        establecerEstadoConexion('sinverificar');
+    }
 
-    // Estado inicial limpio: sin datos de negocio hasta verificar conexión
-    limpiarEstadoNegocio();
-
-    // Feature flags y matriz de permisos: esenciales para UI/roles
-    const fc = localStorage.getItem('nomina_features_config');
+    // Feature flags y matriz de permisos
+    const fc = lsGet('nomina_features_config');
     if (fc) {
         try { appState.features = JSON.parse(fc); } catch (e) {}
     }
-    const rpCache = localStorage.getItem('nomina_roles_permisos');
+    const rpCache = lsGet('nomina_roles_permisos');
     if (rpCache) {
         try {
             const parsed = JSON.parse(rpCache);
@@ -284,15 +338,51 @@ function cargarCacheLocal() {
         } catch (e) {}
     }
 
-    if (typeof establecerEstadoConexion === 'function') establecerEstadoConexion('sinverificar');
     aplicarParametrosEnVista();
     if (typeof renderPanelFeatureFlags === 'function') renderPanelFeatureFlags();
 
-    // Verificar conexión y, si está disponible, cargar datos desde Supabase
-    if (typeof verificarConexionInicial === 'function') verificarConexionInicial().catch(console.warn);
+    if (esModoDemo()) {
+        // En demo no verificamos Supabase; aplicamos UI y listo
+        aplicarParametrosEnVista();
+        if (typeof renderDashboard === 'function') renderDashboard();
+    } else {
+        // Modo DB: verificar conexión y cargar datos
+        if (typeof verificarConexionInicial === 'function') verificarConexionInicial().catch(console.warn);
+        cargarRolesPermisos().catch(console.warn);
+    }
+}
 
-    // Carga de permisos (no bloqueante, con fallback a defaults/caché)
-    cargarRolesPermisos().catch(console.warn);
+function cargarDatosDemoLocal() {
+    if (typeof createDemoSupabaseClient !== 'function') return;
+    // Asegurar que supabaseClient sea demo en modo demo
+    if (esModoDemo() && typeof actualizarClienteSupabase === 'function') {
+        actualizarClienteSupabase();
+    }
+    const g = (t) => (typeof _demoReadTable === 'function' ? _demoReadTable(t) : []);
+    appState.departamentos = g('departamentos');
+    appState.cargos = g('cargos');
+    appState.empleados = _demoPopulateRelations ? _demoPopulateRelations('empleados', g('empleados')) : g('empleados');
+    appState.nominas = g('nominas');
+    appState.vacaciones = g('vacaciones');
+    appState.utilidades = g('utilidades');
+    appState.prestaciones = g('prestaciones');
+    appState.antiguedad = g('antiguedad');
+    appState.historicoSalarios = g('historico_salarios');
+    appState.anticipos = g('anticipos_prestaciones');
+    appState.prestamos = g('prestamos_anticipos');
+    appState.prestamosAbonos = g('prestamos_abonos');
+    appState.tasasMensuales = g('tasas_mensuales');
+    const u = g('usuarios'); if (Array.isArray(u) && u.length) appState.usuarios = u; else appState.usuarios = [...USUARIOS_DEFAULT];
+    const rp = g('roles_permisos'); if (Array.isArray(rp) && rp.length) appState.rolesPermisos = rp;
+    const pc = g('parametros_config');
+    if (Array.isArray(pc) && pc.length) {
+        const p = pc[0];
+        appState.parametros = { ...appState.parametros, ...p };
+    }
+    // Si hay empresa activa en parámetros demo, reflejar en UI
+    if (!appState.parametros.nombre_empresa || appState.parametros.nombre_empresa === 'EMPRESA DEMO') {
+        // mantener demo en blanco
+    }
 }
 
 // ============================================================
@@ -301,6 +391,7 @@ function cargarCacheLocal() {
 
 function aplicarParametrosEnVista() {
     const conectado = (typeof esConexionActiva === 'function') ? esConexionActiva() : appState.estadoConexion === 'conectado';
+    const demo = (typeof esModoDemo === 'function') ? esModoDemo() : appState.estadoConexion === 'demo';
 
     if (gId('param-empresa-nombre')) gId('param-empresa-nombre').value = appState.parametros.nombre_empresa || '';
     if (gId('param-empresa-rif')) gId('param-empresa-rif').value = appState.parametros.rif_empresa || '';
@@ -313,10 +404,10 @@ function aplicarParametrosEnVista() {
 
     if (typeof renderSelectorEmpresas === 'function') renderSelectorEmpresas();
 
-    if (conectado) {
-        const nombre = appState.parametros.nombre_empresa || 'EMPRESA';
-        if (gId('brand-sidebar-title')) gId('brand-sidebar-title').innerText = nombre.split('/')[0].trim();
-        if (gId('brand-sidebar-rif')) gId('brand-sidebar-rif').innerText = appState.parametros.rif_empresa || '';
+    if (conectado || demo) {
+        const nombre = appState.parametros.nombre_empresa || (demo ? 'EMPRESA DEMO' : 'EMPRESA');
+        if (gId('brand-sidebar-title')) gId('brand-sidebar-title').innerText = (nombre || '').split('/')[0].trim() || (demo ? 'Modo Demo' : 'Sistema RRHH');
+        if (gId('brand-sidebar-rif')) gId('brand-sidebar-rif').innerText = appState.parametros.rif_empresa || (demo ? 'Sin configurar' : '');
         if (gId('badge-uti-dias-base')) gId('badge-uti-dias-base').innerHTML = `<i class="fa-solid fa-scale-balanced mr-1.5"></i> Base: ${appState.parametros.dias_utilidades || 30} Días`;
     } else {
         if (gId('brand-sidebar-title')) gId('brand-sidebar-title').innerText = 'Sistema RRHH';
@@ -333,8 +424,8 @@ async function guardarParametrosGenerales() {
     if (rol !== 'master' && rol !== 'administrador') {
         return showToast('No tiene permisos para modificar parámetros', 'error');
     }
-    appState.parametros.nombre_empresa = gId('param-empresa-nombre').value || 'EMPRESA';
-    appState.parametros.rif_empresa = gId('param-empresa-rif').value || 'J-00000000-0';
+    appState.parametros.nombre_empresa = gId('param-empresa-nombre').value || '';
+    appState.parametros.rif_empresa = gId('param-empresa-rif').value || '';
     appState.parametros.dias_utilidades = parseInt(gId('param-dias-utilidades').value) || 30;
     appState.parametros.valor_ut = parseFloat(gId('param-valor-ut').value) || 43.00;
     appState.parametros.riesgo_ivss = parseFloat(gId('param-riesgo-ivss').value) || 9;
@@ -342,11 +433,11 @@ async function guardarParametrosGenerales() {
     appState.parametros.supabase_url = (gId('param-supabase-url') ? gId('param-supabase-url').value.trim() : '') || '';
     appState.parametros.supabase_anon_key = (gId('param-supabase-key') ? gId('param-supabase-key').value.trim() : '') || '';
 
-    // Persistencia local inmediata (funciona incluso sin conexión)
-    localStorage.setItem('nomina_parametros', JSON.stringify(appState.parametros));
+    // Persistencia local de configuración
+    lsSet('nomina_parametros', JSON.stringify(appState.parametros));
     guardarEmpresaActivaEnRegistro();
 
-    // Recrear el cliente con la configuración nueva antes de sincronizar
+    // Recrear cliente si aplica
     if (typeof actualizarClienteSupabase === 'function') actualizarClienteSupabase();
 
     const payload = {
@@ -363,9 +454,23 @@ async function guardarParametrosGenerales() {
         supabase_url: appState.parametros.supabase_url || null,
         supabase_anon_key: appState.parametros.supabase_anon_key || null
     };
+
+    if (esModoDemo()) {
+        // Guardar en demo DB local
+        try { await supabaseClient.from('parametros_config').upsert([payloadConexion]); } catch (e) {}
+        aplicarParametrosEnVista();
+        showToast('Parámetros guardados en modo demo (este equipo)');
+        return;
+    }
+
+    // Modo DB: solo sincronizar si esquema listo; si no, guardar config local y pedir verificación
+    if (!appState.esquemaOk) {
+        aplicarParametrosEnVista();
+        showToast('Parámetros guardados localmente. Verifique el esquema de la base de datos para sincronizar.', 'error');
+        return;
+    }
+
     try {
-        // Intenta guardar también la conexión; si las columnas aún no existen
-        // (esquema anterior), reintenta solo con los parámetros clásicos.
         const res = await supabaseClient.from('parametros_config').upsert([payloadConexion]);
         if (res && res.error) {
             await supabaseClient.from('parametros_config').upsert([payload]);
@@ -373,13 +478,11 @@ async function guardarParametrosGenerales() {
     } catch (e) {}
 
     if (typeof fetchAllData === 'function') {
-        try { await fetchAllData(); showToast('Datos cargados desde la base'); }
-        catch (e) { showToast('No se pudieron cargar los datos', 'error'); console.warn(e); }
+        try { await fetchAllData(); } catch (e) { console.warn(e); }
     }
-    // Actualizar matriz de permisos después de recargar datos
     if (typeof cargarRolesPermisos === 'function') cargarRolesPermisos().catch(console.warn);
     aplicarParametrosEnVista();
-    showToast('Parámetros corporativos guardados exitosamente');
+    showToast('Parámetros corporativos guardados en la base de datos');
 }
 
 // ============================================================
@@ -396,15 +499,15 @@ function guardarEmpresaActivaEnRegistro() {
     if (idx >= 0) appState.empresas[idx] = entrada;
     else appState.empresas.push(entrada);
     appState.empresaActiva = rif;
-    localStorage.setItem('nomina_empresas', JSON.stringify(appState.empresas));
-    localStorage.setItem('nomina_empresa_activa', rif);
+    lsSet('nomina_empresas', JSON.stringify(appState.empresas));
+    lsSet('nomina_empresa_activa', rif);
 }
 
 function renderSelectorEmpresas() {
     const sel = gId('param-empresa-selector');
     if (!sel) return;
-    const conectado = (typeof esConexionActiva === 'function') ? esConexionActiva() : appState.estadoConexion === 'conectado';
-    if (!conectado) {
+    const activo = (typeof esConexionActiva === 'function' && esConexionActiva()) || (typeof esModoDemo === 'function' && esModoDemo());
+    if (!activo) {
         sel.innerHTML = `<option value="">Sin conexión — verifique Supabase para cargar empresa</option>`;
         sel.disabled = true;
         return;
@@ -453,7 +556,7 @@ async function crearNuevaEmpresa() {
         aplica_lpp: true
     };
     guardarEmpresaActivaEnRegistro();
-    localStorage.setItem('nomina_parametros', JSON.stringify(appState.parametros));
+    lsSet('nomina_parametros', JSON.stringify(appState.parametros));
     aplicarParametrosEnVista();
     closeModal('modal-nueva-empresa');
     await guardarParametrosGenerales();
@@ -469,8 +572,8 @@ async function cambiarEmpresaActiva(rif) {
         nombre_empresa: entrada.nombre || entrada.parametros?.nombre_empresa || entrada.rif
     };
     appState.empresaActiva = entrada.rif;
-    localStorage.setItem('nomina_parametros', JSON.stringify(appState.parametros));
-    localStorage.setItem('nomina_empresa_activa', entrada.rif);
+    lsSet('nomina_parametros', JSON.stringify(appState.parametros));
+    lsSet('nomina_empresa_activa', entrada.rif);
     if (typeof actualizarClienteSupabase === 'function') actualizarClienteSupabase();
     aplicarParametrosEnVista();
     showToast(`Empresa activa: ${appState.parametros.nombre_empresa}`);
@@ -480,11 +583,12 @@ async function cambiarEmpresaActiva(rif) {
 function establecerEstadoConexion(estado, detalle) {
     appState.estadoConexion = estado || 'sinverificar';
     const mapa = {
-        conectado:    { color: 'bg-emerald-500', text: 'Conectado a Supabase',      cls: 'text-emerald-400' },
-        comprobando:  { color: 'bg-amber-500',   text: 'Comprobando conexión...',   cls: 'text-amber-400' },
-        cache:        { color: 'bg-sky-500',     text: 'Sin conexión (caché local)', cls: 'text-sky-400' },
-        desconectado: { color: 'bg-rose-500',    text: 'Desconectado',               cls: 'text-rose-400' },
-        sinverificar: { color: 'bg-slate-600',   text: 'Sin verificar',              cls: 'text-slate-400' }
+        conectado:    { color: 'bg-emerald-500', text: 'Conectado a Supabase',           cls: 'text-emerald-400' },
+        comprobando:  { color: 'bg-amber-500',   text: 'Comprobando conexión...',        cls: 'text-amber-400' },
+        cache:        { color: 'bg-sky-500',     text: 'Sin conexión (caché local)',     cls: 'text-sky-400' },
+        desconectado: { color: 'bg-rose-500',    text: 'Desconectado',                   cls: 'text-rose-400' },
+        sinverificar: { color: 'bg-slate-600',   text: 'Sin verificar',                  cls: 'text-slate-400' },
+        demo:         { color: 'bg-violet-500',  text: 'Modo Demo (datos en este equipo)', cls: 'text-violet-400' }
     };
     const m = mapa[appState.estadoConexion] || mapa.sinverificar;
     const dot = gId('supabase-status-dot');
@@ -496,61 +600,37 @@ function establecerEstadoConexion(estado, detalle) {
 }
 
 async function verificarConexionInicial() {
-    const url = (appState.parametros.supabase_url || SUPABASE_URL).replace(/\/+$/, '');
-    const key = appState.parametros.supabase_anon_key || SUPABASE_ANON_KEY;
+    if (esModoDemo()) {
+        establecerEstadoConexion('demo', 'Modo Demo (datos en este equipo)');
+        actualizarClienteSupabase();
+        aplicarParametrosEnVista();
+        if (typeof renderDashboard === 'function') renderDashboard();
+        return;
+    }
+
+    const creds = _obtenerCredencialesDb();
+    if (!creds.url || !creds.key) {
+        appState.modoDatos = 'demo';
+        establecerEstadoConexion('demo', 'Modo Demo (datos en este equipo)');
+        actualizarClienteSupabase();
+        aplicarParametrosEnVista();
+        return;
+    }
+
     establecerEstadoConexion('comprobando');
     let ok = false;
     try {
-        const resp = await fetch(`${url}/rest/v1/parametros_config?select=id&limit=1`, {
-            headers: { apikey: key, Authorization: `Bearer ${key}` }
+        const resp = await fetch(`${creds.url}/rest/v1/parametros_config?select=id&limit=1`, {
+            headers: { apikey: creds.key, Authorization: `Bearer ${creds.key}` }
         });
-        ok = resp.ok;
+        // 200 ok, 404 table not found (DB reachable but schema missing), 401/403 auth issues
+        ok = resp.status === 200 || resp.status === 206 || resp.status === 404 || resp.status === 400;
+        // But 401/403 means bad creds; treat as not ok
+        if (resp.status === 401 || resp.status === 403) ok = false;
+        // 404 means endpoint/table missing but server reachable - connection OK for our purposes
+        if (resp.status === 404) ok = true;
     } catch (e) {
         ok = false;
-    }
-
-    if (ok) {
-        // Asegurar cliente actualizado con la configuración vigente antes de cargar datos
-        if (typeof actualizarClienteSupabase === 'function') actualizarClienteSupabase();
-        if (typeof fetchAllData === 'function') {
-            try {
-                await fetchAllData();
-                if (typeof cargarRolesPermisos === 'function') cargarRolesPermisos().catch(console.warn);
-            } catch (e) {
-                console.warn('Error cargando datos tras verificar conexión:', e);
-            }
-        }
-        establecerEstadoConexion('conectado',
-            appState.parametros.supabase_url ? 'Conectado a Supabase' : 'Conectado (base por defecto)');
-        aplicarParametrosEnVista();
-        if (typeof renderDashboard === 'function') renderDashboard();
-    } else {
-        limpiarEstadoNegocio();
-        establecerEstadoConexion('desconectado');
-        aplicarParametrosEnVista();
-        if (typeof renderDashboard === 'function') renderDashboard();
-    }
-}
-
-async function probarConexionSupabase() {
-    const url = ((gId('param-supabase-url')?.value || '').trim() || SUPABASE_URL).replace(/\/+$/, '');
-    const key = (gId('param-supabase-key')?.value || '').trim() || SUPABASE_ANON_KEY;
-
-    if (!/^https?:\/\//i.test(url)) {
-        establecerEstadoConexion('desconectado');
-        return showToast('URL de Supabase inválida (debe iniciar con https://)', 'error');
-    }
-
-    establecerEstadoConexion('comprobando');
-    let ok = false;
-    try {
-        const resp = await fetch(`${url}/rest/v1/parametros_config?select=id&limit=1`, {
-            headers: { apikey: key, Authorization: `Bearer ${key}` }
-        });
-        ok = resp.ok;
-        if (!ok) showToast(`Supabase respondió ${resp.status}. Verifique URL y anon key.`, 'error');
-    } catch (e) {
-        showToast('No se pudo conectar con Supabase. Verifique la URL y su conexión a internet.', 'error');
     }
 
     if (!ok) {
@@ -561,30 +641,342 @@ async function probarConexionSupabase() {
         return;
     }
 
-    // Guardar la configuración de conexión y recrear el cliente Supabase
-    appState.parametros.supabase_url = url;
-    appState.parametros.supabase_anon_key = key;
-    try { localStorage.setItem('nomina_parametros', JSON.stringify(appState.parametros)); } catch (e) {}
-    if (typeof actualizarClienteSupabase === 'function') actualizarClienteSupabase();
+    // Conexión alcanzable: verificar esquema
+    actualizarClienteSupabase();
+    const verif = (typeof verificarEsquemaDb === 'function') ? await verificarEsquemaDb() : { ok: true, faltantes: [], errores: [] };
+    appState.esquemaOk = !!verif.ok;
+    appState.esquemaFaltantes = verif.faltantes || [];
 
-    establecerEstadoConexion('conectado');
-    showToast('Conexión verificada. Cargando datos desde Supabase...');
+    if (!verif.ok) {
+        const faltantes = verif.faltantes || [];
+        const tablasFaltantes = faltantes.filter(f => String(f).startsWith('Tabla faltante:')).map(f => String(f).replace('Tabla faltante: ','').trim());
+        const core = ['parametros_config','usuarios','empleados','departamentos','cargos'];
+        const bloqueante = tablasFaltantes.some(t => core.includes(t));
+        appState.modoDatos = 'db';
+        actualizarEstadoEsquemaUI(verif);
+
+        if (!bloqueante) {
+            // Tablas núcleo presentes: permitir operar con advertencias
+            lsSet('nomina_modo_datos', 'db');
+            establecerEstadoConexion('conectado', 'Conectado (esquema con advertencias)');
+            if (typeof fetchAllData === 'function') {
+                try {
+                    await fetchAllData();
+                    if (typeof cargarRolesPermisos === 'function') cargarRolesPermisos().catch(console.warn);
+                } catch (e) {
+                    console.warn('Error cargando datos:', e);
+                }
+            }
+            aplicarParametrosEnVista();
+            if (typeof renderDashboard === 'function') renderDashboard();
+            return;
+        }
+
+        // Esquema crítico faltante (base nueva): requerir creación/actualización antes de operar con datos
+        establecerEstadoConexion('conectado', 'Conectado (esquema pendiente)');
+        limpiarEstadoNegocio();
+        aplicarParametrosEnVista();
+        if (typeof renderDashboard === 'function') renderDashboard();
+        return;
+    }
+
+    // Esquema OK: modo DB completo
+    appState.modoDatos = 'db';
+    lsSet('nomina_modo_datos', 'db');
+    limpiarDatosDemoLocal();
+    establecerEstadoConexion('conectado', creds.url === DEFAULT_SUPABASE_URL ? 'Conectado (base por defecto)' : 'Conectado a Supabase');
 
     if (typeof fetchAllData === 'function') {
         try {
             await fetchAllData();
             if (typeof cargarRolesPermisos === 'function') cargarRolesPermisos().catch(console.warn);
+        } catch (e) {
+            console.warn('Error cargando datos:', e);
+        }
+    }
+    aplicarParametrosEnVista();
+    actualizarEstadoEsquemaUI({ ok: true, faltantes: [], errores: [] });
+    if (typeof renderDashboard === 'function') renderDashboard();
+}
+
+async function probarConexionSupabase() {
+    const urlInput = (gId('param-supabase-url')?.value || '').trim();
+    const keyInput = (gId('param-supabase-key')?.value || '').trim();
+
+    // Si el usuario borra credenciales y no hay defaults, volver a modo demo
+    if (!urlInput && !keyInput && !DEFAULT_SUPABASE_URL) {
+        appState.parametros.supabase_url = '';
+        appState.parametros.supabase_anon_key = '';
+        appState.modoDatos = 'demo';
+        lsSet('nomina_parametros', JSON.stringify(appState.parametros));
+        lsSet('nomina_modo_datos', 'demo');
+        actualizarClienteSupabase();
+        limpiarEstadoNegocio();
+        cargarDatosDemoLocal();
+        establecerEstadoConexion('demo', 'Modo Demo (datos en este equipo)');
+        aplicarParametrosEnVista();
+        if (typeof renderDashboard === 'function') renderDashboard();
+        return showToast('Modo demo activado (sin base de datos configurada)');
+    }
+
+    const url = (urlInput || DEFAULT_SUPABASE_URL || '').replace(/\/+$/, '');
+    const key = keyInput || DEFAULT_SUPABASE_ANON_KEY || '';
+
+    if (!/^https?:\/\//i.test(url)) {
+        establecerEstadoConexion('desconectado');
+        return showToast('URL de Supabase inválida (debe iniciar con https://)', 'error');
+    }
+    if (!key) {
+        establecerEstadoConexion('desconectado');
+        return showToast('Debe indicar la clave anónima (anon key)', 'error');
+    }
+
+    establecerEstadoConexion('comprobando');
+    let reachable = false;
+    try {
+        const resp = await fetch(`${url}/rest/v1/`, { headers: { apikey: key, Authorization: `Bearer ${key}` } });
+        reachable = resp.status !== 401 && resp.status !== 403;
+        if (!reachable) showToast(`Credenciales rechazadas (HTTP ${resp.status}). Verifique URL y anon key.`, 'error');
+    } catch (e) {
+        reachable = false;
+        showToast('No se pudo conectar con Supabase. Verifique URL y conexión a internet.', 'error');
+    }
+
+    if (!reachable) {
+        limpiarEstadoNegocio();
+        establecerEstadoConexion('desconectado');
+        aplicarParametrosEnVista();
+        if (typeof renderDashboard === 'function') renderDashboard();
+        return;
+    }
+
+    // Guardar credenciales configuradas y pasar a verificación de esquema
+    appState.parametros.supabase_url = urlInput || (DEFAULT_SUPABASE_URL ? '' : url);
+    appState.parametros.supabase_anon_key = keyInput || (DEFAULT_SUPABASE_ANON_KEY ? '' : key);
+    // Si usaron defaults implícitos, mantener campos claros pero usar defaults; si ingresaron, guardar
+    if (urlInput) appState.parametros.supabase_url = urlInput.replace(/\/+$/, '');
+    if (keyInput) appState.parametros.supabase_anon_key = keyInput;
+    lsSet('nomina_parametros', JSON.stringify(appState.parametros));
+    appState.modoDatos = 'db';
+    actualizarClienteSupabase();
+
+    establecerEstadoConexion('conectado', 'Conectado. Verificando esquema de base de datos...');
+    showToast('Conexión verificada. Revisando tablas y campos...');
+
+    const verif = (typeof verificarEsquemaDb === 'function') ? await verificarEsquemaDb() : { ok: true, faltantes: [], errores: [] };
+    appState.esquemaOk = !!verif.ok;
+    appState.esquemaFaltantes = verif.faltantes || [];
+    actualizarEstadoEsquemaUI(verif);
+
+    if (!verif.ok) {
+        const faltantes = verif.faltantes || [];
+        const tablasFaltantes = faltantes.filter(f => String(f).startsWith('Tabla faltante:')).map(f => String(f).replace('Tabla faltante: ','').trim());
+        const core = ['parametros_config','usuarios','empleados','departamentos','cargos'];
+        const bloqueante = tablasFaltantes.some(t => core.includes(t));
+        appState.modoDatos = 'db';
+        actualizarEstadoEsquemaUI(verif);
+        if (bloqueante) {
+            establecerEstadoConexion('conectado', 'Conectado (esquema pendiente de creación/actualización)');
+            limpiarEstadoNegocio();
             aplicarParametrosEnVista();
-            establecerEstadoConexion('conectado', 'Conectado a Supabase');
-            showToast('Datos cargados desde Supabase correctamente');
+            if (typeof renderDashboard === 'function') renderDashboard();
+            showToast('Conexión OK, pero faltan tablas esenciales. Genere y ejecute el SQL de esquema.', 'error');
+            return;
+        }
+        lsSet('nomina_modo_datos', 'db');
+        establecerEstadoConexion('conectado', 'Conectado (esquema con advertencias)');
+        if (typeof fetchAllData === 'function') {
+            try {
+                await fetchAllData();
+                if (typeof cargarRolesPermisos === 'function') cargarRolesPermisos().catch(console.warn);
+                aplicarParametrosEnVista();
+                showToast('Conectado. Esquema con advertencias: puede completar tablas/campos desde "Verificar esquema".');
+            } catch (e) {
+                console.warn(e);
+                showToast('Conectado, pero no se pudieron cargar todos los datos', 'error');
+            }
+        }
+        return;
+    }
+
+    // Esquema listo: activar modo DB y quitar datos demo locales
+    lsSet('nomina_modo_datos', 'db');
+    limpiarDatosDemoLocal();
+    establecerEstadoConexion('conectado', 'Conectado a Supabase (esquema listo)');
+    if (typeof fetchAllData === 'function') {
+        try {
+            await fetchAllData();
+            if (typeof cargarRolesPermisos === 'function') cargarRolesPermisos().catch(console.warn);
+            aplicarParametrosEnVista();
+            showToast('Base de datos lista. Datos cargados desde Supabase.');
         } catch (e) {
             console.warn(e);
-            establecerEstadoConexion('cache', 'Conectado, usando caché local');
             showToast('Conectado, pero no se pudieron cargar todos los datos', 'error');
         }
-    } else {
-        aplicarParametrosEnVista();
     }
+}
+
+function limpiarDatosDemoLocal() {
+    try {
+        const prefix = storageKey('');
+        const keys = [];
+        for (let i = 0; i < localStorage.length; i++) keys.push(localStorage.key(i));
+        for (const k of keys) {
+            if (!k || !k.startsWith(prefix)) continue;
+            // conservar configuración de conexión y modo
+            if (k === storageKey('nomina_parametros')) continue;
+            if (k === storageKey('nomina_modo_datos')) continue;
+            // eliminar datos demo (tablas demo y cachés de negocio)
+            if (k.indexOf('demo_db__') !== -1) { localStorage.removeItem(k); continue; }
+            // eliminar cachés de negocio antiguas; mantener solo lo esencial de config
+            const keep = ['nomina_parametros','nomina_modo_datos'];
+            const isKeep = keep.some(x => k === storageKey(x));
+            if (!isKeep && k.startsWith(storageKey('nomina_'))) {
+                localStorage.removeItem(k);
+            }
+        }
+    } catch (e) {}
+}
+
+function actualizarEstadoEsquemaUI(verif) {
+    const el = gId('db-schema-status');
+    const btn = gId('btn-crear-esquema');
+    const falt = (verif && verif.faltantes) ? verif.faltantes : [];
+    const errs = (verif && verif.errores) ? verif.errores : [];
+    if (el) {
+        if (verif && verif.ok) {
+            el.innerHTML = `<span class="text-emerald-400 font-semibold"><i class="fa-solid fa-circle-check mr-1"></i> Esquema completo y listo.</span>`;
+        } else {
+            const items = falt.slice(0, 8).map(x => `<li>${x}</li>`).join('');
+            const more = falt.length > 8 ? `<li>... y ${falt.length - 8} más</li>` : '';
+            const errItems = errs.slice(0,3).map(x => `<li class="text-amber-400">${x}</li>`).join('');
+            el.innerHTML = `<div class="text-rose-400 font-semibold mb-1"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Esquema incompleto o faltante</div>
+                <ul class="list-disc ml-4 text-[11px] text-slate-300 space-y-0.5">${items}${more}${errItems}</ul>
+                <p class="text-[11px] text-slate-400 mt-2">Genere el SQL y ejecútelo en Supabase (SQL Editor), luego verifique nuevamente. El sistema trabajará con la base de datos cuando el esquema esté completo.</p>`;
+        }
+    }
+    if (btn) {
+        if (verif && verif.ok) {
+            btn.disabled = true;
+            btn.classList.add('opacity-50', 'cursor-not-allowed');
+            btn.innerHTML = '<i class="fa-solid fa-check"></i><span>Esquema listo</span>';
+        } else if (esConexionActiva() && appState.modoDatos === 'db') {
+            btn.disabled = false;
+            btn.classList.remove('opacity-50', 'cursor-not-allowed');
+            btn.innerHTML = '<i class="fa-solid fa-database"></i><span>Generar SQL de tablas</span>';
+        }
+    }
+}
+
+async function verificarEsquemaUI() {
+    if (esModoDemo()) return showToast('Conecte una base de datos Supabase para verificar el esquema', 'error');
+    establecerEstadoConexion('comprobando', 'Verificando esquema...');
+    const verif = (typeof verificarEsquemaDb === 'function') ? await verificarEsquemaDb() : { ok: false, faltantes: ['Verificador no disponible'], errores: [] };
+    appState.esquemaOk = !!verif.ok;
+    appState.esquemaFaltantes = verif.faltantes || [];
+    actualizarEstadoEsquemaUI(verif);
+
+    if (verif.ok) {
+        establecerEstadoConexion('conectado', 'Conectado a Supabase (esquema listo)');
+        lsSet('nomina_modo_datos', 'db');
+        limpiarDatosDemoLocal();
+        if (typeof fetchAllData === 'function') await fetchAllData();
+        aplicarParametrosEnVista();
+        showToast('Esquema verificado correctamente. Sistema listo para usar la base de datos.');
+        return;
+    }
+
+    const faltantes = verif.faltantes || [];
+    const tablasFaltantes = faltantes.filter(f => String(f).startsWith('Tabla faltante:')).map(f => String(f).replace('Tabla faltante: ','').trim());
+    const core = ['parametros_config','usuarios','empleados','departamentos','cargos'];
+    const bloqueante = tablasFaltantes.some(t => core.includes(t));
+    if (!bloqueante) {
+        lsSet('nomina_modo_datos', 'db');
+        establecerEstadoConexion('conectado', 'Conectado (esquema con advertencias)');
+        if (typeof fetchAllData === 'function') {
+            try { await fetchAllData(); } catch (e) { console.warn(e); }
+        }
+        aplicarParametrosEnVista();
+        showToast('Conectado con advertencias de esquema. Puede generar el SQL para completar tablas/campos faltantes.');
+        return;
+    }
+
+    establecerEstadoConexion('conectado', 'Conectado (esquema pendiente)');
+    limpiarEstadoNegocio();
+    aplicarParametrosEnVista();
+    showToast('Faltan tablas esenciales. Genere y ejecute el SQL en Supabase, luego verifique nuevamente.', 'error');
+}
+
+function abrirModalEsquemaSql() {
+    const sql = (typeof generarSqlEsquemaCompleto === 'function') ? generarSqlEsquemaCompleto() : '-- No disponible';
+    let modal = gId('modal-esquema-sql');
+    if (!modal) {
+        // crear modal dinámicamente si no existe
+        modal = document.createElement('div');
+        modal.id = 'modal-esquema-sql';
+        modal.className = 'fixed inset-0 bg-slate-950/85 backdrop-blur-sm hidden items-center justify-center p-4 z-50';
+        modal.innerHTML = `<div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl">
+          <div class="flex justify-between items-center p-4 border-b border-slate-800"><h3 class="text-base font-bold text-white"><i class="fa-solid fa-database text-sky-400 mr-2"></i>SQL de creación/actualización de tablas</h3><button onclick="closeModal('modal-esquema-sql')" class="text-slate-400 hover:text-white p-1"><i class="fa-solid fa-xmark text-lg"></i></button></div>
+          <div class="p-4 overflow-auto flex-1"><p class="text-[11px] text-slate-400 mb-2">Copie este script y ejecútelo en <strong>Supabase → SQL Editor</strong>. Luego pulse "Verificar esquema".</p><textarea id="esquema-sql-text" readonly class="w-full h-[50vh] bg-slate-950 border border-slate-800 rounded-lg p-3 text-[11px] font-mono text-slate-200"></textarea></div>
+          <div class="p-4 border-t border-slate-800 flex justify-end gap-2"><button onclick="copiarSqlEsquema()" class="bg-sky-600 hover:bg-sky-500 text-white text-xs px-4 py-2 rounded-lg font-bold"><i class="fa-solid fa-copy mr-1"></i>Copiar SQL</button><button onclick="closeModal('modal-esquema-sql')" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-4 py-2 rounded-lg font-bold">Cerrar</button></div>
+        </div>`;
+        document.body.appendChild(modal);
+    }
+    const ta = gId('esquema-sql-text');
+    if (ta) ta.value = sql;
+    openModal('modal-esquema-sql');
+}
+
+function copiarSqlEsquema() {
+    const ta = gId('esquema-sql-text');
+    if (!ta) return;
+    const txt = ta.value || '';
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(txt).then(() => showToast('SQL copiado al portapapeles')).catch(() => { ta.select(); document.execCommand('copy'); showToast('SQL copiado'); });
+    } else {
+        ta.select(); document.execCommand('copy'); showToast('SQL copiado');
+    }
+}
+
+// ============================================================
+// LICENCIA / BLOQUEO POR SUSCRIPCIÓN
+// ============================================================
+
+function verificarLicenciaBloqueo() {
+    if (esModoDemo()) {
+        appState.licenciaBloqueada = false;
+        const ov = gId('license-block-overlay');
+        if (ov) { ov.classList.add('hidden'); ov.classList.remove('flex'); }
+        return false;
+    }
+    const p = appState.parametros || {};
+    let bloqueada = false;
+    let mensaje = p.licencia_mensaje || '';
+
+    if (p.licencia_bloqueada === true || p.licencia_estado === 'bloqueada' || p.licencia_estado === 'suspendida') {
+        bloqueada = true;
+    }
+    if (p.licencia_vencimiento) {
+        try {
+            const hoy = new Date(); hoy.setHours(0,0,0,0);
+            const venc = new Date(p.licencia_vencimiento + 'T00:00:00');
+            if (!isNaN(venc.getTime()) && venc < hoy) {
+                bloqueada = true;
+                if (!mensaje) mensaje = 'La suscripción del servicio se encuentra vencida. Contacte al proveedor.';
+            }
+        } catch (e) {}
+    }
+
+    appState.licenciaBloqueada = bloqueada;
+    appState.licenciaMensaje = mensaje || 'El servicio se encuentra temporalmente bloqueado. Contacte al proveedor para regularizar la suscripción.';
+    const ov = gId('license-block-overlay');
+    if (ov) {
+        const msg = gId('license-block-message');
+        if (msg) msg.innerText = appState.licenciaMensaje;
+        if (bloqueada) { ov.classList.remove('hidden'); ov.classList.add('flex'); }
+        else { ov.classList.add('hidden'); ov.classList.remove('flex'); }
+    }
+    return bloqueada;
 }
 
 // ============================================================

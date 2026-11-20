@@ -41,7 +41,7 @@ async function guardarBorradorNominaEnNube(mostrarAlerta = false) {
     const prenominaData = { id: 1, fecha_pago: f, tasa_bcv: t, salario_minimo: sM, lunes: lun, filas: filas, updated_at: new Date().toISOString() };
 
     await safeQuery(supabaseClient.from('prenomina_borrador').upsert([prenominaData]), 'upsert_prenomina');
-    localStorage.setItem('nomina_borrador_global', JSON.stringify(prenominaData));
+    lsSet('nomina_borrador_global', JSON.stringify(prenominaData));
 
     const badge = gId('txt-ultima-prenomina');
     if (badge) badge.innerText = `Sincronizado: ${new Date().toLocaleTimeString('es-VE')}`;
@@ -58,10 +58,10 @@ async function cargarBorradorParaFechaActual() {
 async function cargarBorradorDesdeNube() {
     const data = await safeQuery(supabaseClient.from('prenomina_borrador').select('*').eq('id', 1).maybeSingle(), 'fetch_prenomina');
     if (data && data.filas) {
-        localStorage.setItem('nomina_borrador_global', JSON.stringify(data));
+        lsSet('nomina_borrador_global', JSON.stringify(data));
         return data;
     }
-    const local = localStorage.getItem('nomina_borrador_global');
+    const local = lsGet('nomina_borrador_global');
     if (local) {
         try { return JSON.parse(local); } catch (e) {}
     }
@@ -71,7 +71,7 @@ async function cargarBorradorDesdeNube() {
 async function limpiarBorradorNomina() {
     if (!confirm('¿Desea restablecer todos los valores de la pre-nómina a cero?')) return;
     await safeQuery(supabaseClient.from('prenomina_borrador').delete().eq('id', 1), 'delete_prenomina');
-    localStorage.removeItem('nomina_borrador_global');
+    lsRemove('nomina_borrador_global');
     renderTablaNominaEditable();
     showToast('Valores de pre-nómina restablecidos');
 }
@@ -84,7 +84,7 @@ function renderTablaNominaEditable() {
     if (!tbody) return;
 
     let borrador = null;
-    const rawDraft = localStorage.getItem('nomina_borrador_global');
+    const rawDraft = lsGet('nomina_borrador_global');
     if (rawDraft) {
         try {
             borrador = JSON.parse(rawDraft);
@@ -353,7 +353,7 @@ async function procesarNominaGlobal() {
     }
 
     await safeQuery(supabaseClient.from('prenomina_borrador').delete().eq('id', 1), 'clear_prenomina');
-    localStorage.removeItem('nomina_borrador_global');
+    lsRemove('nomina_borrador_global');
 
     const [yStr, mStr, dStr] = f.split('-');
     if (parseInt(dStr) >= 20) {
