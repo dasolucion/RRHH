@@ -319,31 +319,35 @@ async function verificarEsquemaDb() {
     if (!supabaseClient || esModoDemoActivo && esModoDemoActivo()) {
         return { ok: false, faltantes: ['Modo demo: no hay conexión a base de datos'], errores: [] };
     }
-    const headers = {
-        apikey: (typeof _obtenerCredencialesDb === 'function' ? _obtenerCredencialesDb().key : (SUPABASE_ANON_KEY || '')),
-        Authorization: `Bearer ${(typeof _obtenerCredencialesDb === 'function' ? _obtenerCredencialesDb().key : (SUPABASE_ANON_KEY || ''))}`
-    };
-    const baseUrl = (typeof _obtenerCredencialesDb === 'function' ? _obtenerCredencialesDb().url : SUPABASE_URL).replace(/\/+$/, '');
+    const cred = (typeof _obtenerCredencialesDb === 'function')
+        ? _obtenerCredencialesDb()
+        : { url: (typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : ''), key: (typeof SUPABASE_ANON_KEY !== 'undefined' ? SUPABASE_ANON_KEY : '') };
+    const headers = { apikey: cred.key, Authorization: `Bearer ${cred.key}` };
+    const baseUrl = String(cred.url || '').replace(/\/+$/, '');
     if (!baseUrl) return { ok: false, faltantes: ['Sin URL de Supabase configurada'], errores: [] };
 
     for (const [table, def] of Object.entries(DB_SCHEMA_EXPECTED)) {
+        const cols = Object.keys((def && def.columns) || {});
+        // PostgREST valida TODAS las columnas del select en una sola petición.
+        // Antes se hacía una petición por columna (270+) y la verificación tardaba casi un minuto.
+        const select = cols.length ? cols.map(c => encodeURIComponent(c)).join(',') : '*';
         try {
-            const resp = await fetch(`${baseUrl}/rest/v1/${encodeURIComponent(table)}?select=*&limit=1`, { headers });
+            const resp = await fetch(`${baseUrl}/rest/v1/${encodeURIComponent(table)}?select=${select}&limit=1`, { headers });
             if (resp.status === 404) {
                 faltantes.push(`Tabla faltante: ${table}`);
                 continue;
             }
-            if (!resp.ok) {
+            if (resp.ok) continue; // tabla y columnas presentes
+            if (resp.status !== 400 && resp.status !== 406) {
                 errores.push(`No se pudo verificar ${table}: HTTP ${resp.status}`);
                 continue;
             }
-            // Verificar columnas intentando seleccionar cada una (limit 0 no soportado igual en todos, usamos select=col&limit=1)
-            const cols = Object.keys(def.columns || {});
+            // La consulta combinada falló: identificar las columnas ausentes una por una
+            // (sólo en este caso, para no penalizar el arranque normal).
             for (const col of cols) {
                 try {
                     const r2 = await fetch(`${baseUrl}/rest/v1/${encodeURIComponent(table)}?select=${encodeURIComponent(col)}&limit=1`, { headers });
                     if (r2.status === 400 || r2.status === 404) {
-                        // 400 suele indicar columna inexistente en PostgREST
                         const txt = await r2.text().catch(()=> '');
                         if (/column|does not exist|Could not find/i.test(txt) || r2.status === 400) {
                             faltantes.push(`Columna faltante: ${table}.${col}`);

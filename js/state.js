@@ -288,7 +288,16 @@ function cargarCacheLocal() {
     const prefillKey = (savedParams && savedParams.supabase_anon_key) || (typeof DEFAULT_SUPABASE_ANON_KEY !== 'undefined' ? DEFAULT_SUPABASE_ANON_KEY : '') || '';
     const tieneCreds = !!(prefillUrl && prefillKey && /^https?:\/\//i.test(prefillUrl));
     const tieneCredsGuardados = !!(savedParams && savedParams.supabase_url && savedParams.supabase_anon_key && /^https?:\/\//i.test(String(savedParams.supabase_url || '')) && String(savedParams.supabase_anon_key || '').trim().length > 10);
-    const autoConectar = (modoGuardado === 'db') || tieneCredsGuardados;
+    // El despliegue puede traer credenciales preconfiguradas (DEFAULT_SUPABASE_URL / DEFAULT_SUPABASE_ANON_KEY).
+    // Son válidas en CUALQUIER PC aunque el localStorage esté vacío (equipo nuevo, se cerró sesión, otro navegador).
+    // Si están registradas, se conecta directo sin exigir que se haya presionado "Conectar" aquí.
+    const tieneCredsDespliegue = !!(
+        typeof DEFAULT_SUPABASE_URL !== 'undefined' &&
+        typeof DEFAULT_SUPABASE_ANON_KEY !== 'undefined' &&
+        /^https?:\/\//i.test(String(DEFAULT_SUPABASE_URL || '')) &&
+        String(DEFAULT_SUPABASE_ANON_KEY || '').trim().length > 10
+    );
+    const autoConectar = (modoGuardado === 'db') || tieneCredsGuardados || tieneCredsDespliegue;
 
     appState.esquemaOk = false;
     appState.esquemaFaltantes = [];
