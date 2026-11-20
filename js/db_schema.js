@@ -243,7 +243,7 @@ END $$;`);
     // Datos iniciales mínimos
     lines.push('-- Parámetros iniciales (si no existen)');
     lines.push(`INSERT INTO public."parametros_config" (id, nombre_empresa, rif_empresa, dias_utilidades, valor_ut, riesgo_ivss, aplica_lpp)
-VALUES (1, 'EMPRESA', 'J-00000000-0', 30, 43, 9, true)
+VALUES (1, 'DEMOSTRATIVA', 'J-00000000-0', 30, 43, 9, true)
 ON CONFLICT (id) DO NOTHING;`);
     lines.push('');
     lines.push('-- Usuario master por defecto (si no existe)');

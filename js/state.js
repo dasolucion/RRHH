@@ -13,7 +13,7 @@ let appState = {
     tasasMensuales: [], usuarios: [], usuarioActual: null, mesesEditablesActuales: [],
     rolesPermisos: [], // Matriz de permisos desde Supabase
     parametros: {
-        nombre_empresa: 'EMPRESA DEMO',
+        nombre_empresa: 'DEMOSTRATIVA',
         rif_empresa: 'J-00000000-0',
         dias_utilidades: 30,
         valor_ut: 43.00,
@@ -276,80 +276,56 @@ function _migrarStorageAntiguo() {
 function cargarCacheLocal() {
     _migrarStorageAntiguo();
 
-    // Credenciales de conexión Supabase configuradas por el usuario (si existen)
+    // Guardar referencia de credenciales guardadas/defaults para prellenar (sin exponer datos de cliente)
+    let savedParams = null;
     const p = lsGet('nomina_parametros');
     if (p) {
-        try { appState.parametros = { ...appState.parametros, ...JSON.parse(p) }; }
-        catch (e) { /* conserva defaults */ }
+        try { savedParams = JSON.parse(p); } catch (e) { savedParams = null; }
     }
 
-    // Determinar modo: DB si hay credenciales (usuario o despliegue), si no demo
-    const modoGuardado = lsGet('nomina_modo_datos');
-    if (modoGuardado === 'demo' || modoGuardado === 'db') appState.modoDatos = modoGuardado;
-    if (!tieneCredencialesDb()) {
-        appState.modoDatos = 'demo';
-    } else if (!appState.modoDatos) {
-        // Credenciales disponibles (defaults del despliegue o guardadas): usar DB
-        appState.modoDatos = 'db';
-    }
+    // SIEMPRE iniciar en modo local demostrativo antes de conectar (sin rastro de datos de cliente)
+    appState.modoDatos = 'demo';
+    appState.esquemaOk = false;
+    appState.esquemaFaltantes = [];
+    appState.licenciaBloqueada = false;
+    appState.licenciaMensaje = '';
+
+    // Prefill de conexión: usar lo guardado por usuario o defaults del despliegue, pero NO conectar automáticamente
+    const prefillUrl = (savedParams && savedParams.supabase_url) || (typeof DEFAULT_SUPABASE_URL !== 'undefined' ? DEFAULT_SUPABASE_URL : '') || '';
+    const prefillKey = (savedParams && savedParams.supabase_anon_key) || (typeof DEFAULT_SUPABASE_ANON_KEY !== 'undefined' ? DEFAULT_SUPABASE_ANON_KEY : '') || '';
+
+    // Estado demostrativo limpio
+    appState.parametros = {
+        nombre_empresa: 'DEMOSTRATIVA',
+        rif_empresa: 'J-00000000-0',
+        dias_utilidades: 30,
+        valor_ut: 43.00,
+        riesgo_ivss: 9,
+        aplica_lpp: true,
+        supabase_url: prefillUrl,
+        supabase_anon_key: prefillKey
+    };
+    appState.empresas = [];
+    appState.empresaActiva = null;
+    appState.usuarios = [...USUARIOS_DEFAULT];
 
     if (typeof actualizarClienteSupabase === 'function') actualizarClienteSupabase();
 
-    // Registro local de empresas
-    const emps = lsGet('nomina_empresas');
-    if (emps) {
-        try {
-            const parsed = JSON.parse(emps);
-            if (Array.isArray(parsed)) appState.empresas = parsed;
-        } catch (e) { appState.empresas = []; }
-    }
-    appState.empresaActiva = lsGet('nomina_empresa_activa') || null;
+    // No cargar datos de negocio ni caches de BD previas en la vista inicial
+    limpiarEstadoNegocio();
+    if (typeof cargarDatosDemoLocal === 'function') cargarDatosDemoLocal();
+    // Forzar ausencia de datos demo visibles (empresa demostrativa en blanco)
+    limpiarEstadoNegocio();
+    appState.usuarios = [...USUARIOS_DEFAULT];
 
-    // Usuarios: en demo mantener defaults + cualquier usuario demo guardado; en DB cargar luego
-    if (esModoDemo()) {
-        const u = lsGet('nomina_usuarios');
-        if (u) {
-            try { const parsed = JSON.parse(u); if (Array.isArray(parsed) && parsed.length) appState.usuarios = parsed; else appState.usuarios = [...USUARIOS_DEFAULT]; }
-            catch (e) { appState.usuarios = [...USUARIOS_DEFAULT]; }
-        } else {
-            appState.usuarios = [...USUARIOS_DEFAULT];
-        }
-        // Cargar datos demo desde tablas locales (demo client)
-        limpiarEstadoNegocio();
-        if (typeof cargarDatosDemoLocal === 'function') cargarDatosDemoLocal();
-        establecerEstadoConexion('demo', 'Modo Demo (datos en este equipo)');
-    } else {
-        // Modo DB: inicio limpio hasta verificar/cargar desde Supabase
-        appState.usuarios = [...USUARIOS_DEFAULT];
-        limpiarEstadoNegocio();
-        establecerEstadoConexion('sinverificar');
-    }
+    // Feature flags locales (UI); no exponer configuración remota de cliente
+    appState.features = (typeof DEFAULT_FEATURES !== 'undefined') ? { ...DEFAULT_FEATURES } : (appState.features || {});
+    appState.rolesPermisos = [];
 
-    // Feature flags y matriz de permisos
-    const fc = lsGet('nomina_features_config');
-    if (fc) {
-        try { appState.features = JSON.parse(fc); } catch (e) {}
-    }
-    const rpCache = lsGet('nomina_roles_permisos');
-    if (rpCache) {
-        try {
-            const parsed = JSON.parse(rpCache);
-            if (Array.isArray(parsed)) appState.rolesPermisos = parsed;
-        } catch (e) {}
-    }
-
+    establecerEstadoConexion('demo', 'Modo Demo (datos en este equipo). Conecte la base de datos para trabajar con su empresa.');
     aplicarParametrosEnVista();
     if (typeof renderPanelFeatureFlags === 'function') renderPanelFeatureFlags();
-
-    if (esModoDemo()) {
-        // En demo no verificamos Supabase; aplicamos UI y listo
-        aplicarParametrosEnVista();
-        if (typeof renderDashboard === 'function') renderDashboard();
-    } else {
-        // Modo DB: verificar conexión y cargar datos
-        if (typeof verificarConexionInicial === 'function') verificarConexionInicial().catch(console.warn);
-        cargarRolesPermisos().catch(console.warn);
-    }
+    if (typeof renderDashboard === 'function') renderDashboard();
 }
 
 function cargarDatosDemoLocal() {
@@ -379,10 +355,6 @@ function cargarDatosDemoLocal() {
         const p = pc[0];
         appState.parametros = { ...appState.parametros, ...p };
     }
-    // Si hay empresa activa en parámetros demo, reflejar en UI
-    if (!appState.parametros.nombre_empresa || appState.parametros.nombre_empresa === 'EMPRESA DEMO') {
-        // mantener demo en blanco
-    }
 }
 
 // ============================================================
@@ -393,26 +365,31 @@ function aplicarParametrosEnVista() {
     const conectado = (typeof esConexionActiva === 'function') ? esConexionActiva() : appState.estadoConexion === 'conectado';
     const demo = (typeof esModoDemo === 'function') ? esModoDemo() : appState.estadoConexion === 'demo';
 
-    if (gId('param-empresa-nombre')) gId('param-empresa-nombre').value = appState.parametros.nombre_empresa || '';
-    if (gId('param-empresa-rif')) gId('param-empresa-rif').value = appState.parametros.rif_empresa || '';
+    // En estado pre-conexión/demo siempre mostrar empresa demostrativa (sin datos de cliente)
+    const nombreVista = conectado ? (appState.parametros.nombre_empresa || '') : 'DEMOSTRATIVA';
+    const rifVista = conectado ? (appState.parametros.rif_empresa || '') : 'J-00000000-0';
+
+    if (gId('param-empresa-nombre')) gId('param-empresa-nombre').value = nombreVista;
+    if (gId('param-empresa-rif')) gId('param-empresa-rif').value = rifVista;
     if (gId('param-dias-utilidades')) gId('param-dias-utilidades').value = appState.parametros.dias_utilidades || 30;
     if (gId('param-valor-ut')) gId('param-valor-ut').value = Number(appState.parametros.valor_ut || 43.00).toFixed(2);
     if (gId('param-riesgo-ivss')) gId('param-riesgo-ivss').value = String(appState.parametros.riesgo_ivss || 9);
     if (gId('param-aplica-lpp')) gId('param-aplica-lpp').checked = appState.parametros.aplica_lpp !== false;
+    // Campos de conexión: prellenar con guardado/default si existen
     if (gId('param-supabase-url')) gId('param-supabase-url').value = appState.parametros.supabase_url || '';
     if (gId('param-supabase-key')) gId('param-supabase-key').value = appState.parametros.supabase_anon_key || '';
 
     if (typeof renderSelectorEmpresas === 'function') renderSelectorEmpresas();
 
-    if (conectado || demo) {
-        const nombre = appState.parametros.nombre_empresa || (demo ? 'EMPRESA DEMO' : 'EMPRESA');
-        if (gId('brand-sidebar-title')) gId('brand-sidebar-title').innerText = (nombre || '').split('/')[0].trim() || (demo ? 'Modo Demo' : 'Sistema RRHH');
-        if (gId('brand-sidebar-rif')) gId('brand-sidebar-rif').innerText = appState.parametros.rif_empresa || (demo ? 'Sin configurar' : '');
+    if (conectado) {
+        const nombre = appState.parametros.nombre_empresa || 'EMPRESA';
+        if (gId('brand-sidebar-title')) gId('brand-sidebar-title').innerText = (nombre || '').split('/')[0].trim() || 'Sistema RRHH';
+        if (gId('brand-sidebar-rif')) gId('brand-sidebar-rif').innerText = appState.parametros.rif_empresa || '';
         if (gId('badge-uti-dias-base')) gId('badge-uti-dias-base').innerHTML = `<i class="fa-solid fa-scale-balanced mr-1.5"></i> Base: ${appState.parametros.dias_utilidades || 30} Días`;
     } else {
-        if (gId('brand-sidebar-title')) gId('brand-sidebar-title').innerText = 'Sistema RRHH';
-        if (gId('brand-sidebar-rif')) gId('brand-sidebar-rif').innerText = 'Sin conexión';
-        if (gId('badge-uti-dias-base')) gId('badge-uti-dias-base').innerHTML = `<i class="fa-solid fa-scale-balanced mr-1.5"></i> Base: -- Días`;
+        if (gId('brand-sidebar-title')) gId('brand-sidebar-title').innerText = 'DEMOSTRATIVA';
+        if (gId('brand-sidebar-rif')) gId('brand-sidebar-rif').innerText = 'J-00000000-0';
+        if (gId('badge-uti-dias-base')) gId('badge-uti-dias-base').innerHTML = `<i class="fa-solid fa-scale-balanced mr-1.5"></i> Base: ${appState.parametros.dias_utilidades || 30} Días`;
     }
 
     if (typeof renderTablaTasasMensuales === 'function') renderTablaTasasMensuales();
@@ -506,9 +483,9 @@ function guardarEmpresaActivaEnRegistro() {
 function renderSelectorEmpresas() {
     const sel = gId('param-empresa-selector');
     if (!sel) return;
-    const activo = (typeof esConexionActiva === 'function' && esConexionActiva()) || (typeof esModoDemo === 'function' && esModoDemo());
-    if (!activo) {
-        sel.innerHTML = `<option value="">Sin conexión — verifique Supabase para cargar empresa</option>`;
+    const conectado = (typeof esConexionActiva === 'function') ? esConexionActiva() : appState.estadoConexion === 'conectado';
+    if (!conectado) {
+        sel.innerHTML = `<option value="">Sin conexión — conecte Supabase para cargar empresa</option>`;
         sel.disabled = true;
         return;
     }
@@ -705,18 +682,27 @@ async function probarConexionSupabase() {
 
     // Si el usuario borra credenciales y no hay defaults, volver a modo demo
     if (!urlInput && !keyInput && !DEFAULT_SUPABASE_URL) {
-        appState.parametros.supabase_url = '';
-        appState.parametros.supabase_anon_key = '';
+        appState.parametros = {
+            ...appState.parametros,
+            nombre_empresa: 'DEMOSTRATIVA',
+            rif_empresa: 'J-00000000-0',
+            supabase_url: '',
+            supabase_anon_key: ''
+        };
+        appState.empresas = [];
+        appState.empresaActiva = null;
+        appState.usuarios = [...USUARIOS_DEFAULT];
         appState.modoDatos = 'demo';
+        appState.esquemaOk = false;
+        appState.esquemaFaltantes = [];
         lsSet('nomina_parametros', JSON.stringify(appState.parametros));
         lsSet('nomina_modo_datos', 'demo');
         actualizarClienteSupabase();
         limpiarEstadoNegocio();
-        cargarDatosDemoLocal();
-        establecerEstadoConexion('demo', 'Modo Demo (datos en este equipo)');
+        establecerEstadoConexion('demo', 'Modo Demo (empresa demostrativa, sin datos)');
         aplicarParametrosEnVista();
         if (typeof renderDashboard === 'function') renderDashboard();
-        return showToast('Modo demo activado (sin base de datos configurada)');
+        return showToast('Modo demo activado (empresa demostrativa, sin datos)');
     }
 
     const url = (urlInput || DEFAULT_SUPABASE_URL || '').replace(/\/+$/, '');
