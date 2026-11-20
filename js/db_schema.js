@@ -254,6 +254,65 @@ WHERE NOT EXISTS (SELECT 1 FROM public."usuarios" WHERE usuario = 'master');`);
     return lines.join('\n');
 }
 
+function generarSqlMultiEmpresa() {
+    const L = [];
+    L.push('-- ============================================================');
+    L.push('-- SCRIPT SQL — MULTIEMPRESA (mismo proyecto Supabase / misma base)');
+    L.push('-- Generado para: sistema RRHH / Nómina (esquema base compartido).');
+    L.push('-- Objetivo: habilitar varias empresas operando con empresa_id');
+    L.push('-- dentro de la MISMA base de datos del proyecto Supabase.');
+    L.push('--');
+    L.push('-- NOTA: ejecutar en Supabase → SQL Editor → proyecto correspondiente,');
+    L.push('--       luego volver a "Verificar esquema" y conectar.');
+    L.push('-- ============================================================');
+    L.push('');
+    L.push('create extension if not exists pgcrypto;');
+    L.push('');
+    L.push('-- 1) Tabla de empresas');
+    L.push('create table if not exists public.empresas (');
+    L.push('  id bigint generated always as identity primary key,');
+    L.push('  nombre text not null,');
+    L.push('  rif text not null unique,');
+    L.push('  activo boolean default true,');
+    L.push('  created_at timestamptz default now(),');
+    L.push('  updated_at timestamptz default now()');
+    L.push(');');
+    L.push('');
+    L.push('-- 2) Parametros de la empresa en la config');
+    L.push('alter table public.parametros_config add column if not exists empresa_id bigint references public.empresas(id);');
+    L.push('');
+    L.push('-- 3) Columnas empresa_id en las tablas de negocio (misma base, varias empresas)');
+    const tablasNegocio = [
+        'departamentos', 'cargos', 'empleados', 'nominas', 'historico_salarios', 'vacaciones',
+        'utilidades', 'prestaciones', 'antiguedad', 'anticipos_prestaciones', 'prestamos_anticipos',
+        'prestamos_abonos', 'asistencia_registros', 'justificativos_faltas', 'expediente_documentos',
+        'prenomina_borrador', 'firmas_recibos', 'tokens_portal_empleado', 'solicitudes_ari'
+    ];
+    for (const t of tablasNegocio) {
+        L.push(`alter table public.${t} add column if not exists empresa_id bigint references public.empresas(id);`);
+    }
+    L.push('');
+    L.push('-- 4) Crear la empresa inicial (datos actuales) y vincular la config');
+    L.push("insert into public.empresas (nombre, rif, activo) values ('Recordplast', 'J-50685235-7', true) on conflict (rif) do update set nombre = excluded.nombre, activo = excluded.activo;");
+    L.push("update public.parametros_config set empresa_id = (select id from public.empresas where rif = 'J-50685235-7' limit 1) where id = 1;");
+    L.push('');
+    L.push('-- 5) Backfill de los datos existentes hacia la empresa creada');
+    L.push("update public.empleados set empresa_id = (select id from public.empresas where rif = 'J-50685235-7' limit 1) where empresa_id is null;");
+    L.push("update public.nominas set empresa_id = (select id from public.empresas where rif = 'J-50685235-7' limit 1) where empresa_id is null;");
+    L.push("update public.departamentos set empresa_id = (select id from public.empresas where rif = 'J-50685235-7' limit 1) where empresa_id is null;");
+    L.push("update public.cargos set empresa_id = (select id from public.empresas where rif = 'J-50685235-7' limit 1) where empresa_id is null;");
+    for (const t of tablasNegocio) {
+        if (['departamentos', 'cargos', 'empleados', 'nominas'].includes(t)) continue;
+        L.push(`update public.${t} set empresa_id = (select id from public.empresas where rif = 'J-50685235-7' limit 1) where empresa_id is null;`);
+    }
+    L.push('');
+    L.push('-- 6) Regla de aislamiento por empresa (RLS opcional, recomendado para producción)');
+    L.push('alter table public.empleados enable row level security;');
+    L.push('-- create policy "empleados_empresa" on public.empleados for all using (empresa_id = (select id from public.empresas limit 1)) with check (empresa_id = (select id from public.empresas limit 1));');
+    L.push('');
+    return L.join('\n');
+}
+
 async function verificarEsquemaDb() {
     const faltantes = [];
     const errores = [];

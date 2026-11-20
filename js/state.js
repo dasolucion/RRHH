@@ -287,6 +287,8 @@ function cargarCacheLocal() {
     const prefillUrl = (savedParams && savedParams.supabase_url) || (typeof DEFAULT_SUPABASE_URL !== 'undefined' ? DEFAULT_SUPABASE_URL : '') || '';
     const prefillKey = (savedParams && savedParams.supabase_anon_key) || (typeof DEFAULT_SUPABASE_ANON_KEY !== 'undefined' ? DEFAULT_SUPABASE_ANON_KEY : '') || '';
     const tieneCreds = !!(prefillUrl && prefillKey && /^https?:\/\//i.test(prefillUrl));
+    const tieneCredsGuardados = !!(savedParams && savedParams.supabase_url && savedParams.supabase_anon_key && /^https?:\/\//i.test(String(savedParams.supabase_url || '')) && String(savedParams.supabase_anon_key || '').trim().length > 10);
+    const autoConectar = (modoGuardado === 'db') || tieneCredsGuardados;
 
     appState.esquemaOk = false;
     appState.esquemaFaltantes = [];
@@ -298,7 +300,7 @@ function cargarCacheLocal() {
     appState.features = (typeof DEFAULT_FEATURES !== 'undefined') ? { ...DEFAULT_FEATURES } : (appState.features || {});
 
     // Si ya fue conectado/configurado a BD, reconectar automáticamente (sin mostrar datos de cliente hasta verificar)
-    if (modoGuardado === 'db' && tieneCreds) {
+    if (autoConectar && tieneCreds) {
         appState.modoDatos = 'db';
         const rifGuardado = (savedParams && savedParams.rif_empresa) ? String(savedParams.rif_empresa).trim().toUpperCase() : '';
         const nomGuardado = (savedParams && savedParams.nombre_empresa) ? String(savedParams.nombre_empresa) : '';
@@ -1011,6 +1013,36 @@ function copiarSqlEsquema() {
         navigator.clipboard.writeText(txt).then(() => showToast('SQL copiado al portapapeles')).catch(() => { ta.select(); document.execCommand('copy'); showToast('SQL copiado'); });
     } else {
         ta.select(); document.execCommand('copy'); showToast('SQL copiado');
+    }
+}
+
+function abrirModalEsquemaSqlMulti() {
+    const sql = (typeof generarSqlMultiEmpresa === 'function') ? generarSqlMultiEmpresa() : '-- No disponible';
+    let modal = gId('modal-esquema-sql-multi');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'modal-esquema-sql-multi';
+        modal.className = 'fixed inset-0 bg-slate-950/85 backdrop-blur-sm hidden items-center justify-center p-4 z-50';
+        modal.innerHTML = `<div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl">
+          <div class="flex justify-between items-center p-4 border-b border-slate-800"><h3 class="text-base font-bold text-white"><i class="fa-solid fa-layer-group text-indigo-400 mr-2"></i>SQL Multiempresa: varias empresas en la misma base</h3><button onclick="closeModal('modal-esquema-sql-multi')" class="text-slate-400 hover:text-white p-1"><i class="fa-solid fa-xmark text-lg"></i></button></div>
+          <div class="p-4 overflow-auto flex-1"><p class="text-[11px] text-slate-400 mb-2">Script para habilitar el uso multiempresa con <code>empresa_id</code> en la misma base de datos (mismo proyecto Supabase). Copie y ejecútelo en <strong>Supabase → SQL Editor</strong>, luego use "Verificar esquema".</p><textarea id="esquema-sql-multi-text" readonly class="w-full h-[55vh] bg-slate-950 border border-slate-800 rounded-lg p-3 text-[11px] font-mono text-slate-200"></textarea></div>
+          <div class="p-4 border-t border-slate-800 flex justify-end gap-2"><button onclick="copiarSqlMulti()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold px-4 py-2 rounded-lg"><i class="fa-solid fa-copy mr-1"></i>Copiar SQL</button><button onclick="closeModal('modal-esquema-sql-multi')" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold px-4 py-2 rounded-lg">Cerrar</button></div>
+        </div>`;
+        document.body.appendChild(modal);
+    }
+    const ta = gId('esquema-sql-multi-text');
+    if (ta) ta.value = sql;
+    openModal('modal-esquema-sql-multi');
+}
+
+function copiarSqlMulti() {
+    const ta = gId('esquema-sql-multi-text');
+    if (!ta) return;
+    const txt = ta.value || '';
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(txt).then(() => showToast('SQL multiempresa copiado al portapapeles')).catch(() => { ta.select(); document.execCommand('copy'); showToast('SQL multiempresa copiado'); });
+    } else {
+        ta.select(); document.execCommand('copy'); showToast('SQL multiempresa copiado');
     }
 }
 
