@@ -311,11 +311,33 @@ function guardarSistemas() { persistSistemas(); showToast('Lista guardada'); }
 async function fetchParametrosSistema(s) {
     const url = normUrl(s.url);
     const headers = { apikey: s.key, Authorization: `Bearer ${s.key}` };
+
+    // 1) Validar URL + anon key (alcance/autenticación) con consulta ligera
+    let authResp;
+    try {
+        authResp = await fetch(`${url}/rest/v1/parametros_config?select=id&limit=1`, { headers });
+    } catch (e) {
+        throw new Error('No se pudo conectar. Verifique URL y conexión a internet.');
+    }
+    if (authResp.status === 401 || authResp.status === 403) {
+        throw new Error(`Credenciales rechazadas (HTTP ${authResp.status}). Verifique URL y anon key.`);
+    }
+    if (!(authResp.ok || authResp.status === 400 || authResp.status === 404 || authResp.status === 406)) {
+        throw new Error(`No se pudo validar la conexión (HTTP ${authResp.status}).`);
+    }
+
+    // 2) Intentar leer parámetros (empresa/licencia). Si no hay esquema/tabla, conexión es válida pero sin datos.
+    if (authResp.status === 404) {
+        return { __conectadoSinEsquema: true };
+    }
+
     const resp = await fetch(`${url}/rest/v1/parametros_config?select=id,nombre_empresa,rif_empresa,licencia_bloqueada,licencia_estado,licencia_vencimiento,licencia_mensaje&order=id.asc&limit=1`, { headers });
+    if (resp.status === 404) {
+        return { __conectadoSinEsquema: true };
+    }
     if (!resp.ok) {
-        let msg = `HTTP ${resp.status}`;
-        try { const t = await resp.text(); if (t) msg += `: ${t.slice(0,120)}`; } catch(e){}
-        throw new Error(msg);
+        // Si falla por columnas faltantes u otro detalle, al menos la conexión/auth es válida
+        return { __conectadoParcial: true, __http: resp.status };
     }
     const data = await resp.json();
     return Array.isArray(data) && data.length ? data[0] : null;
@@ -328,18 +350,37 @@ async function verificarSistema(id) {
     try {
         const p = await fetchParametrosSistema(s);
         s.estadoConexion = 'conectado';
-        s.empresa = p ? (p.nombre_empresa || '') : '';
-        s.empresaRif = p ? (p.rif_empresa || '') : '';
-        const bloqueada = !!(p && (p.licencia_bloqueada === true || p.licencia_estado === 'bloqueada' || p.licencia_estado === 'suspendida'));
-        let vencida = false;
-        if (p && p.licencia_vencimiento) {
-            const hoy = new Date(); hoy.setHours(0,0,0,0);
-            const v = new Date(String(p.licencia_vencimiento).slice(0,10) + 'T00:00:00');
-            if (!isNaN(v.getTime()) && v < hoy) vencida = true;
+
+        if (p && p.__conectadoSinEsquema) {
+            s.empresa = '(esquema no creado)';
+            s.empresaRif = '';
+            s.licencia = null;
+            s.licenciaTexto = 'Conectado (URL/anon válidos). Falta crear/verificar esquema en la BD.';
+            s.lastCheck = new Date().toISOString();
+        } else if (p && p.__conectadoParcial) {
+            s.empresa = '(datos no disponibles)';
+            s.empresaRif = '';
+            s.licencia = null;
+            s.licenciaTexto = `Conectado (respuesta parcial HTTP ${p.__http}). Verifique esquema/campos.`;
+            s.lastCheck = new Date().toISOString();
+        } else {
+            s.empresa = p ? (p.nombre_empresa || '') : '(sin empresa configurada)';
+            s.empresaRif = p ? (p.rif_empresa || '') : '';
+            const bloqueada = !!(p && (p.licencia_bloqueada === true || p.licencia_bloqueada === 'true' || p.licencia_estado === 'bloqueada' || p.licencia_estado === 'suspendida'));
+            let vencida = false;
+            if (p && p.licencia_vencimiento) {
+                const hoy = new Date(); hoy.setHours(0,0,0,0);
+                const v = new Date(String(p.licencia_vencimiento).slice(0,10) + 'T00:00:00');
+                if (!isNaN(v.getTime()) && v < hoy) vencida = true;
+            }
+            s.licencia = (bloqueada || vencida) ? 'bloqueada' : 'activa';
+            const partes = [];
+            if (p && p.licencia_estado) partes.push(`estado: ${p.licencia_estado}`);
+            if (p && p.licencia_vencimiento) partes.push(`vence: ${p.licencia_vencimiento}`);
+            partes.push((bloqueada || vencida) ? 'BLOQUEADA' : 'ACTIVA');
+            s.licenciaTexto = partes.join(' · ');
+            s.lastCheck = new Date().toISOString();
         }
-        s.licencia = (bloqueada || vencida) ? 'bloqueada' : 'activa';
-        s.licenciaTexto = [p && p.licencia_estado ? `estado: ${p.licencia_estado}` : null, p && p.licencia_vencimiento ? `vence: ${p.licencia_vencimiento}` : null, (bloqueada || vencida) ? 'BLOQUEADA' : 'ACTIVA'].filter(Boolean).join(' · ');
-        s.lastCheck = new Date().toISOString();
     } catch (e) {
         s.estadoConexion = 'error';
         s.licencia = null;

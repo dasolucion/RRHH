@@ -720,9 +720,21 @@ async function probarConexionSupabase() {
     establecerEstadoConexion('comprobando');
     let reachable = false;
     try {
-        const resp = await fetch(`${url}/rest/v1/`, { headers: { apikey: key, Authorization: `Bearer ${key}` } });
-        reachable = resp.status !== 401 && resp.status !== 403;
-        if (!reachable) showToast(`Credenciales rechazadas (HTTP ${resp.status}). Verifique URL y anon key.`, 'error');
+        // Validación ligera: consultar endpoint REST (parametros_config) para confirmar URL + anon key.
+        // 200/206/400/404 => servidor alcanzable y credenciales aceptadas (404 puede indicar esquema faltante).
+        // 401/403 => credenciales inválidas.
+        const resp = await fetch(`${url}/rest/v1/parametros_config?select=id&limit=1`, {
+            headers: { apikey: key, Authorization: `Bearer ${key}` }
+        });
+        if (resp.status === 401 || resp.status === 403) {
+            reachable = false;
+            showToast(`Credenciales rechazadas (HTTP ${resp.status}). Verifique URL y anon key.`, 'error');
+        } else if (resp.ok || resp.status === 400 || resp.status === 404 || resp.status === 406) {
+            reachable = true;
+        } else {
+            reachable = false;
+            showToast(`No se pudo validar la conexión (HTTP ${resp.status}). Verifique URL y anon key.`, 'error');
+        }
     } catch (e) {
         reachable = false;
         showToast('No se pudo conectar con Supabase. Verifique URL y conexión a internet.', 'error');
