@@ -41,13 +41,17 @@ function closeModal(id) {
 function toggleMobileMenu() {
     const sb = gId('sidebar');
     const ov = gId('mobile-overlay');
+    const titulo = gId('header-titulo-mobile');
     if (!sb || !ov) return;
-    if (sb.classList.contains('-translate-x-full')) {
+    const abierto = !sb.classList.contains('-translate-x-full');
+    if (abierto) {
         sb.classList.remove('-translate-x-full');
         ov.classList.remove('hidden');
+        if (titulo) { titulo.classList.remove('hidden'); titulo.classList.add('flex'); }
     } else {
         sb.classList.add('-translate-x-full');
         ov.classList.add('hidden');
+        if (titulo) { titulo.classList.add('hidden'); titulo.classList.remove('flex'); }
     }
 }
 
