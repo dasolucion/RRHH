@@ -1,14 +1,94 @@
 <!DOCTYPE html>
-<html lang="es" class="dark">
+<html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistema de Nómina y RRHH</title>
+    <script>try{document.documentElement.dataset.theme=localStorage.getItem('rrhh_tema')||'light'}catch(e){document.documentElement.dataset.theme='light'}</script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="css/estilos.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        /* Light/Dark theme layer shared by the RRHH family of systems */
+        :root {
+            --lienzo: #F3F6FB; --superficie: #FFFFFF; --superficie-2: #F7F9FC;
+            --tinta: #17243B; --tinta-2: #2B3A52; --tinta-3: #3C4B63;
+            --apagado: #63738C; --apagado-2: #91A0B4;
+            --linea: #E4EAF2; --linea-fuerte: #D2DCE8;
+            --acento: #0E7490; --acento-suave: #E8F5F8;
+            --campo-bg: #FFFFFF;
+            --sombra: 0 1px 2px rgba(23,36,59,.05), 0 1px 12px rgba(23,36,59,.03);
+        }
+        [data-theme="dark"] {
+            --lienzo: #020617; --superficie: #0F172A; --superficie-2: #1E293B;
+            --tinta: #F1F5F9; --tinta-2: #E2E8F0; --tinta-3: #CBD5E1;
+            --apagado: #94A3B8; --apagado-2: #64748B;
+            --linea: #1E293B; --linea-fuerte: #334155;
+            --acento: #38BDF8; --acento-suave: rgba(30,41,59,.55);
+            --campo-bg: #0F172A;
+            --sombra: 0 1px 2px rgba(0,0,0,.35);
+        }
+        body { background-color: var(--lienzo) !important; color: var(--tinta) !important; }
+        body { font-family: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif !important; -webkit-font-smoothing: antialiased; }
+        .font-mono, td.font-mono, span.font-mono, p.font-mono { font-variant-numeric: tabular-nums; }
+        .bg-slate-950 { background-color: var(--lienzo) !important; }
+        .bg-slate-900 { background-color: var(--superficie) !important; }
+        .bg-slate-800 { background-color: var(--superficie-2) !important; }
+        .bg-slate-950\/60 { background-color: var(--superficie-2) !important; }
+        .bg-slate-900\/60 { background-color: var(--superficie) !important; }
+        .bg-slate-800\/30 { background-color: var(--acento-suave) !important; }
+        .bg-slate-800\/50 { background-color: var(--superficie-2) !important; }
+        .bg-slate-950\/40 { background-color: var(--superficie-2) !important; }
+        .bg-slate-950\/50 { background-color: var(--superficie-2) !important; }
+        .bg-slate-950\/85 { background-color: rgba(15,23,42,.58) !important; }
+        .bg-slate-950\/80 { background-color: rgba(15,23,42,.50) !important; }
+        .bg-slate-950\/70 { background-color: rgba(15,23,42,.45) !important; }
+        .text-slate-100 { color: var(--tinta) !important; }
+        .text-slate-200 { color: var(--tinta-2) !important; }
+        .text-slate-300 { color: var(--tinta-3) !important; }
+        .text-slate-400 { color: var(--apagado) !important; }
+        .text-slate-500 { color: var(--apagado-2) !important; }
+        body [class*="text-white"]:not(button):not(a):not(select):not(option) { color: var(--tinta) !important; }
+        button.text-white, a.text-white { color: #fff !important; }
+        .border-slate-700, .border-slate-600 { border-color: var(--linea-fuerte) !important; }
+        .border-slate-800 { border-color: var(--linea) !important; }
+        hr, .border-t { border-color: var(--linea) !important; }
+        input:not([type="checkbox"]):not([type="file"]), select, textarea {
+            background-color: var(--campo-bg) !important; border-color: var(--linea-fuerte) !important; color: var(--tinta) !important;
+        }
+        input[readonly], input:disabled, select:disabled { background-color: var(--superficie-2) !important; color: var(--apagado) !important; }
+        input::placeholder, textarea::placeholder { color: var(--apagado-2) !important; }
+        .shadow-xl, .shadow-lg, .shadow-md, .shadow-sm, .shadow-2xl { box-shadow: var(--sombra) !important; }
+        .rounded-2xl { border-radius: 16px !important; }
+        .rounded-xl { border-radius: 10px !important; }
+        .rounded-lg { border-radius: 8px !important; }
+        .backdrop-blur-md, .backdrop-blur-sm { backdrop-filter: none !important; }
+        aside { border-right: 1px solid var(--linea) !important; box-shadow: none !important; }
+        aside nav button, aside nav summary { color: var(--tinta-2) !important; }
+        aside nav button:hover, aside nav summary:hover { background-color: var(--superficie-2) !important; color: var(--tinta) !important; }
+        thead.bg-slate-950, thead.bg-slate-900, thead.bg-slate-800 { background-color: var(--superficie-2) !important; }
+        tbody tr[class*="hover:bg-slate-800"]:hover { background-color: var(--acento-suave) !important; }
+        tbody tr, th, td { border-color: var(--linea) !important; }
+        [class*="rounded-2xl"][class*="border-"] { border-color: var(--linea) !important; }
+        a { color: var(--acento); }
+        :focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; border-radius: 6px; }
+        .tema-toggle {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 30px; height: 30px; border-radius: 9px;
+            border: 1px solid var(--linea-fuerte); background: var(--superficie-2);
+            color: var(--acento); font-size: 12px; cursor: pointer; transition: background .15s ease, color .15s ease;
+        }
+        .tema-toggle:hover { background: var(--acento-suave); }
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+        }
+</style>
+
 </head>
 <body class="bg-slate-950 text-slate-100 font-sans antialiased min-h-screen flex flex-col overflow-x-hidden">
 
@@ -87,7 +167,10 @@
             <div class="pt-4 border-t border-slate-800 space-y-3">
                 <div class="bg-slate-950 p-2.5 rounded-lg border border-slate-800 flex items-center justify-between">
                     <div class="overflow-hidden mr-2"><div class="text-xs font-bold text-white truncate" id="user-badge-name">Usuario</div><div class="text-[10px] text-emerald-400 font-medium truncate" id="user-badge-role">Master</div></div>
-                    <button onclick="cerrarSesion()" class="text-slate-400 hover:text-rose-400 transition p-1.5" title="Cerrar Sesión"><i class="fa-solid fa-power-off text-sm"></i></button>
+                    <div class="flex items-center gap-1">
+                        <button onclick="alternarTema(this)" class="tema-toggle" title="Toggle theme" aria-label="Toggle theme"><i class="fa-solid fa-moon"></i></button>
+                        <button onclick="cerrarSesion()" class="text-slate-400 hover:text-rose-400 transition p-1.5" title="Cerrar Sesión"><i class="fa-solid fa-power-off text-sm"></i></button>
+                    </div>
                 </div>
                 <div class="text-[10px] text-slate-500 flex justify-between items-center px-1"><span>Supabase DB</span><span class="inline-flex items-center text-emerald-400 font-semibold"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1 animate-pulse"></span> Online</span></div>
             </div>
@@ -96,7 +179,10 @@
         <main class="flex-1 h-screen overflow-y-auto p-4 sm:p-6 space-y-6 relative">
             <header class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-800 pb-4">
                 <div class="flex items-center gap-3">
-                    <button onclick="toggleMobileMenu()" class="md:hidden text-slate-400 hover:text-white focus:outline-none"><i class="fa-solid fa-bars text-2xl"></i></button>
+                    <div class="flex items-center gap-2">
+                        <button onclick="alternarTema(this)" class="tema-toggle md:hidden" title="Toggle theme" aria-label="Toggle theme"><i class="fa-solid fa-moon"></i></button>
+                        <button onclick="toggleMobileMenu()" class="md:hidden text-slate-400 hover:text-white focus:outline-none"><i class="fa-solid fa-bars text-2xl"></i></button>
+                    </div>
                     <div><h2 id="view-title" class="text-xl font-bold text-white">Panel de Control</h2><p id="view-desc" class="text-xs text-slate-400">Resumen general de nómina, personal y liquidaciones</p></div>
                 </div>
             </header>
@@ -1182,5 +1268,19 @@
     <script src="js/liquidaciones.js"></script>
     <script src="js/asistencia.js"></script>
     <script src="js/main.js"></script>
+
+    <script>
+        function aplicarTema(tema, botones) {
+            document.documentElement.setAttribute('data-theme', tema);
+            try { localStorage.setItem('rrhh_tema', tema); } catch (e) { /* private mode */ }
+            const icono = tema === 'dark' ? 'fa-sun' : 'fa-moon';
+            (botones || document.querySelectorAll('.tema-toggle')).forEach(b => { if (b) b.innerHTML = '<i class="fa-solid ' + icono + '"></i>'; });
+        }
+        function alternarTema(boton) {
+            const actual = document.documentElement.getAttribute('data-theme') || 'light';
+            aplicarTema(actual === 'dark' ? 'light' : 'dark', [boton]);
+        }
+        aplicarTema(document.documentElement.getAttribute('data-theme') || 'light');
+    </script>
 </body>
 </html>
