@@ -44,7 +44,7 @@ function toggleMobileMenu() {
     const titulo = gId('header-titulo-mobile');
     if (!sb || !ov) return;
     const abierto = !sb.classList.contains('-translate-x-full');
-    if (abierto) {
+    if (!abierto) {
         sb.classList.remove('-translate-x-full');
         ov.classList.remove('hidden');
         if (titulo) { titulo.classList.remove('hidden'); titulo.classList.add('flex'); }
