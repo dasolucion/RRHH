@@ -681,8 +681,10 @@ async function cargarEmpresasDesdeDb() {
 
         appState.multiempresaActivo = true;
         const rifActivo = String(appState.parametros.rif_empresa || '').toUpperCase();
-        const activa = appState.empresas.find(e => String(e.rif).toUpperCase() === rifActivo);
+        let activa = appState.empresas.find(e => String(e.rif).toUpperCase() === rifActivo);
+        if (!activa) activa = appState.empresas[0] || null;
         appState.empresaActivaId = activa ? activa.id : null;
+        appState.empresaActiva = activa ? activa.rif : (appState.parametros.rif_empresa || null);
 
         // Limpiar el localStorage de empresas que ya no existen en la BD.
         lsSet('nomina_empresas', JSON.stringify(appState.empresas));
@@ -813,16 +815,30 @@ function abrirModalEditarEmpresa(id) {
     openModal('modal-editar-empresa');
 }
 
-function abrirModalEditarEmpresaActiva() {
+async function abrirModalEditarEmpresaActiva() {
     if (appState.usuarioActual?.rol !== 'master') {
         return showToast('Sólo el usuario Master puede editar empresas', 'error');
     }
     const id = obtenerEmpresaIdActiva() || appState.empresaActivaId || null;
     const rifActivo = String(appState.parametros.rif_empresa || '').toUpperCase();
-    const empresa = (appState.empresas || []).find(e =>
+    const lista = (appState.empresas || []).filter(e => e && e.rif);
+    const empresa = lista.find(e =>
         (id && Number(e.id) === Number(id)) || String(e.rif || '').toUpperCase() === rifActivo
-    );
+    ) || null;
     if (!empresa) {
+        const nombre = String(appState.parametros?.nombre_empresa || '').trim();
+        const rif = String(appState.parametros?.rif_empresa || '').trim().toUpperCase();
+        if (nombre && rif) {
+            if (typeof mostrarCargando === 'function') mostrarCargando('Validando empresa...');
+            const nuevoId = await guardarEmpresaEnDb(nombre, rif);
+            if (nuevoId) { try { await cargarEmpresasDesdeDb(); } catch (e) {} }
+            if (typeof ocultarCargando === 'function') ocultarCargando();
+        }
+        const lista2 = (appState.empresas || []).filter(e => e && e.rif);
+        const empresa2 = lista2.find(e =>
+            (id && Number(e.id) === Number(id)) || String(e.rif || '').toUpperCase() === rifActivo
+        ) || null;
+        if (empresa2) { abrirModalEditarEmpresa(empresa2.id); return; }
         // En modo empresa única sin id, se usa el formulario de Parámetros para corregir nombre/RIF.
         if (gId('editar-empresa-id')) gId('editar-empresa-id').value = '';
         if (gId('editar-empresa-rif')) gId('editar-empresa-rif').value = appState.parametros.rif_empresa || '';
