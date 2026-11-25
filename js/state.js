@@ -871,9 +871,12 @@ async function guardarEdicionEmpresa() {
     const nombre = (gId('editar-empresa-nombre')?.value || '').trim();
     if (!rif || !nombre) return showToast('Indique RIF y razón social', 'error');
 
-    const duplicada = (appState.empresas || []).find(e =>
-        Number(e.id) !== Number(id) && String(e.rif || '').toUpperCase() === rif
-    );
+    const duplicada = (appState.empresas || []).find(e => {
+        if (!e || !e.rif) return false;
+        if (String(e.rif || '').toUpperCase() !== rif) return false;
+        if (!id) return false; // sin id de edición no puede ser un duplicado
+        return Number(e.id) !== Number(id);
+    });
     if (duplicada) return showToast('Ese RIF ya pertenece a otra empresa registrada', 'error');
 
     const entrada = (appState.empresas || []).find(e => Number(e.id) === Number(id));
