@@ -403,6 +403,46 @@ function cargarDatosDemoLocal() {
 // PARÁMETROS DE EMPRESA — Vista + guardado
 // ============================================================
 
+// Favicon dinámico: la pestaña del navegador usa el logo de la empresa activa.
+// Se aplica junto con el resto de los logos para que siempre coincidan.
+function aplicarFaviconEmpresa(src) {
+    try {
+        const href = src || 'logo-original.png';
+        let tipo = 'image/png';
+        const dataMime = /^data:(image\/[a-z0-9.+-]+)/i.exec(href);
+        if (dataMime) tipo = dataMime[1].toLowerCase();
+        else if (/\.svg(?:[?#]|$)/i.test(href)) tipo = 'image/svg+xml';
+        else if (/\.ico(?:[?#]|$)/i.test(href)) tipo = 'image/x-icon';
+        else if (/\.jpe?g(?:[?#]|$)/i.test(href)) tipo = 'image/jpeg';
+        else if (/\.webp(?:[?#]|$)/i.test(href)) tipo = 'image/webp';
+
+        const head = document.head || document.getElementsByTagName('head')[0];
+        if (!head) return;
+
+        // Un único <link rel="icon">: se reutiliza el existente y se descartan duplicados
+        // para que el navegador no siga mostrando el favicon anterior.
+        const existentes = Array.prototype.slice.call(document.querySelectorAll('link[rel~="icon"]'));
+        let fav = existentes.shift();
+        if (!fav) {
+            fav = document.createElement('link');
+            fav.rel = 'icon';
+            head.appendChild(fav);
+        }
+        existentes.forEach(function (l) { l.parentNode && l.parentNode.removeChild(l); });
+        fav.type = tipo;
+        fav.href = href;
+
+        // Accesos directos en iOS/Android usan el mismo logo.
+        let apple = document.querySelector('link[rel="apple-touch-icon"]');
+        if (!apple) {
+            apple = document.createElement('link');
+            apple.rel = 'apple-touch-icon';
+            head.appendChild(apple);
+        }
+        apple.href = href;
+    } catch (_) { /* el favicon nunca debe romper la app */ }
+}
+
 function renderLogoEmpresa() {
     const logoImg = gId('brand-sidebar-logo');
     const dashLogo = gId('dashboard-logo');
@@ -428,6 +468,7 @@ function renderLogoEmpresa() {
     if (logoImg) logoImg.src = src;
     if (dashLogo) dashLogo.src = src;
     if (loginLogo) loginLogo.src = src;
+    aplicarFaviconEmpresa(src);
     if (nombreEl) nombreEl.innerText = (appState && appState.parametros && appState.parametros.nombre_empresa) || (emp && emp.nombre) || '';
     if (rifEl) rifEl.innerText = (appState && appState.parametros && appState.parametros.rif_empresa) || (emp && emp.rif) || '';
 }
