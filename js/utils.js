@@ -37,6 +37,18 @@ function closeModal(id) {
     if (el) { el.classList.add('hidden'); el.classList.remove('flex'); }
 }
 
+// --- Overlay de espera dentro de la app ---
+function mostrarCargando(texto) {
+    const el = gId('app-loading');
+    const t = gId('app-loading-text');
+    if (t) t.innerText = texto || 'Cargando...';
+    if (el) { el.classList.remove('hidden'); el.classList.add('flex'); }
+}
+function ocultarCargando() {
+    const el = gId('app-loading');
+    if (el) { el.classList.add('hidden'); el.classList.remove('flex'); }
+}
+
 // --- Toggle menú móvil (sidebar) ---
 function toggleMobileMenu() {
     const sb = gId('sidebar');

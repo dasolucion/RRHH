@@ -18,10 +18,59 @@ document.addEventListener('DOMContentLoaded', () => {
         gId('tasa-mes-input').value = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
     }
 
-    // 2. Cargar caché local (usuarios, tasas, etc.) y verificar sesión
-    cargarCacheLocal();
-    verificarSesionInicial();
+    // 2. Verificar conexión/esquema ANTES de mostrar el login.
+    iniciarAplicacion();
 });
+
+function _bootEstado(texto, detalle) {
+    const s = gId('boot-status');
+    const d = gId('boot-detail');
+    if (s) s.innerText = texto || 'Verificando...';
+    if (d) d.innerText = detalle || '';
+}
+
+async function iniciarAplicacion() {
+    _bootEstado('Verificando el sistema', 'Leyendo configuración de este equipo...');
+
+    try {
+        // Configura el modo (demo o db) y el cliente, sin mostrar datos de cliente.
+        cargarCacheLocal();
+
+        if (appState.modoDatos === 'db') {
+            _bootEstado('Conectando a la base de datos', 'Comprobando credenciales y esquema...');
+            if (typeof verificarConexionInicial === 'function') {
+                await verificarConexionInicial();
+            }
+
+            if (appState.esquemaOk) {
+                _bootEstado('Cargando usuarios y empresas', 'Leyendo el registro de empresas de la base de datos...');
+                if (typeof cargarEmpresasDesdeDb === 'function') {
+                    try { await cargarEmpresasDesdeDb(); } catch (e) { console.warn('No se pudieron cargar las empresas:', e); }
+                }
+                if (typeof renderSelectorEmpresas === 'function') renderSelectorEmpresas();
+            }
+        } else {
+            _bootEstado('Preparando modo demo', 'No hay credenciales: los datos se guardan en este equipo.');
+        }
+
+        appState.arranqueVerificado = true;
+        _bootEstado(
+            appState.estadoConexion === 'conectado' ? 'Conexión verificada' : 'Listo',
+            appState.estadoConexion === 'conectado'
+                ? 'Base de datos disponible. Ingrese sus credenciales.'
+                : (appState.modoDatos === 'demo' ? 'Modo demo activo.' : 'Base de datos no disponible.')
+        );
+    } catch (e) {
+        console.warn('Error durante la verificación inicial:', e);
+        _bootEstado('No se pudo verificar', String(e && e.message ? e.message : e));
+    } finally {
+        // Pequeña pausa para que se lea el estado y luego mostrar login o sesión activa.
+        await new Promise(r => setTimeout(r, 350));
+        const boot = gId('boot-screen');
+        if (boot) boot.classList.add('hidden');
+        verificarSesionInicial();
+    }
+}
 
 async function switchTab(tab) {
     const usr = appState.usuarioActual;

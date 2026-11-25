@@ -10,10 +10,13 @@ function verificarSesionInicial() {
         try {
             const u = JSON.parse(ses);
             appState.usuarioActual = u;
+            // Sesión restaurada: no se fuerza el modal de empresa en cada recarga.
+            appState.sesionRestaurada = true;
             iniciarSistemaAutenticado();
             return;
         } catch (e) {}
     }
+    appState.sesionRestaurada = false;
     gId('login-screen').classList.remove('hidden');
     gId('app-wrapper').classList.add('hidden');
     gId('app-wrapper').classList.remove('flex');
@@ -57,6 +60,8 @@ async function ejecutarLogin(e) {
 
     errDiv.classList.add('hidden');
     appState.usuarioActual = coincidencia;
+    // Login explícito: sí se debe preguntar la empresa cuando hay más de una.
+    appState.sesionRestaurada = false;
 
     const sesionSegura = {
         id: coincidencia.id,
@@ -88,8 +93,37 @@ async function iniciarSistemaAutenticado() {
     gId('app-wrapper').classList.remove('hidden');
     gId('app-wrapper').classList.add('flex');
 
-    // Si hay varias empresas registradas en BD (multiempresa), pedir la empresa con la que trabajar.
-    if (appState.modoDatos === 'db' && Array.isArray(appState.empresas) && appState.empresas.length > 1) {
+    // En modo BD, esperar a que el esquema esté verificado y cargar las empresas reales
+    // de Supabase antes de decidir qué empresa usar. Nunca usar empresas de localStorage.
+    if (appState.modoDatos === 'db') {
+        if (!appState.esquemaOk && typeof verificarConexionInicial === 'function') {
+            try { await verificarConexionInicial(); } catch (e) { console.warn('No se pudo verificar la conexión al iniciar sesión:', e); }
+        }
+        if (typeof cargarEmpresasDesdeDb === 'function') {
+            try { await cargarEmpresasDesdeDb(); } catch (e) { console.warn('No se pudieron cargar las empresas:', e); }
+        }
+    }
+
+    const empresasValidas = (Array.isArray(appState.empresas) ? appState.empresas : [])
+        .filter(e => e && e.rif && (!appState.multiempresaActivo || e.id));
+
+    if (appState.modoDatos === 'db' && appState.multiempresaActivo && empresasValidas.length === 0) {
+        if (typeof showToast === 'function') showToast('No hay empresas visibles en la base de datos. Ejecute SQL-FIX-EMPRESAS.sql en Supabase.', 'error');
+    }
+
+    // Si sólo queda una empresa válida y la activa era una empresa local antigua,
+    // activar automáticamente la única empresa real.
+    const rifActivo = String((appState.parametros && appState.parametros.rif_empresa) || '').toUpperCase();
+    const activaValida = empresasValidas.some(e => String(e.rif).toUpperCase() === rifActivo);
+    if (appState.modoDatos === 'db' && empresasValidas.length === 1 && !activaValida) {
+        try { await cambiarEmpresaActiva(empresasValidas[0].rif); } catch (e) { console.warn('No se pudo activar la única empresa disponible:', e); }
+    }
+
+    // Si hay varias empresas registradas en BD, el login explícito SIEMPRE pregunta
+    // con cuál trabajar, aunque ya exista una activa válida. En recargas con sesión
+    // restaurada se respeta la empresa guardada (el selector de cabecera sigue disponible).
+    if (typeof renderSelectorEmpresas === 'function') renderSelectorEmpresas();
+    if (appState.modoDatos === 'db' && empresasValidas.length > 1 && !appState.sesionRestaurada) {
         if (typeof aplicarPermisosSegunRol === 'function') aplicarPermisosSegunRol();
         if (typeof abrirSelectorEmpresaDb === 'function') {
             abrirSelectorEmpresaDb();
@@ -186,6 +220,19 @@ function aplicarPermisosSegunRol() {
     const panelFlags = gId('panel-superadmin-features');
     if (panelFlags) panelFlags.style.display = isMaster ? '' : 'none';
 
+    // Crear/editar empresas es una operación exclusiva del Master y se hace desde Parámetros.
+    ['btn-editar-empresa', 'btn-nueva-empresa'].forEach(id => {
+        const el = gId(id);
+        if (el) el.style.display = isMaster ? '' : 'none';
+    });
+    ['param-empresa-nombre', 'param-empresa-rif'].forEach(id => {
+        const el = gId(id);
+        if (!el) return;
+        el.readOnly = !isMaster;
+        el.classList.toggle('opacity-60', !isMaster);
+        el.title = isMaster ? '' : 'Sólo el usuario Master puede modificar los datos de la empresa';
+    });
+
     if (typeof aplicarPermisosUI === 'function') aplicarPermisosUI();
     if (primerModuloVisible && typeof switchTab === 'function') switchTab(primerModuloVisible);
     else if (!primerModuloVisible) showToast('Su usuario no tiene acceso a ningún módulo. Contacte al administrador.', 'error');
@@ -258,7 +305,7 @@ function aplicarPermisosUI(raiz = document) {
     const controles = raiz.querySelectorAll('button, input:not([type="hidden"]), select, textarea, label[for^="input-"]');
 
     controles.forEach(control => {
-        if (control.closest('#modal-matriz-permisos, #modal-usuario, #login-screen, #sidebar')) return;
+        if (control.closest('#modal-matriz-permisos, #modal-usuario, #login-screen, #sidebar, #header-empresa-wrap')) return;
 
         // Cerrar un diálogo es navegación de interfaz, no una operación del módulo.
         // Debe seguir disponible aun si el perfil solo tiene permiso de consulta.
@@ -323,7 +370,7 @@ document.addEventListener('change', event => {
 
 document.addEventListener('click', event => {
     const control = event.target.closest('button, a, label');
-    if (!control || control.closest('#modal-matriz-permisos, #modal-usuario, #login-screen, #sidebar')) return;
+    if (!control || control.closest('#modal-matriz-permisos, #modal-usuario, #login-screen, #sidebar, #header-empresa-wrap')) return;
 
     // Cierre de modal permitido siempre, independientemente de los permisos CRUD.
     if (esControlCierreModal(control)) return;

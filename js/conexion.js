@@ -13,7 +13,45 @@
    funcionen antes de completar la migración.
    ============================================================ */
 
+// Detecta si la BD usa el esquema multiempresa y carga el registro de empresas ANTES de
+// consultar cualquier tabla de negocio, para que el filtro por empresa_id ya esté activo.
+async function prepararMultiempresaParaCarga() {
+    if (esModoDemo() || !appState.esquemaOk) {
+        appState.multiempresaActivo = false;
+        return;
+    }
+    const cred = (typeof _obtenerCredencialesDb === 'function')
+        ? _obtenerCredencialesDb()
+        : { url: SUPABASE_URL, key: SUPABASE_ANON_KEY };
+    try {
+        const resp = await fetch(`${cred.url}/rest/v1/empresas?select=id,nombre,rif,activo&limit=1`, {
+            headers: { apikey: cred.key, Authorization: `Bearer ${cred.key}` }
+        });
+        // 200/206 = tabla empresas disponible (aunque esté vacía); 404 = despliegue de una sola empresa.
+        appState.multiempresaActivo = resp.status === 200 || resp.status === 206;
+    } catch (e) {
+        appState.multiempresaActivo = false;
+    }
+    if (appState.multiempresaActivo && typeof cargarEmpresasDesdeDb === 'function') {
+        await cargarEmpresasDesdeDb();
+    }
+}
+
 async function fetchAllData() {
+    await prepararMultiempresaParaCarga();
+
+    // En multiempresa no se cargan datos si la empresa activa no existe en Supabase.
+    // Así se evita mostrar datos de Recordplast bajo una empresa local "fantasma".
+    if (appState.multiempresaActivo) {
+        const rifActivo = String((appState.parametros && appState.parametros.rif_empresa) || '').toUpperCase();
+        const activaValida = (appState.empresas || []).some(e => e && e.id && String(e.rif).toUpperCase() === rifActivo);
+        if (!activaValida) {
+            limpiarEstadoNegocio();
+            if (typeof showToast === 'function') showToast('Seleccione una empresa registrada en la base de datos.', 'error');
+            return;
+        }
+    }
+
     // --- Departamentos ---
     const deptos = await safeQuery(
         supabaseClient.from('departamentos').select('*').order('nombre'),
@@ -199,10 +237,20 @@ async function fetchAllData() {
     }
 
     // --- Parámetros corporativos + features_config ---
-    const paramConf = await safeQuery(
-        supabaseClient.from('parametros_config').select('*').eq('id', 1).maybeSingle(),
-        'parametros'
-    );
+    // En multiempresa cada empresa tiene su propia fila; en despliegues de una sola empresa se usa id=1.
+    const empresaIdActiva = (typeof obtenerEmpresaIdActiva === 'function') ? obtenerEmpresaIdActiva() : null;
+    const rifActivo = String((appState.parametros && appState.parametros.rif_empresa) || '').toUpperCase();
+    let queryParams = supabaseClient.from('parametros_config').select('*');
+    if (appState.multiempresaActivo && empresaIdActiva) {
+        queryParams = queryParams.eq('empresa_id', empresaIdActiva);
+    } else if (appState.multiempresaActivo && rifActivo && rifActivo !== 'J-00000000-0') {
+        // Empresa guardada sólo en este equipo: buscar su config por RIF. NUNCA caer a id=1,
+        // porque eso hacía que al seleccionarla el sistema regresara a Recordplast.
+        queryParams = queryParams.eq('rif_empresa', rifActivo);
+    } else {
+        queryParams = queryParams.eq('id', 1);
+    }
+    const paramConf = await safeQuery(queryParams.maybeSingle(), 'parametros');
     if (paramConf) {
         appState.parametros = {
             ...appState.parametros,
@@ -224,6 +272,17 @@ async function fetchAllData() {
         } catch (e) {}
         // Registrar la empresa en el selector multiempresa (solo en DB mode)
         if (!esModoDemo() && typeof guardarEmpresaActivaEnRegistro === 'function') guardarEmpresaActivaEnRegistro();
+        if (appState.multiempresaActivo && paramConf.rif_empresa) {
+            const rifDb = String(paramConf.rif_empresa).toUpperCase();
+            const activa = (appState.empresas || []).find(e => String(e.rif || '').toUpperCase() === rifDb);
+            if (activa) {
+                appState.empresaActiva = activa.rif;
+                appState.empresaActivaId = activa.id || appState.empresaActivaId;
+                appState.empresaRecienCreada = false;
+                lsRemove('nomina_empresa_recien_creada');
+                lsSet('nomina_empresa_activa', activa.rif);
+            }
+        }
         if (!esModoDemo() && typeof establecerEstadoConexion === 'function') {
             const hayAdvertencias = !appState.esquemaOk && Array.isArray(appState.esquemaFaltantes) && appState.esquemaFaltantes.length > 0;
             if (!hayAdvertencias) {
