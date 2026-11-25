@@ -1895,6 +1895,11 @@
                     Si cambia el RIF, los datos existentes de esta empresa siguen vinculados a su ID, no al RIF.
                 </p>
             </div>
+            <div>
+                <label class="text-[11px] font-semibold text-slate-400 block mb-1">Logo de la Empresa</label>
+                <input type="file" id="editar-empresa-logo" accept="image/*" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-indigo-500 file:mr-3 file:rounded file:border-0 file:bg-slate-800 file:text-[11px] file:text-sky-300">
+                <div id="editar-empresa-logo-preview" class="mt-2 flex justify-center"></div>
+            </div>
             <div class="p-3 bg-slate-950 border-t border-slate-800 flex justify-end space-x-2">
                 <button onclick="closeModal('modal-editar-empresa')" class="px-3.5 py-2 rounded-lg text-xs bg-slate-800 text-slate-300 hover:bg-slate-700 font-semibold transition">Cancelar</button>
                 <button onclick="guardarEdicionEmpresa()" class="px-4 py-2 rounded-lg text-xs bg-indigo-600 hover:bg-indigo-500 text-white font-bold shadow transition flex items-center space-x-1.5">

@@ -605,7 +605,7 @@ function obtenerEmpresaIdActiva() {
 async function cargarEmpresasDesdeDb() {
     if (esModoDemo() || !supabaseClient || !appState.esquemaOk) return false;
     try {
-        const res = await supabaseClient.from('empresas').select('id, nombre, rif, activo').order('id');
+        const res = await supabaseClient.from('empresas').select('id, nombre, rif, activo, logo').order('id');
         if (res && res.error) return false;
         const filas = Array.isArray(res && res.data) ? res.data : [];
 
@@ -674,6 +674,7 @@ async function cargarEmpresasDesdeDb() {
                     rif,
                     nombre: f.nombre || prev.nombre || rif,
                     activo: true,
+                    logo: f.logo || prev.logo || null,
                     parametros: prev.parametros || null
                 };
             });
@@ -802,6 +803,12 @@ function abrirModalEditarEmpresa(id) {
     if (gId('editar-empresa-id')) gId('editar-empresa-id').value = empresa.id;
     if (gId('editar-empresa-rif')) gId('editar-empresa-rif').value = empresa.rif || '';
     if (gId('editar-empresa-nombre')) gId('editar-empresa-nombre').value = empresa.nombre || '';
+    if (gId('editar-empresa-logo')) gId('editar-empresa-logo').value = '';
+    if (gId('editar-empresa-logo-preview')) gId('editar-empresa-logo-preview').innerHTML = '';
+    if (empresa && empresa.logo) {
+        const prev = gId('editar-empresa-logo-preview');
+        if (prev) prev.innerHTML = `<img src="${String(empresa.logo)}" alt="Logo empresa" class="h-12 w-auto object-contain" style="max-width:100%;">`;
+    }
     closeModal('modal-selector-empresa');
     openModal('modal-editar-empresa');
 }
@@ -820,14 +827,18 @@ function abrirModalEditarEmpresaActiva() {
         if (gId('editar-empresa-id')) gId('editar-empresa-id').value = '';
         if (gId('editar-empresa-rif')) gId('editar-empresa-rif').value = appState.parametros.rif_empresa || '';
         if (gId('editar-empresa-nombre')) gId('editar-empresa-nombre').value = appState.parametros.nombre_empresa || '';
+        if (gId('editar-empresa-logo')) gId('editar-empresa-logo').value = '';
+        if (gId('editar-empresa-logo-preview')) gId('editar-empresa-logo-preview').innerHTML = '';
         return openModal('modal-editar-empresa');
     }
     abrirModalEditarEmpresa(empresa.id);
 }
 
-async function actualizarEmpresaEnDb(id, nombre, rif) {
+async function actualizarEmpresaEnDb(id, nombre, rif, logo) {
     if (esModoDemo() || !supabaseClient || !appState.esquemaOk || !id) return false;
-    const res = await supabaseClient.from('empresas').update({ nombre, rif }).eq('id', id);
+    const datos = { nombre, rif };
+    if (logo !== undefined) datos.logo = logo;
+    const res = await supabaseClient.from('empresas').update(datos).eq('id', id);
     if (res && res.error) throw res.error;
     return true;
 }
@@ -848,10 +859,21 @@ async function guardarEdicionEmpresa() {
 
     const entrada = (appState.empresas || []).find(e => Number(e.id) === Number(id));
 
+    let logoEditar = undefined;
+    const inputEditarLogo = gId('editar-empresa-logo');
+    if (inputEditarLogo && inputEditarLogo.files && inputEditarLogo.files[0]) {
+        logoEditar = await new Promise((res) => {
+            const r = new FileReader();
+            r.onload = () => res(String(r.result || ''));
+            r.onerror = () => res('');
+            r.readAsDataURL(inputEditarLogo.files[0]);
+        });
+    }
+
     if (id && !esModoDemo()) {
         mostrarCargando('Guardando cambios de la empresa...');
         try {
-            await actualizarEmpresaEnDb(id, nombre, rif);
+            await actualizarEmpresaEnDb(id, nombre, rif, logoEditar);
         } catch (e) {
             console.warn('Error actualizando empresa:', e);
             ocultarCargando();
@@ -870,6 +892,7 @@ async function guardarEdicionEmpresa() {
     if (entrada) {
         entrada.nombre = nombre;
         entrada.rif = rif;
+        if (logoEditar !== undefined) entrada.logo = logoEditar;
     } else if (!appState.multiempresaActivo) {
         appState.empresas = [...(appState.empresas || []), { id, nombre, rif, activo: true }];
     }
@@ -894,6 +917,7 @@ async function guardarEdicionEmpresa() {
 
     lsSet('nomina_empresas', JSON.stringify(appState.empresas));
     renderSelectorEmpresas();
+    if (typeof renderLogoEmpresa === 'function') renderLogoEmpresa();
     aplicarParametrosEnVista();
     closeModal('modal-editar-empresa');
     showToast(`Empresa actualizada: ${nombre} (${rif})`);
