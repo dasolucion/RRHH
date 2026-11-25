@@ -800,7 +800,10 @@ function abrirModalEditarEmpresa(id) {
     if (appState.usuarioActual?.rol !== 'master') {
         return showToast('Sólo el usuario Master puede editar empresas', 'error');
     }
-    const empresa = (appState.empresas || []).find(e => Number(e.id) === Number(id));
+    const rifActivo = String(appState.parametros?.rif_empresa || '').toUpperCase();
+    const empresa = (appState.empresas || []).find(e =>
+        (id && Number(e.id) === Number(id)) || String(e.rif || '').toUpperCase() === rifActivo
+    ) || null;
     if (!empresa) return showToast('Empresa no encontrada en el registro', 'error');
     if (gId('editar-empresa-id')) gId('editar-empresa-id').value = empresa.id;
     if (gId('editar-empresa-rif')) gId('editar-empresa-rif').value = empresa.rif || '';
