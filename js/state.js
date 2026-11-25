@@ -403,6 +403,23 @@ function cargarDatosDemoLocal() {
 // PARÁMETROS DE EMPRESA — Vista + guardado
 // ============================================================
 
+function renderLogoEmpresa() {
+    const logoImg = gId('brand-sidebar-logo');
+    const dashLogo = gId('dashboard-logo');
+    const nombreEl = gId('dashboard-empresa-nombre');
+    const rifEl = gId('dashboard-empresa-rif');
+    const rif = String((appState && appState.empresaActiva) || (appState && appState.parametros?.rif_empresa) || '').trim().toUpperCase();
+    const emp = (Array.isArray(appState.empresas) ? appState.empresas : []).find(e => String(e.rif || '').toUpperCase() === rif) || null;
+    const logo = (emp && emp.logo) || (appState && appState.parametros && appState.parametros.logo) || '';
+    const src = logo || (String(typeof APP_ID !== 'undefined' && APP_ID) === 'record'
+        ? 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#38BDF8" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>')
+        : 'logo-original.png');
+    if (logoImg) logoImg.src = src;
+    if (dashLogo) dashLogo.src = src;
+    if (nombreEl) nombreEl.innerText = (appState && appState.parametros && appState.parametros.nombre_empresa) || (emp && emp.nombre) || '';
+    if (rifEl) rifEl.innerText = (appState && appState.parametros && appState.parametros.rif_empresa) || (emp && emp.rif) || '';
+}
+
 function aplicarParametrosEnVista() {
     const conectado = (typeof esConexionActiva === 'function') ? esConexionActiva() : appState.estadoConexion === 'conectado';
     const demo = (typeof esModoDemo === 'function') ? esModoDemo() : appState.estadoConexion === 'demo';
@@ -433,6 +450,8 @@ function aplicarParametrosEnVista() {
         if (gId('brand-sidebar-rif')) gId('brand-sidebar-rif').innerText = 'J-00000000-0';
         if (gId('badge-uti-dias-base')) gId('badge-uti-dias-base').innerHTML = `<i class="fa-solid fa-scale-balanced mr-1.5"></i> Base: ${appState.parametros.dias_utilidades || 30} Días`;
     }
+
+    if (typeof renderLogoEmpresa === 'function') renderLogoEmpresa();
 
     if (typeof renderTablaTasasMensuales === 'function') renderTablaTasasMensuales();
     if (typeof renderTablaUsuarios === 'function') renderTablaUsuarios();
@@ -673,12 +692,12 @@ async function cargarEmpresasDesdeDb() {
     }
 }
 
-async function guardarEmpresaEnDb(nombre, rif) {
+async function guardarEmpresaEnDb(nombre, rif, logo) {
     // Se permite crear la primera empresa adicional incluso si el despliegue venía
     // en modo empresa única (multiempresaActivo = false).
     if (esModoDemo() || !supabaseClient || !appState.esquemaOk) return null;
     const res = await supabaseClient.from('empresas')
-        .upsert([{ nombre, rif, activo: true }], { onConflict: 'rif' })
+        .upsert([{ nombre, rif, activo: true, logo: logo || null }], { onConflict: 'rif' })
         .select();
     if (res && res.error) throw res.error;
     const datos = Array.isArray(res && res.data) ? res.data : [];
@@ -742,6 +761,8 @@ function abrirModalNuevaEmpresa() {
     }
     if (gId('nueva-empresa-rif')) gId('nueva-empresa-rif').value = '';
     if (gId('nueva-empresa-nombre')) gId('nueva-empresa-nombre').value = '';
+    if (gId('nueva-empresa-logo')) gId('nueva-empresa-logo').value = '';
+    if (gId('nueva-empresa-logo-preview')) gId('nueva-empresa-logo-preview').innerHTML = '';
     openModal('modal-nueva-empresa');
 }
 
@@ -899,11 +920,21 @@ async function crearNuevaEmpresa() {
     }
 
     // Grabar en public.empresas para que la empresa exista en TODOS los equipos, no sólo aquí.
+    let logo = null;
+    const inputLogo = gId('nueva-empresa-logo');
+    if (inputLogo && inputLogo.files && inputLogo.files[0]) {
+        logo = await new Promise((res) => {
+            const r = new FileReader();
+            r.onload = () => res(String(r.result || ''));
+            r.onerror = () => res('');
+            r.readAsDataURL(inputLogo.files[0]);
+        });
+    }
     let nuevoId = null;
     if (!esModoDemo() && appState.esquemaOk) {
         mostrarCargando('Registrando la nueva empresa...');
         try {
-            nuevoId = await guardarEmpresaEnDb(nombre, rif);
+            nuevoId = await guardarEmpresaEnDb(nombre, rif, logo);
             if (!nuevoId) throw new Error('La BD no devolvió el id de la empresa');
             // Desde ahora el despliegue opera en modo multiempresa.
             appState.multiempresaActivo = true;
@@ -916,7 +947,7 @@ async function crearNuevaEmpresa() {
         }
     }
 
-    // Nueva empresa: solo RIF + razón social. El resto se completa luego en esta misma pestaña.
+    // Nueva empresa: solo RIF + razón social + logo. El resto se completa luego en esta misma pestaña.
     appState.parametros = {
         ...appState.parametros,
         nombre_empresa: nombre,
@@ -926,7 +957,7 @@ async function crearNuevaEmpresa() {
         riesgo_ivss: 9,
         aplica_lpp: true
     };
-    const entradaNueva = { id: nuevoId, rif, nombre, activo: true, parametros: JSON.parse(JSON.stringify(appState.parametros)) };
+    const entradaNueva = { id: nuevoId, rif, nombre, activo: true, logo: logo || null, parametros: JSON.parse(JSON.stringify(appState.parametros)) };
     const idx = (appState.empresas || []).findIndex(e => String(e.rif).toUpperCase() === rif);
     if (idx >= 0) appState.empresas[idx] = { ...appState.empresas[idx], ...entradaNueva };
     else appState.empresas.push(entradaNueva);
@@ -982,6 +1013,7 @@ async function cambiarEmpresaActiva(rif) {
     lsSet('nomina_parametros', JSON.stringify(appState.parametros));
     lsSet('nomina_empresa_activa', entrada.rif);
     if (typeof actualizarClienteSupabase === 'function') actualizarClienteSupabase();
+    if (typeof renderLogoEmpresa === 'function') renderLogoEmpresa();
     aplicarParametrosEnVista();
     showToast(`Empresa activa: ${appState.parametros.nombre_empresa}`);
     if (typeof fetchAllData === 'function' && !esEmpresaNueva) {

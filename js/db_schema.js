@@ -277,6 +277,7 @@ function generarSqlMultiEmpresa() {
     L.push('  created_at timestamptz default now(),');
     L.push('  updated_at timestamptz default now()');
     L.push(');');
+    L.push('alter table public.empresas add column if not exists logo text;');
     L.push('');
     L.push('-- 2) Parametros de la empresa en la config');
     L.push('alter table public.parametros_config add column if not exists empresa_id bigint references public.empresas(id);');
@@ -293,7 +294,7 @@ function generarSqlMultiEmpresa() {
     }
     L.push('');
     L.push('-- 4) Crear la empresa inicial (datos actuales) y vincular la config');
-    L.push("insert into public.empresas (nombre, rif, activo) values ('Recordplast', 'J-50685235-7', true) on conflict (rif) do update set nombre = excluded.nombre, activo = excluded.activo;");
+    L.push("insert into public.empresas (nombre, rif, activo, logo) values ('Recordplast', 'J-50685235-7', true, null) on conflict (rif) do update set nombre = excluded.nombre, activo = excluded.activo, logo = excluded.logo;");
     L.push("update public.parametros_config set empresa_id = (select id from public.empresas where rif = 'J-50685235-7' limit 1) where id = 1;");
     L.push('');
     L.push('-- 5) Backfill de los datos existentes hacia la empresa creada');

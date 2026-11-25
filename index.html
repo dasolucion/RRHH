@@ -156,7 +156,7 @@
             <div class="flex-1 min-h-0 overflow-y-auto">
                 <div class="flex items-center space-x-3 px-2 py-3 border-b border-slate-800 mb-4 relative">
                     <button onclick="toggleMobileMenu()" class="md:hidden absolute -top-1 -right-2 text-slate-500 hover:text-white p-2"><i class="fa-solid fa-xmark text-xl"></i></button>
-                    <img src="logo-original.png" alt="DAS RRHH logo" class="h-8 w-auto object-contain drop-shadow-sm" />
+                    <img id="brand-sidebar-logo" src="logo-original.png" alt="DAS RRHH logo" class="h-8 w-auto object-contain drop-shadow-sm" />
                     <div><h1 class="font-bold text-sm tracking-wide text-white" id="brand-sidebar-title">DAS Nómina</h1><p class="text-[10px] text-slate-400" id="brand-sidebar-rif">Control de Pagos & RRHH</p></div>
                 </div>
                 <nav class="space-y-1" id="main-navigation">
@@ -226,6 +226,13 @@
 
             <!-- DASHBOARD -->
             <div id="tab-dashboard-content" class="tab-content space-y-6">
+                <div id="dashboard-brand" class="bg-slate-900 border border-slate-800 rounded-xl p-5 flex items-center space-x-4">
+                    <img id="dashboard-logo" src="logo-original.png" alt="Logo empresa" class="h-12 w-auto object-contain drop-shadow-sm" />
+                    <div class="min-w-0">
+                        <h2 id="dashboard-empresa-nombre" class="font-bold text-sm text-white truncate"></h2>
+                        <p id="dashboard-empresa-rif" class="text-[11px] text-slate-400 font-mono truncate"></p>
+                    </div>
+                </div>
                 <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl"><div class="flex justify-between items-center text-slate-400 mb-2"><span class="text-xs font-medium">Nómina Total Mensual</span><i class="fa-solid fa-dollar-sign text-emerald-400"></i></div><div class="text-2xl font-bold text-white" id="kpi-total-nomina">$0.00</div><span class="text-[10px] text-emerald-400 mt-1 inline-block"><i class="fa-solid fa-calculator"></i> Personal activo</span></div>
                     <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl"><div class="flex justify-between items-center text-slate-400 mb-2"><span class="text-xs font-medium">Empleados Activos</span><i class="fa-solid fa-user-group text-sky-400"></i></div><div class="text-2xl font-bold text-white" id="kpi-total-empleados">0</div><span class="text-[10px] text-slate-400 mt-1 inline-block">Personal activo registrado</span></div>
@@ -1802,6 +1809,11 @@
                 <div>
                     <label class="text-[11px] font-semibold text-slate-400 block mb-1">Razón Social / Nombre Comercial <span class="text-rose-400">*</span></label>
                     <input type="text" id="nueva-empresa-nombre" placeholder="Ej: GRUPO EMPRESARIAL C.A." class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-xs text-white outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="text-[11px] font-semibold text-slate-400 block mb-1">Logo de la Empresa</label>
+                    <input type="file" id="nueva-empresa-logo" accept="image/*" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-white outline-none focus:border-indigo-500 file:mr-3 file:rounded file:border-0 file:bg-slate-800 file:text-[11px] file:text-sky-300">
+                    <div id="nueva-empresa-logo-preview" class="mt-2 flex justify-center"></div>
                 </div>
             </div>
             <div class="p-3 bg-slate-950 border-t border-slate-800 flex justify-end space-x-2">
