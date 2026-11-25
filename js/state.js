@@ -614,15 +614,27 @@ function obtenerEmpresaIdActiva() {
     return appState.empresaActivaId ? Number(appState.empresaActivaId) : null;
 }
 
+// Compatibilidad de esquema detectada en tiempo de ejecución:
+// evita repetir consultas que fallan (columna logo / tabla empresas inexistente).
+let _empresasSinColumnaLogo = false;
+let _empresasSinTabla = false;
+
 async function cargarEmpresasDesdeDb() {
     if (esModoDemo() || !supabaseClient || !appState.esquemaOk) return false;
     try {
         // Compatibilidad: si la columna "logo" aún no existe en public.empresas,
         // se reintenta sin ella en lugar de dejar el sistema sin empresas.
-        let res = await supabaseClient.from('empresas').select('id, nombre, rif, activo, logo').order('id');
-        if (res && res.error) {
-            console.warn('public.empresas sin columna logo, reintentando sin logo:', res.error.message || res.error);
-            res = await supabaseClient.from('empresas').select('id, nombre, rif, activo').order('id');
+        let res;
+        if (_empresasSinTabla) {
+            res = { data: [] };
+        } else {
+            const cols = _empresasSinColumnaLogo ? 'id, nombre, rif, activo' : 'id, nombre, rif, activo, logo';
+            res = await supabaseClient.from('empresas').select(cols).order('id');
+            if (res && res.error) {
+                console.warn('public.empresas sin columna logo, reintentando sin logo:', res.error.message || res.error);
+                _empresasSinColumnaLogo = true;
+                res = await supabaseClient.from('empresas').select('id, nombre, rif, activo').order('id');
+            }
         }
         // Si public.empresas no existe (PGRST205) se usa el modo empresa única de
         // parametros_config; cualquier otro error se reporta como fallo de carga.
@@ -632,6 +644,8 @@ async function cargarEmpresasDesdeDb() {
                 || /could not find the table|does not exist|no existe la relaci/i.test(msgError);
             if (!faltaTabla) return false;
             console.warn('public.empresas no existe; se usa la empresa de parametros_config:', msgError);
+            _empresasSinTabla = true;
+            _empresasSinColumnaLogo = true;
             res = { data: [] };
         }
         const filas = Array.isArray(res && res.data) ? res.data : [];
@@ -733,7 +747,7 @@ async function guardarEmpresaEnDb(nombre, rif, logo) {
     // en modo empresa única (multiempresaActivo = false).
     if (esModoDemo() || !supabaseClient || !appState.esquemaOk) return null;
     const fila = { nombre, rif, activo: true };
-    if (logo) fila.logo = logo;
+    if (logo && !_empresasSinColumnaLogo) fila.logo = logo;
 
     // Intento principal: upsert por RIF.
     let res = await supabaseClient.from('empresas')
@@ -741,6 +755,7 @@ async function guardarEmpresaEnDb(nombre, rif, logo) {
         .select();
     if (res && res.error && fila.logo && /logo/i.test(String(res.error.message || ''))) {
         // Columna logo aún no creada: se guarda la empresa sin logo.
+        _empresasSinColumnaLogo = true;
         delete fila.logo;
         res = await supabaseClient.from('empresas').upsert([fila], { onConflict: 'rif' }).select();
     }
@@ -921,12 +936,14 @@ async function abrirModalEditarEmpresaActiva() {
 async function actualizarEmpresaEnDb(id, nombre, rif, logo) {
     if (esModoDemo() || !supabaseClient || !appState.esquemaOk || !id) return { ok: false, logoGuardado: false };
     const datos = { nombre, rif };
-    if (logo !== undefined) datos.logo = logo;
-    let logoGuardado = logo !== undefined;
+    const incluirLogo = logo !== undefined && !_empresasSinColumnaLogo;
+    if (incluirLogo) datos.logo = logo;
+    let logoGuardado = incluirLogo;
     let res = await supabaseClient.from('empresas').update(datos).eq('id', id);
     if (res && res.error && datos.logo !== undefined && /logo/i.test(String(res.error.message || ''))) {
         // Columna logo aún no creada: guardar al menos nombre/RIF.
         console.warn('public.empresas sin columna logo; se guarda sin logo:', res.error.message || res.error);
+        _empresasSinColumnaLogo = true;
         delete datos.logo;
         logoGuardado = false;
         res = await supabaseClient.from('empresas').update(datos).eq('id', id);
